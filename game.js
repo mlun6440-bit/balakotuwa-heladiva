@@ -1365,6 +1365,7 @@ function endLevel(won) {
   let stars = won ? (pct >= 0.9 ? 3 : pct >= 0.5 ? 2 : 1) : 0;
   // "Let not one drop of rain reach the sea unused": three stars need 70% kept.
   if (S.L.objectives.some(o => o.type === "catch") && rainKept() < 70) stars = Math.min(stars, 2);
+  S.starsEarned = stars;
   if (!won) S.causes = defeatCauses();
   if (S.L.endless) {
     S.survived = Math.max(0, S.nextWave - 1);
