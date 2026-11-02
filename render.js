@@ -286,149 +286,337 @@ function label(text, gx, gy, z, font = "14px sans-serif", color = "#fff") {
   ctx.fillText(text, p.x, p.y);
 }
 
-function drawSprite(key, gx, gy, z = 0) {
-  const s = SPRITES[key];
-  if (!s || !s.img.complete) return false;
-  const p = iso(gx, gy, z), k = s.scale || 1;
-  ctx.drawImage(s.img, p.x - s.ax * k, p.y - s.ay * k, s.img.width * k, s.img.height * k);
-  return true;
+// ==================== TERRAIN ====================
+// The ground is generated per pixel: a smooth colour field (meadow, dry
+// patches, bare earth, gravel near rock, sand and mud along the river, water
+// shaded by depth) with hillshaded elevation and fine grain, then painted
+// over with grass blades, flowers and reeds. No tile diamonds anywhere.
+// Both seasons are baked when a level starts and cross-faded when the season
+// turns. Canvases cover the whole map in world pixels × terrain.scale.
+const terrain = { key: "", S: null, canvases: {}, shown: "", fadeFrom: null, fadeAt: 0, scale: 1.5,
+  ox: MAP * TW / 2 + 20, oy: 60, w: MAP * TW + 40, h: MAP * TH + 120 };
+
+function vnoise(x, y, seed) {
+  const xi = Math.floor(x), yi = Math.floor(y), xf = x - xi, yf = y - yi;
+  const u = xf * xf * (3 - 2 * xf), v = yf * yf * (3 - 2 * yf);
+  const a = hash(xi, yi, seed), b = hash(xi + 1, yi, seed), c = hash(xi, yi + 1, seed), d = hash(xi + 1, yi + 1, seed);
+  return a + (b - a) * u + (c - a) * v + (a - b - c + d) * u * v;
+}
+function fbm(x, y, seed, oct = 4) {
+  let s = 0, amp = 0.5, f = 1;
+  for (let i = 0; i < oct; i++) { s += amp * vnoise(x * f, y * f, seed + i * 13); f *= 2.03; amp *= 0.5; }
+  return s / (1 - Math.pow(0.5, oct));
 }
 
-// ==================== TERRAIN CACHE ====================
-// Static ground (grass texture, shores, river bed, rocks, map skirt) is baked
-// once per level and season into an offscreen canvas at 2× resolution.
-const terrain = { canvas: null, key: "", ox: MAP * TW / 2 + 20, oy: 60, w: MAP * TW + 40, h: MAP * TH + 120, scale: 2 };
+const TERRAIN_SUB = 8; // field samples per tile edge
+// Signed distance to the river bank (negative in water) and distance to rock,
+// sampled on a fine grid. Shared by both seasons and by ambient props.
+function terrainDist() {
+  const N = MAP * TERRAIN_SUB + 1, river = [], rock = [];
+  for (let y = 0; y < MAP; y++) for (let x = 0; x < MAP; x++) {
+    const t = S.tiles[y][x].t;
+    if (t === "river") river.push([x + 0.5, y + 0.5]); else if (t === "rock") rock.push([x + 0.5, y + 0.5]);
+  }
+  const sd = new Float32Array(N * N), rd = new Float32Array(N * N);
+  for (let j = 0; j < N; j++) for (let i = 0; i < N; i++) {
+    const gx = i / TERRAIN_SUB, gy = j / TERRAIN_SUB;
+    let dr = 99, dk = 99;
+    for (const [x, y] of river) { const d = (x - gx) ** 2 + (y - gy) ** 2; if (d < dr) dr = d; }
+    for (const [x, y] of rock) { const d = (x - gx) ** 2 + (y - gy) ** 2; if (d < dk) dk = d; }
+    // river tiles touching the map edge continue off-map
+    sd[j * N + i] = Math.sqrt(dr) - 0.66 + (fbm(gx * 0.9, gy * 0.9, 5, 2) - 0.5) * 0.3;
+    rd[j * N + i] = Math.sqrt(dk);
+  }
+  return { N, sd, rd };
+}
+const sampleField = (F, arr, gx, gy) => {
+  const N = F.N, fx = clamp(gx * TERRAIN_SUB, 0, N - 1.001), fy = clamp(gy * TERRAIN_SUB, 0, N - 1.001);
+  const i = fx | 0, j = fy | 0, u = fx - i, v = fy - j, k = j * N + i;
+  return (arr[k] * (1 - u) + arr[k + 1] * u) * (1 - v) + (arr[k + N] * (1 - u) + arr[k + N + 1] * u) * v;
+};
 
-function bakeTerrain() {
-  const key = `${S.L.id}|${S.season}`;
-  if (terrain.key === key) return;
-  terrain.key = key;
-  if (!terrain.canvas) terrain.canvas = document.createElement("canvas");
-  const c = terrain.canvas;
-  c.width = terrain.w * terrain.scale;
-  c.height = terrain.h * terrain.scale;
+function terrainColours(season, D) {
+  const N = D.N, col = new Float32Array(N * N * 3);
+  const yala = season === "yala";
+  const amp = [6, 5, 10, 5, 18][S.idx] ?? 8;
+  const hgt = new Float32Array(N * N);
+  for (let j = 0; j < N; j++) for (let i = 0; i < N; i++) {
+    const gx = i / TERRAIN_SUB, gy = j / TERRAIN_SUB, k = j * N + i;
+    const sd = D.sd[k], rd = D.rd[k];
+    hgt[k] = fbm(gx * 0.16, gy * 0.16, 31, 3) * amp + Math.max(0, 1.6 - rd) * 5 - (sd < 0.6 ? (0.6 - sd) * 4 : 0);
+  }
+  const lush = yala ? [146, 138, 72] : [70, 118, 44], lush2 = yala ? [168, 150, 86] : [96, 138, 54];
+  const dry = yala ? [184, 156, 100] : [120, 130, 62], earth = yala ? [160, 126, 84] : [118, 92, 58];
+  const sand = yala ? [204, 184, 136] : [176, 156, 112], mud = yala ? [150, 124, 86] : [104, 86, 58];
+  const gravel = [138, 128, 110], shallow = [86, 150, 156], deep = [26, 78, 108];
+  const mix = (a, b, t) => [a[0] + (b[0] - a[0]) * t, a[1] + (b[1] - a[1]) * t, a[2] + (b[2] - a[2]) * t];
+  for (let j = 0; j < N; j++) for (let i = 0; i < N; i++) {
+    const gx = i / TERRAIN_SUB, gy = j / TERRAIN_SUB, k = j * N + i;
+    const sd = D.sd[k], rd = D.rd[k];
+    let c;
+    if (sd < 0) {
+      const t = Math.min(1, -sd / 0.9);
+      c = mix(shallow, deep, Math.sqrt(t));
+      if (sd > -0.07) c = mix(c, [220, 232, 228], 0.55 * (1 + sd / 0.07)); // foam line
+      const n = fbm(gx * 1.4 + 3, gy * 1.4, 9, 2);
+      c = mix(c, [120, 170, 190], (n - 0.5) * 0.25 + 0.05);
+    } else {
+      const n1 = fbm(gx * 0.35, gy * 0.35, 1), n2 = fbm(gx * 0.7 + 11, gy * 0.7, 2), n3 = fbm(gx * 2.2, gy * 2.2, 3, 2);
+      c = mix(lush, lush2, clamp(n1 * 1.4 - 0.2, 0, 1));
+      c = mix(c, dry, clamp((n2 - 0.58) * 4, 0, 1) * (yala ? 0.9 : 0.6));
+      c = mix(c, earth, clamp((n3 - 0.72) * 5, 0, 0.7));
+      if (rd < 1.05) c = mix(c, gravel, clamp((1.05 - rd) / 0.6, 0, 0.55));
+      if (sd < 0.6) c = mix(c, sd < 0.18 ? mud : sand, clamp((0.6 - sd) / 0.35, 0, 1));
+      // hillshade from the height field, light from the upper left
+      const hx = hgt[Math.min(k + 1, N * N - 1)] - hgt[Math.max(k - 1, 0)], hy = hgt[Math.min(k + N, N * N - 1)] - hgt[Math.max(k - N, 0)];
+      const sh = clamp(1 - (hx * 0.7 - hy * 0.7) * 0.11 + (hgt[k] / (amp + 6)) * 0.08, 0.72, 1.18);
+      c = [c[0] * sh, c[1] * sh, c[2] * sh];
+    }
+    col[k * 3] = c[0]; col[k * 3 + 1] = c[1]; col[k * 3 + 2] = c[2];
+  }
+  return col;
+}
+
+function buildTerrain(season, D) {
+  const sc = terrain.scale, W = Math.round(terrain.w * sc), H = Math.round(terrain.h * sc);
+  const col = terrainColours(season, D), N = D.N;
+  const field = document.createElement("canvas"); field.width = W; field.height = H;
+  const fx = field.getContext("2d");
+  const img = fx.createImageData(W, H), d = img.data;
+  const hw = TW / 2, hh = TH / 2;
+  for (let py = 0; py < H; py++) {
+    const wy = py / sc - terrain.oy;
+    for (let px = 0; px < W; px++) {
+      const wx = px / sc - terrain.ox;
+      const gx = (wx / hw + wy / hh) / 2, gy = (wy / hh - wx / hw) / 2;
+      if (gx < 0 || gy < 0 || gx >= MAP || gy >= MAP) continue;
+      const fxp = gx * TERRAIN_SUB, fyp = gy * TERRAIN_SUB, i = fxp | 0, j = fyp | 0, u = fxp - i, v = fyp - j, k = j * N + i;
+      const w00 = (1 - u) * (1 - v), w10 = u * (1 - v), w01 = (1 - u) * v, w11 = u * v;
+      // cheap per-pixel grain
+      let h = (px * 374761393 + py * 668265263) | 0; h = Math.imul(h ^ (h >>> 13), 1274126177);
+      const gr = 1 + (((h >>> 16) & 255) / 255 - 0.5) * 0.09;
+      const o = (py * W + px) * 4;
+      for (let ch = 0; ch < 3; ch++) {
+        d[o + ch] = (col[k * 3 + ch] * w00 + col[(k + 1) * 3 + ch] * w10 + col[(k + N) * 3 + ch] * w01 + col[(k + N + 1) * 3 + ch] * w11) * gr;
+      }
+      d[o + 3] = 255;
+    }
+  }
+  fx.putImageData(img, 0, 0);
+
+  const c = document.createElement("canvas"); c.width = W; c.height = H;
   const saved = { ctx, camX: view.camX, camY: view.camY };
   ctx = c.getContext("2d");
-  ctx.setTransform(terrain.scale, 0, 0, terrain.scale, 0, 0);
+  ctx.setTransform(sc, 0, 0, sc, 0, 0);
   view.camX = terrain.ox; view.camY = terrain.oy;
   try {
-    drawSkirt();
-    for (let y = 0; y < MAP; y++) for (let x = 0; x < MAP; x++) drawTile(x, y);
-    for (let y = 0; y < MAP; y++) for (let x = 0; x < MAP; x++) if (S.tiles[y][x].t === "rock") drawRock(x, y);
-  } finally {
-    ctx = saved.ctx; view.camX = saved.camX; view.camY = saved.camY;
+    drawSkirt(season);
+    ctx.drawImage(field, 0, 0, terrain.w, terrain.h);
+    paintGroundDetail(season, D);
+  } finally { ctx = saved.ctx; view.camX = saved.camX; view.camY = saved.camY; }
+  return c;
+}
+
+function drawSkirt(season) {
+  const depth = 54, top = season === "yala" ? "#8a6a42" : "#6e5232";
+  const sides = [[iso(0, MAP), iso(MAP, MAP), 0.92], [iso(MAP, MAP), iso(MAP, 0), 0.66]];
+  for (const [a, b, f] of sides) {
+    const g = ctx.createLinearGradient(0, Math.min(a.y, b.y), 0, Math.max(a.y, b.y) + depth);
+    g.addColorStop(0, shade(top, f)); g.addColorStop(1, shade("#2a1e12", f));
+    poly([a, b, { x: b.x, y: b.y + depth }, { x: a.x, y: a.y + depth }], g);
+    for (let k = 1; k < 6; k++) {
+      const off = k * 8 + hash(k, f) * 3;
+      ctx.strokeStyle = `rgba(30,18,8,${0.15 + 0.05 * k})`; ctx.lineWidth = 0.8;
+      ctx.beginPath();
+      for (let i = 0; i <= 40; i++) { const t = i / 40, x = a.x + (b.x - a.x) * t, y = a.y + (b.y - a.y) * t + off + Math.sin(t * 30 + k) * 1.2; i ? ctx.lineTo(x, y) : ctx.moveTo(x, y); }
+      ctx.stroke();
+    }
+    // stones in the cut
+    for (let i = 0; i < 60; i++) {
+      const t = hash(i, f, 3), x = a.x + (b.x - a.x) * t, y = a.y + (b.y - a.y) * t + 6 + hash(i, 4) * (depth - 10);
+      ctx.fillStyle = `rgba(${150 * f | 0},${135 * f | 0},${110 * f | 0},0.6)`;
+      ctx.beginPath(); ctx.ellipse(x, y, 1 + hash(i, 5) * 2.5, 0.8 + hash(i, 6) * 1.2, 0, 0, Math.PI * 2); ctx.fill();
+    }
+    // grass lip
+    ctx.strokeStyle = season === "yala" ? "#9a8a48" : "#4f7a2c"; ctx.lineWidth = 2;
+    ctx.beginPath(); ctx.moveTo(a.x, a.y + 0.5); ctx.lineTo(b.x, b.y + 0.5); ctx.stroke();
   }
 }
 
-function drawSkirt() {
-  const depth = 46;
-  for (let i = 0; i < MAP; i++) {
-    const a = iso(i, MAP), b = iso(i + 1, MAP);
-    poly([a, b, { x: b.x, y: b.y + depth }, { x: a.x, y: a.y + depth }], shade(PAL.earth, 0.85 + hash(i, 1) * 0.1));
-    const c = iso(MAP, i), d = iso(MAP, i + 1);
-    poly([c, d, { x: d.x, y: d.y + depth }, { x: c.x, y: c.y + depth }], shade(PAL.earth, 0.6 + hash(i, 2) * 0.08));
+function paintGroundDetail(season, D) {
+  const yala = season === "yala";
+  const blades = yala ? ["#c4b46a", "#9a8a46", "#b8a05a", "#7e7a3e"] : ["#7fb04f", "#4f8a34", "#3d6b2a", "#93c060"];
+  ctx.lineWidth = 0.6;
+  for (let y = 0; y < MAP; y++) for (let x = 0; x < MAP; x++) {
+    const t = S.tiles[y][x].t;
+    if (t === "river") continue;
+    const n = t === "rock" ? 6 : 26;
+    for (let i = 0; i < n; i++) {
+      const u = hash(x, y, i), v = hash(x, y, i + 50);
+      const gx = x + u, gy = y + v;
+      const sd = sampleField(D, D.sd, gx, gy);
+      if (sd < 0.12) continue;
+      const p = iso(gx, gy, 0);
+      const len = 1.6 + hash(x, y, i + 90) * (sd < 0.5 ? 4.5 : 2.6);
+      ctx.strokeStyle = blades[(hash(x, y, i + 7) * blades.length) | 0];
+      ctx.beginPath(); ctx.moveTo(p.x, p.y); ctx.lineTo(p.x + (u - 0.5) * 2.2, p.y - len); ctx.stroke();
+    }
+    // wildflowers
+    if (t === "grass" && hash(x, y, 99) > 0.82) {
+      const cols = yala ? ["#e8c060", "#d9a040", "#f0e0b0"] : ["#f4e3f0", "#f2c94c", "#e68aa6", "#ffffff", "#b9a0e8"];
+      const cx = x + 0.2 + hash(x, y, 3) * 0.6, cy = y + 0.2 + hash(x, y, 4) * 0.6;
+      for (let i = 0; i < 9; i++) {
+        const p = iso(cx + (hash(x, i, 8) - 0.5) * 0.3, cy + (hash(i, y, 9) - 0.5) * 0.3, 0);
+        ctx.fillStyle = cols[(hash(x, y, i) * cols.length) | 0];
+        ctx.fillRect(p.x, p.y - 1.4, 1.3, 1.3);
+      }
+    }
+    // pebbles near rock
+    if (t !== "rock" && sampleField(D, D.rd, x + 0.5, y + 0.5) < 1.6) for (let i = 0; i < 5; i++) {
+      const p = iso(x + hash(x, y, i + 30), y + hash(x, y, i + 40), 0);
+      ctx.fillStyle = `rgba(${150 + hash(i, x) * 40 | 0},${142 + hash(i, y) * 30 | 0},${125},0.85)`;
+      ctx.beginPath(); ctx.ellipse(p.x, p.y, 1 + hash(x, i) * 1.4, 0.7 + hash(y, i) * 0.6, 0, 0, Math.PI * 2); ctx.fill();
+    }
   }
-  // Strata lines
-  for (let k = 1; k < 4; k++) {
-    const off = k * 11;
-    line({ x: iso(0, MAP).x, y: iso(0, MAP).y + off }, { x: iso(MAP, MAP).x, y: iso(MAP, MAP).y + off }, "rgba(40,25,10,0.35)", 1);
-    line({ x: iso(MAP, 0).x, y: iso(MAP, 0).y + off }, { x: iso(MAP, MAP).x, y: iso(MAP, MAP).y + off }, "rgba(30,18,8,0.35)", 1);
-  }
-}
-
-const isRiver = (x, y) => inb(x, y) && S.tiles[y][x].t === "river";
-
-function drawTile(x, y) {
-  const t = S.tiles[y][x];
-  const yala = S.season === "yala";
-  if (t.t === "river") {
-    let shoreN = 0;
-    for (const [dx, dy] of DIRS8) if (!isRiver(x + dx, y + dy) && inb(x + dx, y + dy)) shoreN++;
-    const deep = shoreN === 0;
-    diamond(x, y, 1, 1, 0, deep ? "#1d5a80" : "#2f7ea4");
-    if (!deep) diamond(x + 0.15, y + 0.15, 0.7, 0.7, 0, "rgba(29,90,128,0.6)");
-    return;
-  }
-  // Large-scale meadow variation plus per-tile jitter.
-  const n = 0.5 + 0.25 * Math.sin(x * 0.45) * Math.cos(y * 0.37) + 0.25 * t.v;
-  const base = yala ? [142 + n * 30, 140 + n * 22, 70 + n * 10] : [62 + n * 26, 116 + n * 34, 44 + n * 12];
-  diamond(x, y, 1, 1, 0, `rgb(${base[0] | 0},${base[1] | 0},${base[2] | 0})`);
-
-  // Grass blades and specks
-  for (let i = 0; i < 9; i++) {
-    const u = hash(x, y, i), v = hash(x, y, i + 20);
-    const p = iso(x + u, y + v, 0);
-    const lit = hash(x, y, i + 40) > 0.5;
-    line(p, { x: p.x + (u - 0.5) * 2, y: p.y - 3 }, yala ? (lit ? "#b9b46a" : "#7e7a3e") : (lit ? "#7fb04f" : "#3d6b2a"), 1);
-  }
-  if (hash(x, y, 99) > 0.9) {
-    const p = iso(x + hash(x, y, 3), y + hash(x, y, 4), 0);
-    ctx.fillStyle = yala ? "#e0c070" : ["#f4e3f0", "#f2c94c", "#e68aa6"][Math.floor(hash(x, y, 5) * 3)];
-    for (let i = 0; i < 4; i++) ctx.fillRect(p.x + (i % 2) * 3, p.y + (i >> 1) * 2 - 1, 1.6, 1.6);
-  }
-  if (hash(x, y, 77) > 0.93) diamond(x + 0.25, y + 0.3, 0.45, 0.35, 0, "rgba(120,90,50,0.35)");
-
-  // Sandy shore along river edges
-  const shore = [[0, -1, x, y, 1, 0.2], [0, 1, x, y + 0.8, 1, 0.2], [-1, 0, x, y, 0.2, 1], [1, 0, x + 0.8, y, 0.2, 1]];
-  for (const [dx, dy, sx, sy, sw, sh] of shore) {
-    if (isRiver(x + dx, y + dy)) diamond(sx, sy, sw, sh, 0, PAL.sand);
+  // reeds and lilies along the banks
+  for (let j = 0; j < MAP * 3; j++) for (let i = 0; i < MAP * 3; i++) {
+    const gx = (i + hash(i, j, 1)) / 3, gy = (j + hash(i, j, 2)) / 3;
+    const sd = sampleField(D, D.sd, gx, gy);
+    if (sd > -0.12 && sd < 0.12 && hash(i, j, 3) < 0.5) drawSprite(`reeds.${(hash(i, j, 4) * 3) | 0}`, gx, gy);
+    else if (sd < -0.35 && sd > -0.7 && hash(i, j, 5) < 0.04 && !yala) drawSprite("lotus.1", gx, gy);
   }
 }
 
-function drawRock(x, y) {
-  diamond(x, y, 1, 1, 0, "#7c766b");
-  const n = 2 + Math.floor(hash(x, y, 7) * 2);
-  for (let i = 0; i < n; i++) {
-    const s = 0.32 + hash(x, y, i + 8) * 0.25;
-    const ox = 0.1 + hash(x, y, i + 11) * (0.85 - s), oy = 0.1 + hash(x, y, i + 13) * (0.85 - s);
-    const hgt = 5 + hash(x, y, i + 15) * 11;
-    box(x + ox, y + oy, s, s, 0, hgt, "#9a9387");
-    const t = iso(x + ox + s * 0.3, y + oy + s * 0.3, hgt);
-    ctx.fillStyle = "rgba(255,255,255,0.12)";
-    ctx.fillRect(t.x - 3, t.y - 1, 5, 2);
+// ==================== CACHED LAYERS ====================
+// Footpaths: soft earth worn in wherever villagers walk.
+const paths = { canvas: null, S: null, last: 0, scale: 0.5 };
+function wearPaths() {
+  if (paths.S !== S) {
+    paths.S = S; paths.last = 0;
+    paths.canvas = paths.canvas || document.createElement("canvas");
+    paths.canvas.width = Math.round(terrain.w * paths.scale); paths.canvas.height = Math.round(terrain.h * paths.scale);
   }
+  if (S.time - paths.last < 0.25) return;
+  paths.last = S.time;
+  const x = paths.canvas.getContext("2d"), k = paths.scale;
+  x.fillStyle = "rgba(118,92,58,0.045)";
+  for (const w of S.workers) {
+    if (w.phase !== "toSite" && w.phase !== "toStore") continue;
+    const px = ((w.gx - w.gy) * TW / 2 + terrain.ox) * k, py = ((w.gx + w.gy) * TH / 2 + terrain.oy) * k;
+    x.beginPath(); x.ellipse(px, py, 5 * k * 2, 2.6 * k * 2, 0, 0, Math.PI * 2); x.fill();
+  }
+}
+
+// Soft cast shadows of every standing thing, rebuilt only when the world changes.
+const shadows = { canvas: null, key: "", scale: 1 };
+function shadowKey() {
+  let t = 0;
+  for (const tr of S.trees) t += tr.stage >= 35 ? (tr.stage / 20) | 0 : 0;
+  return `${S.idx}|${S.buildings.length}|${S.uid}|${S.trees.length}|${t}|${atlas.version}|${amb.props ? amb.props.size : 0}`;
+}
+function bakeShadows() {
+  const key = shadowKey();
+  if (key === shadows.key && shadows.S === S) return;
+  shadows.key = key; shadows.S = S;
+  const c = shadows.canvas || (shadows.canvas = document.createElement("canvas"));
+  c.width = terrain.w; c.height = terrain.h;
+  const saved = { ctx, camX: view.camX, camY: view.camY, zoom: view.zoom, dpr: view.dpr };
+  ctx = c.getContext("2d");
+  view.camX = terrain.ox; view.camY = terrain.oy; view.zoom = 1; view.dpr = 1;
+  try {
+    for (const t of S.trees) {
+      if (t.stage < 35) continue;
+      drawSprite(`${treeSpriteKey(t)}#sh`, t.gx, t.gy, 0, { scale: treeScale(t) });
+    }
+    for (const b of S.buildings) {
+      if (b.def.ground && b.id !== "sluice" || b.id === "wewa") { if (b.id === "wewa") drawSprite("wewa.front#sh", b.gx, b.gy); continue; }
+      if (b.def.wall && b.id !== "gate") { for (const k of wallKeys(b)) drawSprite(`${k}#sh`, b.gx, b.gy); continue; }
+      drawSprite(`${buildingKey(b)}#sh`, b.gx, b.gy);
+    }
+    for (const r of amb.rocks || []) drawSprite(`rock.${r.v}#sh`, r.x, r.y);
+    for (const [, list] of amb.props || []) for (const pr of list) drawSprite(`${pr.key}#sh`, pr.gx, pr.gy);
+    for (const bu of amb.bushes || []) drawSprite(`bush.maha.${bu.v}#sh`, bu.gx, bu.gy);
+  } finally { ctx = saved.ctx; Object.assign(view, { camX: saved.camX, camY: saved.camY, zoom: saved.zoom, dpr: saved.dpr }); }
+}
+
+function bakeTerrain() {
+  const key = `${S.idx}|${atlas.version}`;
+  if (terrain.key !== key || terrain.S !== S && terrain.key.split("|")[0] !== String(S.idx)) {
+    terrain.key = key; terrain.S = S;
+    const D = terrainDist();
+    terrain.D = D;
+    terrain.canvases = { maha: buildTerrain("maha", D), yala: buildTerrain("yala", D) };
+    terrain.shown = S.season; terrain.fadeFrom = null;
+  }
+  if (terrain.S !== S) { terrain.S = S; terrain.shown = S.season; terrain.fadeFrom = null; }
+  if (terrain.shown !== S.season) { terrain.fadeFrom = terrain.shown; terrain.fadeAt = performance.now(); terrain.shown = S.season; }
+  if (amb.S !== S) resetAmbient();
 }
 
 // ==================== FRAME ====================
 function render(now) {
   bakeTerrain();
   const zs = view.zoom * view.dpr;
+  ctx.imageSmoothingEnabled = true;
 
   ctx.setTransform(1, 0, 0, 1, 0, 0);
   const bg = ctx.createLinearGradient(0, 0, 0, canvas.height);
-  bg.addColorStop(0, S.season === "maha" ? "#1a2a33" : "#2a2a22");
+  bg.addColorStop(0, S.season === "maha" ? "#1c2b33" : "#2e2a20");
   bg.addColorStop(1, "#0b1214");
   ctx.fillStyle = bg;
   ctx.fillRect(0, 0, canvas.width, canvas.height);
 
   ctx.setTransform(zs, 0, 0, zs, 0, 0);
-  ctx.drawImage(terrain.canvas, view.camX - terrain.ox, view.camY - terrain.oy, terrain.w, terrain.h);
+  const tx = view.camX - terrain.ox, ty = view.camY - terrain.oy;
+  if (terrain.fadeFrom) {
+    const k = (now - terrain.fadeAt) / 4000;
+    if (k >= 1) terrain.fadeFrom = null;
+    else { ctx.drawImage(terrain.canvases[terrain.fadeFrom], tx, ty, terrain.w, terrain.h); ctx.globalAlpha = k; }
+  }
+  ctx.drawImage(terrain.canvases[terrain.shown], tx, ty, terrain.w, terrain.h);
+  ctx.globalAlpha = 1;
+  wearPaths();
+  ctx.drawImage(paths.canvas, tx, ty, terrain.w, terrain.h);
   drawWaterShimmer(now);
 
   for (const b of S.buildings) if (b.def.ground || b.id === "wewa") drawGround(b, now);
 
+  updateAmbient(now);
+  bakeShadows();
+  ctx.globalAlpha = S.season === "maha" ? 0.3 : 0.38;
+  ctx.drawImage(shadows.canvas, tx, ty, terrain.w, terrain.h);
+  ctx.globalAlpha = 1;
+  if (!hasSprite("citadel")) {
+    for (const b of S.buildings) if (!b.def.ground && b.id !== "wewa") groundShadow(b.gx, b.gy, b.w, b.h, b.def.z || 18);
+  }
+  drawRuins();
+
   drawHoverTile();
   drawWaveMarkers(now);
-
-  // Shadows under everything standing
-  for (const t of S.trees) if (t.stage >= 35 && onScreen(t.gx, t.gy)) {
-    const s = 0.5 + 0.5 * t.stage / 100;
-    diamond(t.gx - 0.15 * s + 0.25, t.gy - 0.3 * s, 0.55 * s, 0.4 * s, 0, "rgba(10,25,5,0.25)");
-  }
-  for (const b of S.buildings) if (!b.def.ground && b.id !== "wewa") groundShadow(b.gx, b.gy, b.w, b.h, b.def.z || 18);
 
   // Depth-sorted world objects
   const list = [];
   for (const t of S.trees) if (onScreen(t.gx, t.gy)) list.push([t.gx + t.gy, 0, t]);
-  for (const b of S.buildings) if (!b.def.ground && b.id !== "wewa") list.push([b.gx + b.gy + b.w + b.h - 1.2, 1, b]);
+  for (const b of S.buildings) {
+    if (!b.def.ground && b.id !== "wewa") list.push([b.gx + b.gy + b.w + b.h - 1.2, 1, b]);
+    else if (b.id === "sluice") list.push([b.gx + b.gy + 1, 1, b]);
+  }
   for (const w of S.workers) list.push([w.gx + w.gy, 2, w]);
   for (const u of S.units) list.push([u.gx + u.gy + (u.z ? 1 : 0), 3, u]);
+  for (const r of amb.rocks) if (onScreen(r.x + 0.5, r.y + 0.5)) list.push([r.x + r.y + 1.0, 4, r]);
+  for (const bu of amb.bushes) if (!buildingAt(Math.floor(bu.gx), Math.floor(bu.gy)) && onScreen(bu.gx, bu.gy)) list.push([bu.gx + bu.gy, 5, bu]);
+  for (const [, pl] of amb.props) for (const pr of pl) if (propFree(pr)) list.push([pr.gx + pr.gy, 6, pr]);
+  for (const a of amb.animals) if (onScreen(a.gx, a.gy)) list.push([a.gx + a.gy, 7, a]);
   list.sort((a, b) => a[0] - b[0]);
   for (const [, kind, o] of list) {
     if (kind === 0) drawTree(o, now);
-    else if (kind === 1) drawBuilding(o, now);
+    else if (kind === 1) { if (o.id === "sluice") drawSluice(o); else drawBuilding(o, now); }
     else if (kind === 2) drawWorker(o, now);
-    else drawUnit(o, now);
+    else if (kind === 3) drawUnit(o, now);
+    else if (kind === 4) { if (!drawSprite(`rock.${o.v}`, o.x, o.y)) drawRock(o.x, o.y); }
+    else if (kind === 5) drawSprite(`bush.${S.season}.${o.v}`, o.gx, o.gy);
+    else if (kind === 6) drawSprite(o.key, o.gx, o.gy);
+    else drawAnimal(o, now);
   }
 
   drawGhost();
@@ -447,32 +635,59 @@ function render(now) {
     ctx.strokeRect(Math.min(x1, x2), Math.min(y1, y2), Math.abs(x2 - x1), Math.abs(y2 - y1));
   }
 
-  // Screen-space atmosphere
+  // Screen-space atmosphere and seasonal grading
   ctx.setTransform(view.dpr, 0, 0, view.dpr, 0, 0);
-  if (S.season === "maha") drawRain(now);
-  else { ctx.fillStyle = "rgba(255,190,110,0.05)"; ctx.fillRect(0, 0, view.w, view.h); }
+  if (S.season === "maha") {
+    ctx.fillStyle = "rgba(40,70,90,0.07)"; ctx.fillRect(0, 0, view.w, view.h);
+    drawRain(now);
+  } else {
+    const g = ctx.createLinearGradient(0, 0, view.w, view.h);
+    g.addColorStop(0, "rgba(255,214,140,0.10)"); g.addColorStop(1, "rgba(255,170,90,0.04)");
+    ctx.fillStyle = g; ctx.fillRect(0, 0, view.w, view.h);
+  }
   const vg = ctx.createRadialGradient(view.w / 2, view.h / 2, Math.min(view.w, view.h) * 0.35, view.w / 2, view.h / 2, Math.max(view.w, view.h) * 0.75);
   vg.addColorStop(0, "rgba(0,0,0,0)");
-  vg.addColorStop(1, "rgba(0,0,0,0.42)");
+  vg.addColorStop(1, "rgba(0,0,0,0.38)");
   ctx.fillStyle = vg;
   ctx.fillRect(0, 0, view.w, view.h);
 }
 
-function onScreen(gx, gy, pad = 80) {
+function onScreen(gx, gy, pad = 90) {
   const p = iso(gx, gy);
   const W = view.w / view.zoom, H = view.h / view.zoom;
   return p.x > -pad && p.x < W + pad && p.y > -pad && p.y < H + pad * 2;
 }
 
 function drawWaterShimmer(now) {
-  const step = Math.floor(now / 350);
+  const step = Math.floor(now / 400);
+  ctx.lineWidth = 0.8;
   for (let y = 0; y < MAP; y++) for (let x = 0; x < MAP; x++) {
-    if (!isRiver(x, y)) continue;
-    const h = hash(x, y, step % 7);
-    if (h > 0.55) continue;
-    const drift = (now * 0.00025 + hash(x, y, 1)) % 1;
-    const p = iso(x + drift, y + hash(x, y, 2) * 0.8 + 0.1, 0);
-    line({ x: p.x - 5, y: p.y }, { x: p.x + 5, y: p.y }, `rgba(220,240,255,${0.15 + 0.3 * (1 - h)})`, 1);
+    if (!isRiver(x, y) || !onScreen(x, y)) continue;
+    for (let i = 0; i < 2; i++) {
+      const h = hash(x * 3 + i, y, step % 9);
+      if (h > 0.6) continue;
+      const drift = (now * 0.00018 + hash(x, y, i + 1)) % 1;
+      const p = iso(x + drift, y + hash(x, y, i + 2) * 0.8 + 0.1, 0);
+      const a = Math.sin(drift * Math.PI) * (0.18 + 0.3 * (1 - h));
+      ctx.strokeStyle = `rgba(225,242,255,${a})`;
+      ctx.beginPath(); ctx.moveTo(p.x - 4, p.y); ctx.quadraticCurveTo(p.x, p.y - 0.8, p.x + 4, p.y); ctx.stroke();
+    }
+  }
+}
+
+const isRiver = (x, y) => inb(x, y) && S.tiles[y][x].t === "river";
+
+function drawRock(x, y) {
+  diamond(x, y, 1, 1, 0, "#7c766b");
+  const n = 2 + Math.floor(hash(x, y, 7) * 2);
+  for (let i = 0; i < n; i++) {
+    const s = 0.32 + hash(x, y, i + 8) * 0.25;
+    const ox = 0.1 + hash(x, y, i + 11) * (0.85 - s), oy = 0.1 + hash(x, y, i + 13) * (0.85 - s);
+    const hgt = 5 + hash(x, y, i + 15) * 11;
+    box(x + ox, y + oy, s, s, 0, hgt, "#9a9387");
+    const t = iso(x + ox + s * 0.3, y + oy + s * 0.3, hgt);
+    ctx.fillStyle = "rgba(255,255,255,0.12)";
+    ctx.fillRect(t.x - 3, t.y - 1, 5, 2);
   }
 }
 
@@ -1037,8 +1252,24 @@ function treeKind(t) {
   return t.kind;
 }
 
+const treeScale = t => 0.5 + 0.5 * (t.stage / 100);
+function treeSpriteKey(t) {
+  const k = treeKind(t);
+  return `tree.${k === "palm" ? "palm" : k}.${S.season}.${Math.floor(hash(t.gx * 7, t.gy * 7, 2) * 3)}`;
+}
 function drawTree(t, now) {
   if (drawSprite("tree", t.gx, t.gy)) return;
+  if (hasSprite("stump")) {
+    if (t.stage < 12) { drawSprite("stump", t.gx, t.gy); return; }
+    if (t.stage < 35) { drawSprite(`tree.sapling.${S.season}`, t.gx, t.gy, 0, { scale: 0.6 + t.stage / 60 }); return; }
+    // gentle sway: draw the tree twice? no — a tiny horizontal skew is enough
+    const sway = Math.sin(now * 0.0012 + t.gx * 3 + t.gy) * 0.012;
+    const p = iso(t.gx, t.gy, 0);
+    ctx.save(); ctx.translate(p.x, p.y); ctx.transform(1, 0, sway, 1, 0, 0); ctx.translate(-p.x, -p.y);
+    drawSprite(treeSpriteKey(t), t.gx, t.gy, 0, { scale: treeScale(t), flip: hash(t.gx, t.gy, 9) > 0.5 });
+    ctx.restore();
+    return;
+  }
   const p = iso(t.gx, t.gy, 0);
   if (t.stage < 35) {
     ctx.fillStyle = "#6b4426"; ctx.beginPath(); ctx.ellipse(p.x, p.y - 2, 3.5, 2, 0, 0, Math.PI * 2); ctx.fill();

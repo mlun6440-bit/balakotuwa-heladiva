@@ -75,7 +75,7 @@ function saveProgress() {
 let S = null; // current level state
 let progress = loadProgress();
 // camX/camY are in world pixels at zoom 1; w/h are the viewport in CSS pixels.
-const view = { camX: 0, camY: 0, zoom: 1, w: 0, h: 0, dpr: 1 };
+const view = { camX: 0, camY: 0, zoom: 0.9, w: 0, h: 0, dpr: 1 };
 const input = { hover: { gx: -1, gy: -1, x: 0, y: 0 }, panning: false, panFrom: null, drag: null, painting: false, lastPaint: "" };
 const audio = { on: false, ctx: null };
 
@@ -875,7 +875,7 @@ function centerCamera(gx, gy) {
 
 // Zoom about a screen point (CSS pixels) so the world under the cursor stays put.
 function zoomAt(factor, sx = view.w / 2, sy = view.h / 2) {
-  const z0 = view.zoom, z1 = clamp(z0 * factor, 0.55, 2.2);
+  const z0 = view.zoom, z1 = clamp(z0 * factor, 0.45, 2.6);
   view.camX += sx / z1 - sx / z0;
   view.camY += sy / z1 - sy / z0;
   view.zoom = z1;
