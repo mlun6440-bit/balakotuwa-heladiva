@@ -51,7 +51,7 @@ const BUILDINGS = {
                 desc: "Drop-off for timber and stone." },
 
   pansala:    { name: "Pansala (Monastery)", cat: "town", icon: "🪷", w: 2, h: 2, hp: 600, cost: { timber: 20, stone: 12, gold: 20 }, solid: true, z: 34, worker: "monk",
-                desc: "A monk on alms rounds adds +5 harmony (up to two pansalas)." },
+                desc: "A monk on alms rounds: +5 harmony (two count)." },
   house:      { name: "Gedara (House)", cat: "town", icon: "🏠", w: 1, h: 1, hp: 220, cost: { timber: 8 }, solid: true, flammable: true, z: 18, pop: 5, upgrade: { to: "walawwa", cost: { timber: 10, stone: 8, gold: 15 } },
                 desc: "Room for 5 more villagers." },
   walawwa:    { name: "Walawwa (Manor)", cat: null, icon: "🏡", w: 1, h: 1, hp: 420, cost: { timber: 18, stone: 8, gold: 15 }, solid: true, z: 24, pop: 8, harmony: 1,
@@ -60,15 +60,15 @@ const BUILDINGS = {
                 desc: "+12 harmony (counts up to two)." },
 
   palisade:   { name: "Palisade", cat: "defence", icon: "🪵", w: 1, h: 1, hp: 320, cost: { timber: 3 }, solid: true, flammable: true, wall: true, z: 20, paint: true, upgrade: { to: "rampart", cost: { stone: 4 } },
-                desc: "Cheap wall raiders must break through; archers on it are out of their swords' reach." },
+                desc: "Cheap wall; archers on it are safe from swords." },
   thorn:      { name: "Katu Wetiya (Thorn barrier)", cat: "defence", icon: "🌿", w: 1, h: 1, hp: 140, cost: { timber: 1 }, ground: true, thorn: true, flammable: true, paint: true,
-                desc: "Cheap brush that slows and scratches raiders pushing through, but burns easily." },
+                desc: "Slows and scratches raiders pushing through; burns easily." },
   rampart:    { name: "Gal Bamma (Rampart)", cat: "defence", icon: "🧱", w: 1, h: 1, hp: 950, cost: { stone: 5 }, solid: true, wall: true, z: 26, paint: true,
-                desc: "Heavy stone wall; archers on it are out of melee reach and shoot 40% farther." },
+                desc: "Stone wall; archers on it are safe from swords and shoot farther." },
   gate:       { name: "Vahalkada (Gate)", cat: "defence", icon: "⛩️", w: 1, h: 1, hp: 900, cost: { timber: 8, stone: 6 }, solid: true, wall: true, z: 30,
                 desc: "Your soldiers pass through; raiders must break it." },
   tower:      { name: "Atuwa (Watchtower)", cat: "defence", icon: "🗼", w: 1, h: 1, hp: 750, cost: { timber: 12, stone: 10 }, solid: true, z: 48,
-                tower: { range: 5.5, dmg: 12, cd: 1.1 }, desc: "Shoots raiders within 5.5 tiles; archers on it get +40% range." },
+                tower: { range: 5.5, dmg: 12, cd: 1.1 }, desc: "Shoots raiders within 5.5 tiles; archers on it shoot farther." },
   barracks:   { name: "Angam Maduwa (Barracks)", cat: "defence", icon: "⚔️", w: 2, h: 2, hp: 700, cost: { timber: 18, stone: 8 }, solid: true, z: 22,
                 desc: "Needed to train soldiers in the Army tab." }
 };
@@ -79,7 +79,7 @@ const BUILDINGS = {
 const EDICTS = {
   rajakariya: { name: "Rajakariya (Royal service)", icon: "🛠️", cost: { rice: 15 }, once: "season", dur: 30, harmony: -8,
                 work: 1.6, buildDiscount: 0.3,
-                desc: "For 30s villagers work 60% faster and building costs 30% less, at −8 harmony." },
+                desc: "30s of faster work and 30% cheaper building, at −8 harmony." },
   perahera:   { name: "Perahera (Festival)", icon: "🐘", cost: { rice: 40, gold: 30 }, once: "maha", dur: 60, harmony: 6,
                 harmonyTarget: 25,
                 desc: "Once per Maha, a 60s procession lifts harmony towards +25." }
@@ -205,7 +205,7 @@ const LEVELS = [
     forests: [[2, 9, 8, 16, 0.4], [9, 19, 16, 25, 0.4], [18, 8, 24, 13, 0.35]],
     unlocks: { edicts: ["rajakariya", "perahera"] }, fireArrows: true,
     waves: [
-      { t: 140, from: ["east"], raider: 6, bowman: 2 },
+      { t: 180, from: ["east"], raider: 5, bowman: 2 },
       { t: 230, from: ["south"], raider: 6, bowman: 3 },
       { t: 320, from: ["north"], raider: 7, bowman: 3, brute: 1 },
       { t: 410, from: ["east", "south"], raider: 8, bowman: 4, brute: 1 },

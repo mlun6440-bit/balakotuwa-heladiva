@@ -1315,6 +1315,9 @@ function callRaidEarly() {
   launchWave();
 }
 
+// Soldiers eat more than villagers: a standing army has a real cost.
+const SOLDIER_RICE = 0.06;
+
 // ==================== ONE-SECOND TICK ====================
 function tick() {
   S.seasonLeft--;
@@ -1331,7 +1334,11 @@ function tick() {
   while (nextWaveIn() <= 0) launchWave();
   if (nextWaveIn() === 20 && S.warnedWave !== S.nextWave) {
     S.warnedWave = S.nextWave;
-    say(`Scouts report raiders from the ${S.L.waves[S.nextWave].from.join(" and ")} in 20 seconds.`, true);
+    const from = S.L.waves[S.nextWave].from;
+    const fresh = from.filter(e => !S.L.waves.slice(0, S.nextWave).some(w => w.from.includes(e)));
+    say(fresh.length && S.nextWave > 0
+      ? `Scouts report raiders coming from the ${fresh.join(" and ")} for the first time, in 20 seconds! That side may have no towers or archers yet.`
+      : `Scouts report raiders from the ${from.join(" and ")} in 20 seconds.`, true);
   }
 
   tickWater();
@@ -1348,7 +1355,7 @@ function tick() {
 
   // Economy & harmony
   const soldiers = S.units.filter(u => u.team === "p").length;
-  S.rice = Math.max(0, S.rice - S.villagers * 0.04 - soldiers * 0.03);
+  S.rice = Math.max(0, S.rice - S.villagers * 0.04 - soldiers * SOLDIER_RICE);
   S.gold += S.villagers * 0.02 * (S.harmony / 60);
   S.fear = Math.max(0, S.fear - 0.5);
 
@@ -1918,7 +1925,7 @@ function showEnd(won, starCount) {
         ? (S.idx + 1 === LEVELS.length ? "The hill kingdom endures. You have completed the campaign." : "The kingdom is fed and the walls still stand. A new region awaits.")
         : "Raiders breached the Maligawa."}</p>
       ${!won && S.causes ? `<div class="causes"><b>Why it fell</b><ul>${S.causes.map(c => `<li>${c}</li>`).join("")}</ul></div>` : ""}
-      ${S.rain.caught + S.rain.lost > 0 ? `<p>🌧️ Rain kept: <b>${rainKept()}%</b>${S.L.objectives.some(o => o.type === "catch") ? (rainKept() >= 70 ? " · Parakramabahu would be pleased." : " · Below 70%: too much rain reached the sea for three stars.") : ""}</p>` : ""}
+      ${S.L.objectives.some(o => o.type === "catch") && S.rain.caught + S.rain.lost > 0 ? `<p>🌧️ Rain kept: <b>${rainKept()}%</b>${S.L.objectives.some(o => o.type === "catch") ? (rainKept() >= 70 ? " · Parakramabahu would be pleased." : " · Below 70%: too much rain reached the sea for three stars.") : ""}</p>` : ""}
       ${won && !S.L.endless && S.stats.tributes ? `<p>🪙 Tribute paid ${S.stats.tributes} time${S.stats.tributes > 1 ? "s" : ""}: a kingdom that buys peace earns at most two stars.</p>` : ""}
       <div class="actions">
         ${hasNext ? `<button class="btn primary" id="nextBtn">Next level ▶</button>` : ""}

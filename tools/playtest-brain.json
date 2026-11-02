@@ -4,20 +4,20 @@
   "1": {
    "P": {
     "paddyPerHouse": 1.31,
-    "houseRice": 4.68,
+    "houseRice": 2.36,
     "maxHouses": 3.68,
     "woodcutters": 3.3,
     "barracksAt": 0,
-    "armyBase": 7.72,
+    "armyBase": 3.89,
     "armyPerRaid": 5,
     "towersPerEdge": 3,
-    "towerAt": 161.91,
-    "walls": 5.25,
+    "towerAt": 372.67,
+    "walls": 3.61,
     "tribute": 0,
     "reserve": 0.16,
     "decrees": 0.67
    },
-   "sigma": 0.28257609999999994,
+   "sigma": 0.44152515624999994,
    "history": [
     {
      "at": "2026-11-02T11:25",
@@ -93,27 +93,37 @@
      "at": "2026-11-02T11:42",
      "gen": 15,
      "score": 1385
+    },
+    {
+     "at": "2026-11-02T11:46",
+     "gen": 16,
+     "score": 1385
+    },
+    {
+     "at": "2026-11-02T11:46",
+     "gen": 17,
+     "score": 1385
     }
    ],
    "score": 1385
   },
   "2": {
    "P": {
-    "paddyPerHouse": 1.45,
+    "paddyPerHouse": 2,
     "houseRice": 0.5,
-    "maxHouses": 30.62,
-    "woodcutters": 3.66,
-    "barracksAt": 0,
+    "maxHouses": 40,
+    "woodcutters": 3.02,
+    "barracksAt": 20.01,
     "armyBase": 10,
-    "armyPerRaid": 4.84,
-    "towersPerEdge": 1.97,
-    "towerAt": 0,
-    "walls": 12,
+    "armyPerRaid": 2.21,
+    "towersPerEdge": 1.85,
+    "towerAt": 13.87,
+    "walls": 3.07,
     "tribute": 0,
-    "reserve": 0.56,
+    "reserve": 0.87,
     "decrees": 1
    },
-   "sigma": 0.5,
+   "sigma": 0.41,
    "history": [
     {
      "at": "2026-11-02T11:25",
@@ -189,19 +199,29 @@
      "at": "2026-11-02T11:42",
      "gen": 15,
      "score": 1380
+    },
+    {
+     "at": "2026-11-02T11:46",
+     "gen": 16,
+     "score": 1379
+    },
+    {
+     "at": "2026-11-02T11:46",
+     "gen": 17,
+     "score": 1379
     }
    ],
-   "score": 1380
+   "score": 1379
   },
   "3": {
    "P": {
     "paddyPerHouse": 0.94,
     "houseRice": 0.68,
     "maxHouses": 3,
-    "woodcutters": 1.53,
-    "barracksAt": 54.81,
-    "armyBase": 1.59,
-    "armyPerRaid": 3.75,
+    "woodcutters": 1.74,
+    "barracksAt": 0,
+    "armyBase": 0,
+    "armyPerRaid": 4.66,
     "towersPerEdge": 2.81,
     "towerAt": 0,
     "walls": 0,
@@ -209,7 +229,7 @@
     "reserve": 1,
     "decrees": 0.67
    },
-   "sigma": 0.3714642980213165,
+   "sigma": 0.38075090547184937,
    "history": [
     {
      "at": "2026-11-02T11:25",
@@ -285,6 +305,16 @@
      "at": "2026-11-02T11:42",
      "gen": 15,
      "score": 1375
+    },
+    {
+     "at": "2026-11-02T11:46",
+     "gen": 16,
+     "score": 1375
+    },
+    {
+     "at": "2026-11-02T11:46",
+     "gen": 17,
+     "score": 1375
     }
    ],
    "score": 1375
@@ -292,20 +322,20 @@
   "4": {
    "P": {
     "paddyPerHouse": 2,
-    "houseRice": 0.73,
+    "houseRice": 1.22,
     "maxHouses": 8.95,
     "woodcutters": 1,
-    "barracksAt": 52.53,
-    "armyBase": 9.18,
+    "barracksAt": 47.09,
+    "armyBase": 10,
     "armyPerRaid": 5,
     "towersPerEdge": 0.91,
     "towerAt": 0,
     "walls": 1.85,
     "tribute": 0.57,
-    "reserve": 0.57,
-    "decrees": 0.41
+    "reserve": 0.46,
+    "decrees": 0.29
    },
-   "sigma": 0.15580341910479995,
+   "sigma": 0.1596985045824199,
    "history": [
     {
      "at": "2026-11-02T11:26",
@@ -381,27 +411,37 @@
      "at": "2026-11-02T11:42",
      "gen": 15,
      "score": 1275
+    },
+    {
+     "at": "2026-11-02T11:46",
+     "gen": 16,
+     "score": 1275
+    },
+    {
+     "at": "2026-11-02T11:46",
+     "gen": 17,
+     "score": 1275
     }
    ],
    "score": 1275
   },
   "5": {
    "P": {
-    "paddyPerHouse": 1.51,
+    "paddyPerHouse": 2,
     "houseRice": 5,
     "maxHouses": 3.71,
-    "woodcutters": 3.62,
-    "barracksAt": 119.25,
+    "woodcutters": 2.02,
+    "barracksAt": 100.11,
     "armyBase": 0.25,
-    "armyPerRaid": 5,
-    "towersPerEdge": 1.33,
+    "armyPerRaid": 3.61,
+    "towersPerEdge": 1.45,
     "towerAt": 0,
-    "walls": 0,
+    "walls": 9.2,
     "tribute": 0,
     "reserve": 1,
-    "decrees": 1
+    "decrees": 0.59
    },
-   "sigma": 0.3714642980213163,
+   "sigma": 0.5,
    "history": [
     {
      "at": "2026-11-02T11:26",
@@ -477,9 +517,19 @@
      "at": "2026-11-02T11:43",
      "gen": 15,
      "score": 1354
+    },
+    {
+     "at": "2026-11-02T11:47",
+     "gen": 16,
+     "score": 1248
+    },
+    {
+     "at": "2026-11-02T11:47",
+     "gen": 17,
+     "score": 1299
     }
    ],
-   "score": 1354
+   "score": 1299
   }
  }
 }
