@@ -588,6 +588,7 @@ function updateWorker(w, dt) {
         if (b && S.buildings.includes(b) && b.fire > 0) {
           b.fire = Math.max(0, b.fire - 1);
           spawnFloat("💧", w.gx, w.gy, "#9fd8ff");
+          sfx("splash");
         }
         if (b && b.fire > 0 && S.buildings.includes(b)) seekWater(w);
         else { w.fireTarget = null; if (w.temp) S.workers = S.workers.filter(x => x !== w); else planJob(w); }
@@ -633,7 +634,7 @@ function updateWorker(w, dt) {
         w.timer -= dt * workMult();
         if (w.timer <= 0) {
           w.timer = 6;
-          if (S.rice > 30) { S.rice -= 5; S.gold += 8; spawnFloat("-5🍚 +8🪙", w.gx, w.gy, "#e9b949"); }
+          if (S.rice > 30) { S.rice -= 5; S.gold += 8; spawnFloat("-5🍚 +8🪙", w.gx, w.gy, "#e9b949"); sfx("coin"); }
         }
       }
       break;
@@ -1126,6 +1127,7 @@ function frame(now) {
     for (let sim = realDt * S.speed; sim > 0 && S.mode === "play"; sim -= 0.1) step(Math.min(0.1, sim));
   }
   if (S) { render(now); renderMinimap(); }
+  if (typeof SOUND !== "undefined") SOUND.update();
 }
 
 // Rendering lives in render.js.
@@ -1476,22 +1478,12 @@ function showEnd(won, starCount) {
 // ==================== AUDIO ====================
 function unlockAudio() {
   if (!audio.on) return;
-  try { audio.ctx = audio.ctx || new AudioContext(); audio.ctx.resume(); } catch (e) { audio.on = false; }
+  try { audio.ctx = audio.ctx || new AudioContext(); audio.ctx.resume(); } catch (e) { audio.on = false; return; }
+  if (typeof SOUND !== "undefined") SOUND.init();
 }
-
+// Effects are synthesised in audio.js.
 function sfx(kind) {
-  if (!audio.on || !audio.ctx) return;
-  const spec = { build: [330, 0.08, "triangle"], conch: [146, 0.9, "sawtooth"], harvest: [660, 0.1, "sine"], hit: [110, 0.05, "square"], win: [523, 0.6, "triangle"], lose: [98, 0.8, "sawtooth"], fire: [80, 0.3, "sawtooth"] }[kind];
-  try {
-    const o = audio.ctx.createOscillator(), g = audio.ctx.createGain();
-    o.type = spec[2];
-    o.frequency.value = spec[0];
-    g.gain.setValueAtTime(0.08, audio.ctx.currentTime);
-    g.gain.exponentialRampToValueAtTime(0.0001, audio.ctx.currentTime + spec[1]);
-    o.connect(g).connect(audio.ctx.destination);
-    o.start();
-    o.stop(audio.ctx.currentTime + spec[1]);
-  } catch (e) { /* audio unavailable */ }
+  if (audio.on && typeof SOUND !== "undefined") SOUND.play(kind);
 }
 
 // ==================== INPUT ====================
