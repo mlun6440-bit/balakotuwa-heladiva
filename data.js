@@ -198,7 +198,7 @@ const LEVELS = [
     id: "senkadagala", name: "Hill Kingdom", era: "Senkadagala", seed: 71,
     intro: "The last free kingdom in the hills, and the home of the Perahera. Raiders come from three sides. Use royal decrees to rally your people and keep the citadel standing.",
     citadel: [13, 13], season: "maha",
-    start: { timber: 160, stone: 100, rice: 110, gold: 180, villagers: 16 },
+    start: { timber: 160, stone: 100, rice: 190, gold: 180, villagers: 16 },
     army: { spearman: 4, archer: 4, angampora: 2 },
     rivers: [{ edge: "west", at: 1, width: 1, wobble: 2 }],
     rocks: [[3, 3, 7, 6], [20, 20, 24, 24], [19, 3, 22, 6]],
