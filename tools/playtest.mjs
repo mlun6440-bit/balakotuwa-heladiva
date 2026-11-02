@@ -200,7 +200,7 @@ function report(results) {
   }
   L.push(...F.map(f => `- ${f}`), "");
   L.push("## Bot limits (so findings aren't over-read)", "",
-    "- The bots never open sluices, never use forest ambush on purpose, never repair or upgrade except for harmony, and never call raids early.",
+    "- The bots never open sluices, never use forest ambush on purpose, never repair or upgrade except for harmony, and never call raids early. The planner does send its melee soldiers out against stone throwers.",
     "- They place buildings by simple rules (near the citadel, near water or forest), not by reading the map like a person.",
     "- Raids involve randomness; a single run per bot is a sample, not a verdict. Learning averages several runs per candidate.", "");
   L.push("## Learning history", "");

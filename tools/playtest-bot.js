@@ -255,6 +255,11 @@ const BOT = (() => {
     const target = novice ? (raidSoon || under ? 3 : 0) : Math.round(P.armyBase + S.nextWave * P.armyPerRaid);
     army(target, style);
     if (raidSoon || under) rally(nextFrom()[0]);
+    // sally out: melee soldiers go after siege engines that outrange the walls
+    const engine = !novice && S.units.find(u => u.team === "e" && u.def.siege && u.hp > 0);
+    if (engine) S.units.filter(u => u.team === "p" && !u.def.ranged).forEach((u, i) => {
+      u.tx = clamp(engine.gx + (i % 3 - 1) * 0.3, 0.3, MAP - 0.3); u.ty = clamp(engine.gy + 0.3, 0.3, MAP - 0.3); u.ordered = true;
+    });
 
     // decrees
     if (!novice && P.decrees >= 0.5 && S.unlocked.edicts.has("perahera") && !edictBlocked("perahera") && S.harmony < 65) { proclaim("perahera"); note("perahera"); }
