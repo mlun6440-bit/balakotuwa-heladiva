@@ -15,13 +15,13 @@ const SEASONS = {
   yala: { len: 60, label: "☀️ Yala dry season", next: "maha" }
 };
 
-const RES = { timber: "🪵", stone: "🪨", rice: "🍚", gold: "🪙" };
+const RES = { timber: "🪵", stone: "🪨", rice: "🍚", gold: "🪙", arms: "🗡️" };
 
 // ==================== BUILDINGS ====================
 // solid: blocks raiders (they must break it). ground: flat, walkable.
 // worker: job type staffed by one villager. store: drop-off for those resources.
 const BUILDINGS = {
-  citadel:    { name: "Maligawa (Citadel)", cat: null, icon: "🏯", w: 2, h: 2, hp: 2500, solid: true, z: 40, store: ["timber", "stone", "rice"],
+  citadel:    { name: "Maligawa (Citadel)", cat: null, icon: "🏯", w: 2, h: 2, hp: 2500, solid: true, z: 40, store: ["timber", "stone", "rice", "arms"],
                 tower: { range: 4.5, dmg: 8, cd: 1.3 } },
 
   wewa:       { name: "Wewa (Tank)", cat: "water", icon: "💧", w: 2, h: 2, hp: 700, cost: { timber: 10, stone: 6 }, solid: true, water: true, z: 5,
@@ -42,6 +42,8 @@ const BUILDINGS = {
                 desc: "Fells mature trees within 9 tiles." },
   quarry:     { name: "Gal Wala (Quarry)", cat: "industry", icon: "⛏️", w: 1, h: 1, hp: 260, cost: { timber: 10 }, solid: true, z: 16, worker: "mason", needsRock: true,
                 desc: "Cuts stone. Must stand within 2 tiles of rock." },
+  kammala:    { name: "Kammala (Smithy)", cat: "industry", icon: "⚒️", w: 1, h: 1, hp: 260, cost: { timber: 10, stone: 4 }, solid: true, z: 20, worker: "smith",
+                desc: "A smith fetches 3 timber and forges 1 weapon (🗡️) for the barracks. Archers, spearmen and elephants need weapons." },
   storehouse: { name: "Gabadawa (Storehouse)", cat: "industry", icon: "📦", w: 2, h: 2, hp: 400, cost: { timber: 12 }, solid: true, z: 18, store: ["timber", "stone"],
                 desc: "Drop-off for timber and stone." },
 
@@ -60,7 +62,7 @@ const BUILDINGS = {
                 desc: "Your soldiers pass through; raiders must break it." },
   tower:      { name: "Atuwa (Watchtower)", cat: "defence", icon: "🗼", w: 1, h: 1, hp: 750, cost: { timber: 12, stone: 10 }, solid: true, z: 48,
                 tower: { range: 5.5, dmg: 12, cd: 1.1 }, desc: "Shoots raiders within 5.5 tiles. Archers on it get +40% range." },
-  barracks:   { name: "Angam Maduwa (Barracks)", cat: "defence", icon: "⚔️", w: 2, h: 2, hp: 700, cost: { timber: 18, stone: 8 }, solid: true, z: 22,
+  barracks:   { name: "Angam Maduwa (Barracks)", cat: "defence", icon: "⚔️", w: 2, h: 2, hp: 700, cost: { timber: 18, stone: 8 }, solid: true, z: 22, store: ["arms"],
                 desc: "Needed to train soldiers in the Army tab." }
 };
 
@@ -89,13 +91,13 @@ const CATS = [
 // ==================== SOLDIERS & RAIDERS ====================
 // Training a soldier costs one idle villager as well as the listed resources.
 const TROOPS = {
-  archer:    { name: "Dunuvaya (Archer)", icon: "🏹", cost: { gold: 15, rice: 5 }, hp: 70, dmg: 11, range: 5, speed: 1.8, ranged: true, color: "#2f8f4e",
+  archer:    { name: "Dunuvaya (Archer)", icon: "🏹", cost: { gold: 15, rice: 5, arms: 1 }, hp: 70, dmg: 11, range: 5, speed: 1.8, ranged: true, color: "#2f8f4e",
                desc: "Ranged. Stand on walls or towers for extra range." },
-  spearman:  { name: "Hella (Spearman)", icon: "🔱", cost: { gold: 10, rice: 5 }, hp: 130, dmg: 14, range: 0.9, speed: 2.0, color: "#2d6fa8",
+  spearman:  { name: "Hella (Spearman)", icon: "🔱", cost: { gold: 10, rice: 5, arms: 1 }, hp: 130, dmg: 14, range: 0.9, speed: 2.0, color: "#2d6fa8",
                desc: "Sturdy melee guard." },
   angampora: { name: "Angampora Fighter", icon: "🥋", cost: { gold: 22, rice: 8 }, hp: 170, dmg: 24, range: 0.9, speed: 2.6, color: "#d2902a",
-               desc: "Fast, hard-hitting martial artist." },
-  elephant:  { name: "Kandula (War Elephant)", icon: "🐘", cost: { gold: 70, rice: 25 }, hp: 560, dmg: 38, range: 1.2, speed: 1.4, heavy: true, splash: 1.3, color: "#6e6e74",
+               desc: "Fast, hard-hitting martial artist. Trained in Angampora, needs no forged weapon." },
+  elephant:  { name: "Kandula (War Elephant)", icon: "🐘", cost: { gold: 70, rice: 25, arms: 2 }, hp: 560, dmg: 38, range: 1.2, speed: 1.4, heavy: true, splash: 1.3, color: "#6e6e74",
                desc: "Tramples every raider near its target." }
 };
 
@@ -113,13 +115,13 @@ const LEVELS = [
     id: "anuradhapura", name: "Dawn at Anuradhapura", era: "Early kingdom", seed: 11,
     intro: "A young settlement beside the river. Cut timber, dig your first wewa and fill the granary before raiders come out of the east.",
     citadel: [11, 12], season: "maha",
-    start: { timber: 70, stone: 20, rice: 60, gold: 60, villagers: 8 },
+    start: { timber: 70, stone: 20, rice: 60, gold: 60, villagers: 8, arms: 4 },
     prebuilt: [["house", 9, 15]],
     army: { spearman: 2, archer: 1 },
     rivers: [{ edge: "west", at: 1, width: 2, wobble: 1.2 }],
     rocks: [[16, 3, 20, 6]],
     forests: [[3, 4, 9, 9, 0.55], [4, 18, 10, 24, 0.5], [19, 18, 24, 24, 0.45]],
-    unlocks: { buildings: ["woodcutter", "quarry", "storehouse", "house", "wewa", "canal", "paddy", "bissa", "palisade", "barracks"], troops: ["spearman", "archer"] },
+    unlocks: { buildings: ["woodcutter", "quarry", "storehouse", "house", "wewa", "canal", "paddy", "bissa", "palisade", "barracks", "kammala"], troops: ["spearman", "archer"] },
     waves: [{ t: 170, from: ["east"], raider: 3 }, { t: 290, from: ["east"], raider: 4, bowman: 1 }],
     hpScale: 1.0,
     objectives: [{ type: "res", key: "timber", n: 100 }, { type: "build", id: "wewa", n: 1 }, { type: "res", key: "rice", n: 80 }, { type: "waves" }],
@@ -129,7 +131,7 @@ const LEVELS = [
     id: "dryzone", name: "The Dry Zone", era: "Rajarata", seed: 23,
     intro: "The rains here are short. Store every drop in wewas and canals. A sluice gate can flood those canals under the raiders' feet.",
     citadel: [13, 13], season: "yala",
-    start: { timber: 110, stone: 40, rice: 70, gold: 90, villagers: 10 },
+    start: { timber: 110, stone: 40, rice: 70, gold: 90, villagers: 10, arms: 6 },
     army: { spearman: 3, archer: 2 },
     rivers: [{ edge: "north", at: 0, width: 1, wobble: 1 }],
     rocks: [[3, 18, 7, 23], [20, 4, 23, 7]],
@@ -143,7 +145,7 @@ const LEVELS = [
     id: "lionrock", name: "Lion Rock", era: "Sigiriya", seed: 37,
     intro: "Your citadel sits beneath a great rock. Quarry granite, raise ramparts and open a market to pay for Angampora fighters.",
     citadel: [12, 12], season: "maha",
-    start: { timber: 120, stone: 60, rice: 80, gold: 120, villagers: 12 },
+    start: { timber: 120, stone: 60, rice: 80, gold: 120, villagers: 12, arms: 8 },
     army: { spearman: 3, archer: 3 },
     rivers: [{ edge: "west", at: 0, width: 2, wobble: 1.5 }],
     rocks: [[15, 6, 19, 9], [5, 16, 8, 19]],
@@ -162,7 +164,7 @@ const LEVELS = [
     id: "parakrama", name: "Sea of Parakrama", era: "Polonnaruwa", seed: 53,
     intro: "\"Let not one drop of rain reach the sea unused.\" Chain your wewas with canals so a full tank spills into the next, raise a dagoba, and beware the ram bearers.",
     citadel: [14, 11], season: "yala",
-    start: { timber: 140, stone: 80, rice: 90, gold: 150, villagers: 14 },
+    start: { timber: 140, stone: 80, rice: 90, gold: 150, villagers: 14, arms: 10 },
     army: { spearman: 4, archer: 3, angampora: 1 },
     lakes: [[5, 6, 3]],
     rivers: [{ edge: "south", at: 0, width: 2, wobble: 1 }],
@@ -183,7 +185,7 @@ const LEVELS = [
     id: "senkadagala", name: "Hill Kingdom", era: "Senkadagala", seed: 71,
     intro: "The last free kingdom in the hills. Raiders come from three sides. Hide soldiers in the forest to ambush them, keep your people fed and content, and the citadel standing.",
     citadel: [13, 13], season: "maha",
-    start: { timber: 160, stone: 100, rice: 110, gold: 180, villagers: 16 },
+    start: { timber: 160, stone: 100, rice: 110, gold: 180, villagers: 16, arms: 12 },
     army: { spearman: 4, archer: 4, angampora: 2 },
     rivers: [{ edge: "west", at: 1, width: 1, wobble: 2 }],
     rocks: [[3, 3, 7, 6], [20, 20, 24, 24], [19, 3, 22, 6]],
@@ -209,6 +211,7 @@ const TUTORIAL = [
   { when: () => count("woodcutter") > 0, text: "Good. Now dig a Wewa (Water tab). In the Maha monsoon, rain fills it." },
   { when: () => count("wewa") > 0, text: "Lay Ela canals from the wewa and plant Kumbura paddies beside them. In the dry Yala season, only watered paddies grow." },
   { when: () => count("paddy") > 0, text: "Farmers carry rice to the citadel. Build Gedara houses so more villagers come to work." },
-  { when: () => nextWaveIn() <= 30, text: "Raiders gather in the east! Train soldiers at the Angam Maduwa and close the gaps with palisades." }
+  { when: () => nextWaveIn() <= 30, text: "Raiders gather in the east! Train soldiers at the Angam Maduwa and close the gaps with palisades." },
+  { when: () => count("barracks") > 0, text: "Soldiers need weapons 🗡️. A Kammala smithy (Industry tab) forges spears and bows from timber." }
 ];
 

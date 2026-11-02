@@ -164,6 +164,30 @@ ART.add("quarry", () => {
   for (let i = 0; i < 20; i++) at(rr(0.1, 0.9), rr(0.6, 0.95), 0.7, c => { c.fillStyle = pick(["#cfc8ba", "#a49d90", "#8d877c"]); c.fillRect(0, 0, rr(0.5, 1.2), rr(0.4, 0.8)); });
 }, { size: 140 });
 
+// Kammala (smithy): open forge shed, clay hearth with glowing coals, anvil, bellows, racks of spears.
+ART.add("kammala", () => {
+  box(0.05, 0.05, 0, 0.9, 0.9, 0.6, { top: { col: "#6a5a48", tex: TEX.earth }, left: M.earth, right: M.earth }, { edges: false });
+  // roofed workshop at the back
+  box(0.08, 0.08, 0.6, 0.84, 0.36, 11, { top: M.mud, left: M.mud, right: M.mud }, { ao: 2, eave: 3, top: false });
+  doorL(0.35, 0.55, 0.44, 0.6, 8.5);
+  hipRoof(0.02, 0.02, 0.96, 0.48, 11.6, 9, M.tileDark, { hip: 1 });
+  // open-air hearth with glowing coals and a clay chimney
+  box(0.14, 0.56, 0.6, 0.3, 0.28, 4, { top: { col: "#3a2216" }, left: M.mud, right: M.mud });
+  at(0.29, 0.7, 4.6, c => {
+    const gr = c.createRadialGradient(0, 0, 0, 0, 0, 5.5); gr.addColorStop(0, "#fff4b0"); gr.addColorStop(0.3, "#ff9a28"); gr.addColorStop(1, "rgba(140,30,0,0)");
+    c.fillStyle = gr; c.beginPath(); c.ellipse(0, 0, 5.5, 2.6, 0, 0, 7); c.fill();
+  });
+  lathe(0.2, 0.62, [[0.06, 4.6], [0.045, 10], [0.03, 15]], M.mud, { seg: 10 });
+  box(0.46, 0.6, 0.6, 0.14, 0.1, 2.4, { col: "#5a3a22", tex: TEX.plain }); // bellows
+  latheAt([0.66, 0.78, 0.6], [[0.07, 0], [0.065, 3]], { col: "#5a4028" }, { seg: 10 });
+  box(0.6, 0.74, 3.6, 0.14, 0.08, 1.8, { col: "#4a4c50", tex: TEX.plain });
+  // rack of finished spears
+  for (let i = 0; i < 4; i++) {
+    gline([0.9, 0.52 + i * 0.1, 0.6], [0.88, 0.5 + i * 0.1, 15], "#7a5530", 0.6);
+    gline([0.88, 0.5 + i * 0.1, 15], [0.88, 0.5 + i * 0.1, 17.5], "#cfd3d6", 0.8);
+  }
+}, { size: 140 });
+
 // Storehouse (Gabadawa): long tiled hall, wide doors, crates and sacks.
 ART.add("storehouse", () => {
   box(0.05, 0.05, 0, 1.9, 1.9, 0.5, M.earth, { edges: false, top: true });

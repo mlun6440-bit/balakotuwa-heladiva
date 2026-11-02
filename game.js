@@ -150,7 +150,7 @@ function startLevel(idx, mode = "brief") {
     idx, L, tiles, trees,
     unlocked: unlockedFor(idx),
     buildings: [], occ: [], workers: [], units: [], shots: [], floats: [], spawnQueue: [],
-    timber: L.start.timber, stone: L.start.stone, rice: L.start.rice, gold: L.start.gold,
+    timber: L.start.timber, stone: L.start.stone, rice: L.start.rice, gold: L.start.gold, arms: L.start.arms || 0,
     villagers: L.start.villagers, cap: 0, harmony: 60, fear: 0,
     season: L.season, seasonLeft: SEASONS[L.season].len,
     time: 0, tickAcc: 0, waveClock: 0, nextWave: 0,
@@ -484,6 +484,11 @@ function planJob(w) {
     }
     if (!best) { goTo(w, hx, hy + 0.6, "wait"); w.timer = 3; return; }
     goTo(w, best[0] + 0.5, best[1] + 0.9, "toSite");
+  } else if (w.job === "smith") {
+    // Fetch timber from a store, then forge it into a weapon at the kammala.
+    if (S.timber < 3) { goTo(w, hx, hy + 0.7, "wait"); w.timer = 4; return; }
+    const st = nearestStore(w, "timber");
+    goTo(w, st.gx + st.w / 2, st.gy + st.h + 0.2, "fetch");
   } else if (w.job === "monk") {
     // Alternate between the alms round (a house) and meditation at the pansala.
     const houses = S.buildings.filter(h => h.id === "house");
@@ -529,9 +534,18 @@ function updateWorker(w, dt) {
       w.timer -= dt * workMult();
       if (w.timer <= 0) planJob(w);
       break;
+    case "fetch":
+      if (walk(w, dt)) {
+        if (S.timber < 3) { planJob(w); break; }
+        S.timber -= 3;
+        w.carry = { key: "timber", n: 3 };
+        goTo(w, w.b.gx + 0.5, w.b.gy + 1.2, "toSite");
+      }
+      break;
     case "toSite":
       if (walk(w, dt)) {
-        if (w.job === "woodcutter" || w.job === "mason") { w.phase = "work"; w.timer = w.job === "mason" ? 4.5 : 3.5; }
+        if (w.job === "smith") { w.carry = null; w.phase = "work"; w.timer = 7; }
+        else if (w.job === "woodcutter" || w.job === "mason") { w.phase = "work"; w.timer = w.job === "mason" ? 4.5 : 3.5; }
         else { w.phase = "tend"; w.timer = 6; }
       }
       break;
@@ -544,6 +558,8 @@ function updateWorker(w, dt) {
         if (!t || !S.trees.includes(t)) { planJob(w); break; }
         t.stage = 0; t.reserved = false;
         carryHome(w, "timber", 5);
+      } else if (w.job === "smith") {
+        carryHome(w, "arms", 1);
       } else {
         carryHome(w, "stone", 4);
       }

@@ -244,6 +244,7 @@ const LOOKS = {
   "v.farmer": { skin: SKIN.villager, upper: "#f2efe6", lower: "#3d6fa8", lowerBand: "#e8e2d0", head: { kind: "turban", col: "#f4f1e8" }, sleeves: false, item: ITEMS.hoe, work: "work" },
   "v.woodcutter": { skin: SKIN.villager, bare: true, lower: "#a8321e", lowerBand: "#e9b949", head: {}, item: ITEMS.axe, work: "work", short: true },
   "v.mason": { skin: SKIN.villager, upper: "#e8e0d0", lower: "#6b4a2a", head: { kind: "turban", col: "#c9b48a" }, item: ITEMS.hammer, work: "work", short: true },
+  "v.smith": { skin: SKIN.villager, bare: true, lower: "#3a3028", lowerBand: "#7a5a30", head: { kind: "turban", col: "#8a6a4a" }, item: ITEMS.hammer, work: "work", short: true, beard: "#2a1a10", sash: "#5a3a22" },
   "v.monk": { skin: SKIN.villager, upper: "#d9822b", lower: "#d9822b", lowerBand: "#b8641c", head: { kind: "shaved" }, sleeves: true, sash: "#b8641c", item: ITEMS.bowl, offItem: ITEMS.talapata, work: "work" },
   "v.trader": { skin: SKIN.villager, upper: "#e9b949", lower: "#f2efe6", lowerBand: "#a8321e", head: { kind: "turban", col: "#a8321e" }, sleeves: true, item: ITEMS.scales, work: "work", beard: "#2a1a10" },
   // soldiers
@@ -289,6 +290,22 @@ const LOADS = {
   stone(c) { // basket of cut stone on the head
     c.fillStyle = "#8a6a3a"; c.beginPath(); c.ellipse(0.5, -21, 3.6, 1.4, 0, 0, Math.PI); c.lineTo(-3.1, -21); c.fill();
     for (const [x, y] of [[-1.5, -22.4], [1, -22.8], [2.6, -22], [0, -23.6]]) { c.fillStyle = css(jit("#b8b2a6", 0.1)); c.fillRect(x - 1, y - 0.8, 2.2, 1.6); c.fillStyle = "rgba(255,255,255,0.3)"; c.fillRect(x - 1, y - 0.8, 2.2, 0.4); }
+  },
+  arms(c) { // a bundle of spears and a bow over the shoulder
+    for (let i = 0; i < 4; i++) {
+      c.save(); c.translate(-7 + i * 0.5, -14 - i * 0.6); c.rotate(-0.55);
+      c.fillStyle = "#7a5530"; c.fillRect(0, -0.35, 15, 0.7);
+      c.fillStyle = "#d9dde0"; c.beginPath(); c.moveTo(15, -0.9); c.lineTo(18, 0); c.lineTo(15, 0.9); c.fill();
+      c.restore();
+    }
+    c.strokeStyle = "#5a3418"; c.lineWidth = 0.8; c.beginPath(); c.arc(-1, -15, 6, 2.2, 4.2); c.stroke();
+  },
+  water(c) { // clay water pot (kalagediya) on the head
+    const gr = c.createLinearGradient(-3.4, 0, 3.4, 0); gr.addColorStop(0, "#c46a3a"); gr.addColorStop(1, "#7a3a1c");
+    c.fillStyle = gr; c.beginPath(); c.ellipse(0.4, -22.6, 3.3, 2.6, 0, 0, 7); c.fill();
+    c.fillStyle = "#8a4422"; c.fillRect(-0.8, -26.4, 2.4, 1.8);
+    c.fillStyle = "rgba(255,230,200,0.35)"; c.beginPath(); c.ellipse(-0.9, -23.4, 0.9, 1.4, 0, 0, 7); c.fill();
+    c.fillStyle = "#6ab0d8"; c.beginPath(); c.ellipse(0.4, -26.4, 1.1, 0.4, 0, 0, 7); c.fill();
   },
   rice(c) { // woven basket of paddy on the head
     const gr = c.createLinearGradient(-3.5, 0, 3.5, 0); gr.addColorStop(0, "#d9b77a"); gr.addColorStop(1, "#8a6a3a");

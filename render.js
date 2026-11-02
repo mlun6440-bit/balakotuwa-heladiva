@@ -501,7 +501,7 @@ function wearPaths() {
   const x = paths.canvas.getContext("2d"), k = paths.scale;
   x.fillStyle = "rgba(118,92,58,0.045)";
   for (const w of S.workers) {
-    if (w.phase !== "toSite" && w.phase !== "toStore") continue;
+    if (w.phase === "work" || w.phase === "tend") continue;
     const px = ((w.gx - w.gy) * TW / 2 + terrain.ox) * k, py = ((w.gx + w.gy) * TH / 2 + terrain.oy) * k;
     x.beginPath(); x.ellipse(px, py, 5 * k * 2, 2.6 * k * 2, 0, 0, Math.PI * 2); x.fill();
   }
@@ -1404,7 +1404,7 @@ function drawWorkerSprite(w, now) {
   if (!hasSprite(`${base}.f.i0`)) return false;
   const g = stride(w);
   const f = g.back ? "b" : "f";
-  const moving = (w.phase === "toSite" || w.phase === "toStore" || w.phase === "wait") && g.moving;
+  const moving = g.moving;
   const working = w.phase === "work" || (w.phase === "tend" && w.job !== "trader") || (w.job === "trader" && w.phase === "tend");
   let fr;
   if (moving) fr = `w${Math.floor(g.d * 7) % 6}`;
@@ -1547,6 +1547,11 @@ function updateFx(dt) {
     // Hearth smoke from the citadel and houses
     if ((b.id === "citadel" || b.id === "house") && Math.random() < dt * 0.8) {
       S.fx.push({ gx: b.gx + b.w * 0.3, gy: b.gy + b.h * 0.3, z: b.id === "citadel" ? 58 : 24, vx: 0.15, vy: -0.05, vz: 9, life: 2.5, max: 2.5, r: 2.5, col: "#d8d4cc" });
+    }
+    // Sparks and smoke from a working forge
+    if (b.id === "kammala" && b.worker && b.worker.phase === "work") {
+      if (Math.random() < dt * 6) S.fx.push({ gx: b.gx + 0.35, gy: b.gy + 0.75, z: 7, vx: (Math.random() - 0.5) * 0.6, vy: (Math.random() - 0.5) * 0.6, vz: 20 + Math.random() * 15, life: 0.5, max: 0.5, r: 1.2, col: "#ffb040", kind: "flame" });
+      if (Math.random() < dt * 1.2) S.fx.push({ gx: b.gx + 0.3, gy: b.gy + 0.3, z: 24, vx: 0.15, vy: -0.05, vz: 9, life: 2.5, max: 2.5, r: 2.5, col: "#7a7470", kind: "smoke" });
     }
     // Damaged buildings smoke; badly damaged ones burn
     const k = b.hp / b.maxHp;
