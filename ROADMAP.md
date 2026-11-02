@@ -24,11 +24,14 @@ off here when they ship.
       Follow-ups: 8-direction units; a proper side/back view for elephants and
       cattle; true elevation (raised terrain) instead of shading only; WebP
       atlas to cut the 3.4 MB download.
-- [ ] **Sound and music.** Replace the oscillator beeps with recorded effects
-      (conch, rain, harvest songs, combat) and a quiet ambient loop per season.
-- [ ] **Save mid-level.** Serialise `S` (minus derived fields) to localStorage
-      so a level can be resumed after closing the tab.
-- [ ] **Building upgrades.** Palisade → rampart in place; house → walawwa (+cap, +harmony).
+- [x] **Sound and music.** `audio.js` synthesises every effect and a seasonal
+      ambience live with WebAudio (conch, knocks, harvest notes, clashes, fire,
+      splash; Maha rain/frogs/thunder, Yala wind/cicadas/koel; war and
+      Perahera drums). Follow-up: a quiet melodic loop.
+- [x] **Save mid-level.** Autosave every 15s, on tab hide/close and at the
+      menu; "Continue" on the menu (`saveRun`/`continueRun` in `game.js`).
+- [x] **Building upgrades.** ⬆️ Upgrade tool; palisade → rampart, house →
+      walawwa (+cap, +harmony). Rows declare `upgrade: { to, cost }`.
 - [ ] **Soldier stances.** Hold / guard / patrol; a "garrison this tower" command.
 
 ## Ideas from Sri Lankan history (gameplay)
@@ -55,12 +58,27 @@ system, not a copy of any other game's mechanic.
       rounds); +5 harmony each (two count) and 25% cheaper soldiers.
       Follow-up: monks could also calm fear after a raid.
 
+## Supply and siege
+
+- [x] **Kammala smithy and weapons.** Smiths turn timber into 🗡️ weapons;
+      archers, spearmen and elephants need them.
+- [x] **Genre notes steps 1–4** (`docs/GENRE-NOTES.md`): volley spread, raider
+      morale, control groups, spatial hash, sandbox, thorn barriers, repair
+      tool, market orders.
+- [ ] **Genre notes step 5:** raider stone-thrower that outranges towers vs a
+      player bolt tower; hill tiles that block building; scorched ground.
+- [ ] Minimap arrows for incoming raids (notes #4); wall stairs (notes #7);
+      merit currency for elite units (notes #10); sealed-citadel pathing test (notes #12).
+
 ## Later
 
-- [ ] **Fire.** Raider fire arrows set thatch alight; villagers douse it from a wewa.
+- [x] **Fire.** Bowmen loose fire arrows at `flammable` buildings; fire spreads
+      in Yala, dies in Maha rain; idle villagers then workers carry water pots
+      from wewas, canals or the river.
 - [ ] **Siltation.** Wewas slowly lose capacity unless villagers desilt them in Yala.
 - [ ] **Trade caravans** arriving by road with offers (timber for rice, etc.).
-- [ ] **Skirmish mode** with a seeded random map and endless escalating raids.
+- [x] **Skirmish mode** with a seeded random map and endless escalating raids
+      (best score saved), plus a **Sandbox** where you send raids yourself.
 - [ ] **Touch controls** for tablets (pinch zoom, long-press to cancel).
 - [ ] **Accessibility.** Colour-blind-safe palette option; keyboard build cursor.
 - [ ] **Localisation.** Sinhala and Tamil UI strings.
