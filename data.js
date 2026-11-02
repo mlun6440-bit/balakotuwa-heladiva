@@ -158,7 +158,7 @@ const LEVELS = [
   },
   {
     id: "parakrama", name: "Sea of Parakrama", era: "Polonnaruwa", seed: 53,
-    intro: "Let not one drop of rain reach the sea unused. Build a chain of wewas, raise a dagoba, and beware the ram bearers.",
+    intro: "\"Let not one drop of rain reach the sea unused.\" Chain your wewas with canals so a full tank spills into the next, raise a dagoba, and beware the ram bearers.",
     citadel: [14, 11], season: "yala",
     start: { timber: 140, stone: 80, rice: 90, gold: 150, villagers: 14 },
     army: { spearman: 4, archer: 3, angampora: 1 },
@@ -175,7 +175,7 @@ const LEVELS = [
       { t: 560, from: ["east"], raider: 10, bowman: 4, brute: 2 }
     ],
     hpScale: 1.3,
-    objectives: [{ type: "build", id: "wewa", n: 4 }, { type: "build", id: "dagoba", n: 1 }, { type: "water", n: 300 }, { type: "waves" }]
+    objectives: [{ type: "build", id: "wewa", n: 4 }, { type: "build", id: "dagoba", n: 1 }, { type: "catch", n: 400 }, { type: "waves" }]
   },
   {
     id: "senkadagala", name: "Hill Kingdom", era: "Senkadagala", seed: 71,

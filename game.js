@@ -157,7 +157,7 @@ function startLevel(idx, mode = "brief") {
     nets: [], netOf: null, flooded: new Set(), flow: null,
     tool: null, demolish: false, cat: "water",
     paused: true, speed: 1, mode, growAcc: 0, starveAcc: 0, tutorialStep: 0, warnedWave: -1, uid: 0,
-    seasonNo: 0, edictEnd: {}, edictUsed: {}
+    seasonNo: 0, edictEnd: {}, edictUsed: {}, rain: { caught: 0, lost: 0, spilled: 0 }
   };
   const [cx, cy] = L.citadel;
   S.citadel = addBuilding("citadel", cx, cy);
@@ -391,11 +391,36 @@ function waterSource(b) {
   return null;
 }
 
+const RAIN = 2.4; // water each wewa catches per second of Maha
+
 function tickWater() {
   const maha = S.season === "maha";
+  const spill = new Map(); // network id -> rain a full wewa could not hold
   for (const w of S.buildings) {
     if (w.id !== "wewa") continue;
-    w.water = clamp(w.water + (maha ? 2.4 : -0.3) + (riverBeside(w) ? 1.2 : 0), 0, WEWA_CAP);
+    if (maha) {
+      const add = Math.min(RAIN, WEWA_CAP - w.water);
+      w.water += add; S.rain.caught += add;
+      if (add < RAIN) { const id = S.netOf[w.gy][w.gx]; spill.set(id, (spill.get(id) || 0) + RAIN - add); }
+    } else w.water = Math.max(0, w.water - 0.3);
+    if (riverBeside(w)) w.water = Math.min(WEWA_CAP, w.water + 1.2);
+  }
+  // Ellangawa (cascading tanks): a full wewa spills into the emptiest wewas
+  // on its canal network. Whatever no tank can hold runs off to the sea.
+  for (const [id, amt0] of spill) {
+    let amt = amt0;
+    const ws = id === -1 ? [] : [...S.nets[id].wewas].filter(w => w.water < WEWA_CAP).sort((a, b) => a.water - b.water);
+    for (const w of ws) {
+      const add = Math.min(amt, WEWA_CAP - w.water);
+      w.water += add; amt -= add; S.rain.caught += add; S.rain.spilled += add;
+      if (amt <= 0) break;
+    }
+    S.rain.lost += amt;
+  }
+  if (S.rain.spilled > 0 && !S.warnedCascade) { S.warnedCascade = true; say("A full wewa spills down the canal into the next tank. That is ellangawa: no rain wasted."); }
+  if (S.rain.lost > 20 && !S.warnedSpill && S.L.objectives.some(o => o.type === "catch")) {
+    S.warnedSpill = true;
+    say("Rain is spilling from full wewas to the sea! Link another wewa to them with a canal.", true);
   }
   updateNetWater();
   for (const p of S.buildings) {
@@ -804,6 +829,7 @@ function objective(o) {
     case "water": return { label: `💧 Hold ${o.n} water in wewas`, cur: Math.floor(totalWater()), n: o.n };
     case "harmony": return { label: `😊 Harmony ${o.n}+`, cur: Math.floor(S.harmony), n: o.n };
     case "pop": return { label: `👥 ${o.n} villagers`, cur: S.villagers, n: o.n };
+    case "catch": return { label: `🌧️ Catch ${o.n} rain (${rainKept()}% kept)`, cur: Math.floor(S.rain.caught), n: o.n };
     case "waves": {
       const busy = foesAlive() || S.spawnQueue.length > 0;
       return { label: `🛡️ Survive ${L.waves.length} raids`, cur: Math.max(0, S.nextWave - (busy ? 1 : 0)), n: L.waves.length };
@@ -812,6 +838,8 @@ function objective(o) {
   return { label: "?", cur: 0, n: 1 };
 }
 
+// Share of the rain that fell on your wewas that was kept (Parakramabahu's maxim).
+const rainKept = () => { const t = S.rain.caught + S.rain.lost; return t > 0 ? Math.round((100 * S.rain.caught) / t) : 100; };
 const totalWater = () => S.buildings.reduce((n, b) => n + (b.id === "wewa" ? b.water : 0), 0);
 
 function checkVictory() {
@@ -824,7 +852,9 @@ function endLevel(won) {
   S.mode = "end";
   S.paused = true;
   const pct = Math.max(0, S.citadel.hp) / S.citadel.maxHp;
-  const stars = won ? (pct >= 0.9 ? 3 : pct >= 0.5 ? 2 : 1) : 0;
+  let stars = won ? (pct >= 0.9 ? 3 : pct >= 0.5 ? 2 : 1) : 0;
+  // "Let not one drop of rain reach the sea unused": three stars need 70% kept.
+  if (S.L.objectives.some(o => o.type === "catch") && rainKept() < 70) stars = Math.min(stars, 2);
   if (won) {
     progress.stars[S.L.id] = Math.max(progress.stars[S.L.id] || 0, stars);
     progress.unlocked = Math.max(progress.unlocked, Math.min(LEVELS.length - 1, S.idx + 1));
@@ -1068,7 +1098,11 @@ function spawnFloat(text, gx, gy, color) {
 function describe(b) {
   const lines = [`<b>${b.def.icon} ${b.def.name}</b>`, `HP ${Math.ceil(b.hp)}/${b.maxHp}`];
   if (b.def.worker) lines.push(b.worker ? "Staffed" : "💤 No villager free. Build houses.");
-  if (b.id === "wewa") lines.push(`Water ${Math.round(b.water)}/${WEWA_CAP}${riverBeside(b) ? " · river-fed" : ""}`);
+  if (b.id === "wewa") {
+    lines.push(`Water ${Math.round(b.water)}/${WEWA_CAP}${riverBeside(b) ? " · river-fed" : ""}`);
+    const id = S.netOf[b.gy][b.gx], linked = id !== -1 ? S.nets[id].wewas.size - 1 : 0;
+    lines.push(linked ? `Spills into ${linked} linked wewa${linked > 1 ? "s" : ""} when full` : "When full, rain runs off. Link another wewa by canal.");
+  }
   if (b.id === "paddy") lines.push(`Growth ${Math.round(b.growth)}% · ${b.irrigated ? "irrigated" : "dry"}`);
   if (b.id === "sluice") lines.push(b.open ? "Open: flooding canals. Click to close." : "Closed. Click to flood the canals.");
   if (b.def.water && b.id !== "wewa") {
@@ -1165,6 +1199,7 @@ function showEnd(won, starCount) {
       <p>${won
         ? (S.idx + 1 === LEVELS.length ? "The hill kingdom endures. You have completed the campaign." : "The kingdom is fed and the walls still stand. A new region awaits.")
         : "Raiders breached the Maligawa. Build more wewas, wall the approaches and keep soldiers at home."}</p>
+      ${S.rain.caught + S.rain.lost > 0 ? `<p>🌧️ Rain kept: <b>${rainKept()}%</b>${S.L.objectives.some(o => o.type === "catch") ? (rainKept() >= 70 ? " · Parakramabahu would be pleased." : " · Below 70%: too much rain reached the sea for three stars.") : ""}</p>` : ""}
       <div class="actions">
         ${hasNext ? `<button class="btn primary" id="nextBtn">Next level ▶</button>` : ""}
         <button class="btn" id="retryBtn">↻ Replay</button>
