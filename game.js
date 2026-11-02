@@ -212,10 +212,10 @@ function makeSkirmish(seed, sandbox = false) {
   const rect = (w, h) => { for (;;) { const x = ri(2, MAP - 3 - w), y = ri(2, MAP - 3 - h); if (away(x + w / 2, y + h / 2)) return [x, y, x + w, y + h]; } };
   const all = unlockedFor(LEVELS.length - 1);
   return {
-    id: `skirmish-${seed}`, name: "Skirmish", era: `Random map · seed ${seed}`, seed, skirmish: true, endless: true,
+    id: `skirmish-${seed}`, name: "Skirmish", era: `Random map · seed ${seed}`, seed, skirmish: true, endless: true, fireArrows: true,
     intro: "A fresh valley and no end to the raiders. Each raid is larger than the last. How long can the Maligawa stand?",
     citadel: [cx, cy], season: r() < 0.5 ? "maha" : "yala",
-    start: { timber: 150, stone: 80, rice: 100, gold: 150, villagers: 12, arms: 8 },
+    start: { timber: 150, stone: 80, rice: 100, gold: 150, villagers: 12 },
     army: { spearman: 3, archer: 2 },
     rivers: [{ edge: riverEdge, at: ri(0, 2), width: ri(1, 2), wobble: 0.8 + r() * 1.4 }],
     rocks: Array.from({ length: ri(2, 3) }, () => rect(ri(2, 4), ri(2, 4))),
@@ -226,7 +226,7 @@ function makeSkirmish(seed, sandbox = false) {
     ...(sandbox ? {
       id: `sandbox-${seed}`, name: "Sandbox", sandbox: true, endless: false, era: `Royal sandbox · seed ${seed}`,
       intro: "A peaceful valley with full stores. Build anything; open 👑 Decrees to send raids of any size from any edge and test your defences.",
-      start: { timber: 999, stone: 999, rice: 600, gold: 999, villagers: 30, arms: 60 }
+      start: { timber: 999, stone: 999, rice: 600, gold: 999, villagers: 30 }
     } : {})
   };
 }
@@ -264,7 +264,7 @@ function startLevel(idx, mode = "brief", custom = null) {
     idx, L, tiles, trees,
     unlocked: custom ? custom.all : unlockedFor(idx),
     buildings: [], occ: [], workers: [], units: [], shots: [], floats: [], spawnQueue: [],
-    timber: L.start.timber, stone: L.start.stone, rice: L.start.rice, gold: L.start.gold, arms: L.start.arms || 0,
+    timber: L.start.timber, stone: L.start.stone, rice: L.start.rice, gold: L.start.gold,
     villagers: L.start.villagers, cap: 0, harmony: 60, fear: 0,
     season: L.season, seasonLeft: SEASONS[L.season].len,
     time: 0, tickAcc: 0, waveClock: 0, nextWave: 0,
@@ -748,7 +748,10 @@ function updateWorker(w, dt) {
         t.stage = 0; t.reserved = false;
         carryHome(w, "timber", 5);
       } else if (w.job === "smith") {
-        carryHome(w, "arms", 1);
+        // carry the forged arms to the barracks (or citadel); no stockpile
+        const dest = S.buildings.find(b => b.id === "barracks") || S.citadel;
+        w.carry = { key: "arms", n: 1 };
+        goTo(w, dest.gx + dest.w / 2, dest.gy + dest.h + 0.2, "toStore");
       } else {
         carryHome(w, "stone", 4);
       }
@@ -775,8 +778,10 @@ function updateWorker(w, dt) {
       break;
     case "toStore":
       if (walk(w, dt)) {
-        S[w.carry.key] += w.carry.n;
-        spawnFloat(`+${w.carry.n} ${RES[w.carry.key]}`, w.gx, w.gy, "#bff0a8");
+        if (w.carry.key in RES) {
+          S[w.carry.key] += w.carry.n;
+          spawnFloat(`+${w.carry.n} ${RES[w.carry.key]}`, w.gx, w.gy, "#bff0a8");
+        }
         if (w.carry.key === "rice") sfx("harvest");
         w.carry = null;
         planJob(w);
@@ -1057,6 +1062,7 @@ function updateCombat(dt) {
 // season, is beaten down by monsoon rain, spreads to flammable neighbours,
 // and villagers run with water pots from the nearest wewa, canal or river.
 function nearestFlammable(u, range) {
+  if (!S.L.fireArrows) return null; // fire arrows arrive from Lion Rock on
   let best = null, bd = range;
   for (const b of S.buildings) {
     if (!b.def.flammable || b.fire >= 1) continue;
@@ -1257,20 +1263,20 @@ function tick() {
 function objective(o) {
   const L = S.L;
   switch (o.type) {
-    case "res": return { label: `${RES[o.key]} Store ${o.n} ${o.key}`, cur: Math.floor(S[o.key]), n: o.n };
-    case "build": return { label: `${BUILDINGS[o.id].icon} Build ${o.n} ${BUILDINGS[o.id].name}`, cur: count(o.id), n: o.n };
-    case "water": return { label: `💧 Hold ${o.n} water in wewas`, cur: Math.floor(totalWater()), n: o.n };
+    case "res": return { label: `${RES[o.key]} ${o.key}`, cur: Math.floor(S[o.key]), n: o.n };
+    case "build": return { label: `${BUILDINGS[o.id].icon} ${BUILDINGS[o.id].name.split(" (")[0]}`, cur: count(o.id), n: o.n };
+    case "water": return { label: "💧 water held", cur: Math.floor(totalWater()), n: o.n };
     case "harmony": return { label: `😊 Harmony ${o.n}+`, cur: Math.floor(S.harmony), n: o.n };
-    case "pop": return { label: `👥 ${o.n} villagers`, cur: S.villagers, n: o.n };
-    case "catch": return { label: `🌧️ Catch ${o.n} rain (${rainKept()}% kept)`, cur: Math.floor(S.rain.caught), n: o.n };
-    case "sandbox": return { label: `🏗️ Sandbox · raids sent: ${S.raidsSent || 0} (send more from 👑)`, cur: 0, n: Infinity };
+    case "pop": return { label: "👥 villagers", cur: S.villagers, n: o.n };
+    case "catch": return { label: `🌧️ rain caught, ${rainKept()}% kept`, cur: Math.floor(S.rain.caught), n: o.n };
+    case "sandbox": return { label: `🏗️ Sandbox · ${S.raidsSent || 0} raids sent from 👑`, cur: 0, n: Infinity };
     case "endless": {
       const busy = foesAlive() || S.spawnQueue.length > 0;
-      return { label: `🛡️ Raids survived: ${Math.max(0, S.nextWave - (busy ? 1 : 0))} (best ${progress.skirmishBest || 0})`, cur: 0, n: Infinity };
+      return { label: `🛡️ ${Math.max(0, S.nextWave - (busy ? 1 : 0))} raids survived (best ${progress.skirmishBest || 0})`, cur: 0, n: Infinity };
     }
     case "waves": {
       const busy = foesAlive() || S.spawnQueue.length > 0;
-      return { label: `🛡️ Survive ${L.waves.length} raids`, cur: Math.max(0, S.nextWave - (busy ? 1 : 0)), n: L.waves.length };
+      return { label: "🛡️ raids survived", cur: Math.max(0, S.nextWave - (busy ? 1 : 0)), n: L.waves.length };
     }
   }
   return { label: "?", cur: 0, n: 1 };
@@ -1371,10 +1377,15 @@ function zoomAt(factor, sx = view.w / 2, sy = view.h / 2) {
 }
 
 // ==================== HUD ====================
+// The 👑 tab appears once there is something in it: a decree, a market's orders, or the sandbox.
+const realmTabUseful = () => !!(S.L.sandbox || S.unlocked.edicts.size || count("market"));
+
 function buildTabs() {
   const nav = document.getElementById("tabs");
   nav.innerHTML = "";
+  S.realmTab = realmTabUseful();
   for (const c of CATS) {
+    if (c.id === "realm" && !S.realmTab) continue;
     const btn = document.createElement("button");
     btn.className = `tab ${S.cat === c.id && !S.demolish && !S.upgrade && !S.repair ? "active" : ""}`;
     btn.innerHTML = `<span>${c.icon}</span><span>${c.label}</span>`;
@@ -1515,14 +1526,12 @@ function proclaim(id) {
   syncHud();
 }
 
-// Soldiers' price: monks at a staffed pansala teach discipline, 25% off.
+// Soldiers' price: a staffed kammala (smithy) forges their arms, 30% off the gold.
 const staffedPansalas = () => S.buildings.filter(b => b.id === "pansala" && b.worker).length;
 function troopCost(id) {
   const c = TROOPS[id].cost;
-  if (!staffedPansalas()) return c;
-  const out = {};
-  for (const [k, v] of Object.entries(c)) out[k] = Math.ceil(v * 0.75);
-  return out;
+  if (!S.buildings.some(b => b.id === "kammala" && b.worker)) return c;
+  return { ...c, gold: Math.ceil(c.gold * 0.7) };
 }
 
 function recruit(id) {
@@ -1550,7 +1559,7 @@ function syncHud() {
   document.getElementById("seasonBadge").textContent = `${SEASONS[S.season].label} · ${S.seasonLeft}s`;
   document.getElementById("objectives").innerHTML = S.L.objectives.map(o => {
     const r = objective(o);
-    return `<li class="${r.cur >= r.n ? "done" : ""}">${r.label}${r.n === Infinity ? "" : ` (${Math.min(r.cur, r.n)}/${r.n})`}</li>`;
+    return `<li class="${r.cur >= r.n ? "done" : ""}">${r.label}${r.n === Infinity ? "" : ` ${Math.min(r.cur, r.n)}/${r.n}`}</li>`;
   }).join("");
   document.getElementById("resources").innerHTML = Object.entries(RES)
     .map(([k, ic]) => `<span>${ic} ${k}: <strong>${Math.floor(S[k])}</strong></span>`).join("") +
@@ -1571,6 +1580,7 @@ function syncHud() {
   document.getElementById("pauseBtn").textContent = S.paused ? "▶ Resume" : "⏸ Pause";
   document.getElementById("pauseBtn").disabled = S.mode !== "play";
   document.getElementById("speedBtn").textContent = `⏩ ${S.speed}×`;
+  if (S.realmTab !== realmTabUseful()) buildTabs();
   // decree cards show live timers; building costs change while rajakariya runs
   if ((S.cat === "realm" && !S.L.sandbox) || (S.cat !== "army" && S.cat !== "realm" && S.lastDiscount !== edictOn("rajakariya"))) { S.lastDiscount = edictOn("rajakariya"); renderPalette(); }
   else updateAffordability();
@@ -1689,7 +1699,7 @@ function showBriefing() {
       <h2>${L.name}</h2>
       <p>${L.intro}</p>
       <b>Objectives</b>
-      <ul>${L.objectives.map(o => `<li>${objective(o).label}</li>`).join("")}</ul>
+      <ul>${L.objectives.map(o => { const r = objective(o); return `<li>${r.label}${r.n === Infinity ? "" : `: ${r.n}`}</li>`; }).join("")}</ul>
       ${unlocks.length ? `<b>New this level</b><ul><li>${unlocks.join("</li><li>")}</li></ul>` : ""}
       <div class="actions">
         <button class="btn primary" id="beginBtn">Begin</button>

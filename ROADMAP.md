@@ -60,8 +60,8 @@ system, not a copy of any other game's mechanic.
 
 ## Supply and siege
 
-- [x] **Kammala smithy and weapons.** Smiths turn timber into 🗡️ weapons;
-      archers, spearmen and elephants need them.
+- [x] **Kammala smithy.** A staffed smithy makes soldiers 30% cheaper in gold
+      (smiths still fetch timber and carry arms to the barracks).
 - [x] **Genre notes steps 1–4** (`docs/GENRE-NOTES.md`): volley spread, raider
       morale, control groups, spatial hash, sandbox, thorn barriers, repair
       tool, market orders.
@@ -69,6 +69,25 @@ system, not a copy of any other game's mechanic.
       player bolt tower; hill tiles that block building; scorched ground.
 - [ ] Minimap arrows for incoming raids (notes #4); wall stairs (notes #7);
       merit currency for elite units (notes #10); sealed-citadel pathing test (notes #12).
+
+## Simplify round 1 (cut or merged, per docs/ITERATION-GUARDRAILS.md)
+
+Recorded so these are not re-added without a strong reason:
+
+- **Cut: weapons as a fifth resource (🗡️ arms).** Broke the 4-resources
+  budget. The smithy became a gold discount for soldiers instead.
+- **Cut: the pansala's soldier discount.** Duplicated the smithy; the pansala
+  is now a harmony building only.
+- **Moved to one headline mechanic per level:** fire arrows from level 3
+  (`fireArrows` level flag), thorn barriers and the smithy to level 3, royal
+  decrees to level 5 (the home of the Perahera). Level 1 is back to the core
+  economy. The 👑 tab only appears once it has something in it.
+- **Polish:** every tooltip is one sentence; objective labels are short so
+  the top bar stays one row; the market tooltip no longer claims a fixed 30.
+- **Level 1 winnable:** a scripted player following only the tutorial hints
+  never reached 80 rice (true on `main` before any of this work too). A new
+  hint ("keep about one watered paddy for each house") fixes it; following it,
+  the scripted player wins at ~350s.
 
 ## Later
 

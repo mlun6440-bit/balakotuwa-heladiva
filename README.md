@@ -28,10 +28,10 @@ The sprite art is original, modelled in code under `tools/art/` and baked into
 - **Harmony.** It rises with a full granary and dagobas, and falls with hunger and destruction. New families settle only at 45 or above.
 - **Cascading tanks.** A full wewa spills its rain into the other wewas on its canal network. On Sea of Parakrama, keep 70% of the rain for three stars: "let not one drop reach the sea unused".
 - **Royal decrees (👑).** *Rajakariya*, the king's labour service, speeds up work and makes building cheaper for a harmony cost. A *Perahera* festival in Maha lifts harmony with a procession of tuskers and torch-bearers.
-- **Pansala.** A monk walks alms rounds; a staffed monastery raises harmony and makes soldiers cheaper.
+- **Pansala.** A monk walks alms rounds; a staffed monastery raises harmony.
 - **Forest ambush.** Raiders slow down in thick jungle. Soldiers hidden in the forest can't be seen from afar and strike first for double damage.
-- **Weapons.** A Kammala smithy forges timber into 🗡️ weapons. Archers, spearmen and elephants need them; Angampora fighters don't.
-- **Fire.** Raider bowmen shoot fire arrows at thatch and timber. Fire spreads in the dry season and dies in the monsoon. Villagers run with water pots from the nearest wewa, canal or river.
+- **Smithy.** A staffed Kammala forges timber into arms, making soldiers 30% cheaper in gold.
+- **Fire (from Lion Rock).** Raider bowmen shoot fire arrows at thatch and timber. Fire spreads in the dry season and dies in the monsoon. Villagers run with water pots from the nearest wewa, canal or river.
 - **Morale.** A raid party that loses most of its strength breaks and flees (no gold for those who escape).
 - **Defences.** Thorn barriers slow and scratch raiders. Upgrade palisades to ramparts and houses to walawwas, and repair damage with the 🔧 tool.
 - **Raiders.** They follow the cheapest path to the citadel. They walk around walls when there is a gap and break through when there isn't.
@@ -41,10 +41,12 @@ The sprite art is original, modelled in code under `tools/art/` and baked into
 | # | Level | Era | New |
 |---|-------|-----|-----|
 | 1 | Dawn at Anuradhapura | Early kingdom | Core economy, palisades, archers, spearmen |
-| 2 | The Dry Zone | Rajarata | Sluice gates, watchtowers, pansala, rajakariya |
-| 3 | Lion Rock | Sigiriya | Ramparts, gates, market, Angampora fighters |
-| 4 | Sea of Parakrama | Polonnaruwa | Dagoba, war elephants, ram bearers, perahera, rain-catch goal |
-| 5 | Hill Kingdom | Senkadagala | Raids from three sides |
+| 2 | The Dry Zone | Rajarata | **Sluice flooding**; watchtowers, pansala |
+| 3 | Lion Rock | Sigiriya | **Fire arrows and water carriers**; ramparts, gates, thorn barriers, upgrades, market, smithy, Angampora fighters |
+| 4 | Sea of Parakrama | Polonnaruwa | **Cascading tanks and the rain-catch goal**; dagoba, war elephants, ram bearers |
+| 5 | Hill Kingdom | Senkadagala | **Royal decrees** (rajakariya, perahera); raids from three sides |
+
+Each level introduces one headline mechanic (in bold); the rest are buildings and units that use ideas you already know.
 | ∞ | Skirmish | Random map | Endless escalating raids; best score saved |
 | ∞ | Sandbox | Random map | Full stores; send raids of any size yourself |
 
