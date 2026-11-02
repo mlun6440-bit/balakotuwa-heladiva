@@ -439,6 +439,31 @@ ART.add("rampart.nx", () => rampartPiece(0, RO, RO, RW, "x"), { size: 110, oy: 0
 ART.add("rampart.py", () => rampartPiece(RO, RO + RW, RW, 1 - RO - RW, "y"), { size: 110, oy: 0.8 });
 ART.add("rampart.ny", () => rampartPiece(RO, 0, RW, RO, "y"), { size: 110, oy: 0.8 });
 
+// Katu wetiya: a hedge of cut thorny branches piled between a few stakes.
+for (let v = 0; v < 2; v++) ART.add(`thorn.${v}`, () => {
+  blob(0.5, 0.5, 26, 12, "rgba(30,20,8,0.35)");
+  for (const [x, y] of [[0.2, 0.25], [0.75, 0.3], [0.3, 0.78], [0.8, 0.8]]) post(x, y, 0.018, 0, 9 + R() * 3, M.timber, 6);
+  const branches = [];
+  for (let i = 0; i < 46; i++) branches.push([rr(0.08, 0.92), rr(0.08, 0.92), rr(-1, 1), rr(5, 11)]);
+  branches.sort((a, b) => a[0] + a[1] - b[0] - b[1]);
+  for (const [x, y, lean, h] of branches) {
+    if (MODE.shadow) { gline([x, y, 0], [x + lean * 0.1, y, h], "#000", 0.8); continue; }
+    const p = P(x, y, 0);
+    const col = pick(["#6b5434", "#7d6440", "#584530", "#8a7048"]);
+    g.strokeStyle = col; g.lineWidth = rr(0.5, 0.9); g.lineCap = "round";
+    const tx = p.x + lean * 6, ty = p.y - h;
+    g.beginPath(); g.moveTo(p.x, p.y); g.quadraticCurveTo(p.x + lean * 2, p.y - h * 0.6, tx, ty); g.stroke();
+    // thorns and twigs
+    g.lineWidth = 0.3;
+    for (let k = 0; k < 4; k++) {
+      const t = rr(0.25, 0.95), mx = lerp(p.x, tx, t), my = lerp(p.y, ty, t), side = R() < 0.5 ? -1 : 1;
+      g.beginPath(); g.moveTo(mx, my); g.lineTo(mx + side * rr(1, 2.5), my - rr(0.5, 1.5)); g.stroke();
+    }
+    if (R() < 0.3) { g.fillStyle = pick(["#5d7a2e", "#7a8f3a", "#4a6a28"]); g.beginPath(); g.ellipse(tx, ty, 1.1, 0.6, lean, 0, 7); g.fill(); }
+  }
+  gline([0.2, 0.25, 6], [0.8, 0.8, 6], "#b18a4c", 0.5);
+}, { size: 90 });
+
 // ---------- water works ----------
 // Wewa: earthen bund around a basin. "base" is drawn before the water, "front" after.
 function bundRing(front) {

@@ -697,9 +697,9 @@ function drawRock(x, y) {
 function drawHoverTile() {
   const h = input.hover;
   if (S.tool || !inb(h.gx, h.gy) || S.mode !== "play") return;
-  if (S.upgrade) {
+  if (S.upgrade || S.repair) {
     const b = buildingAt(h.gx, h.gy);
-    const ok = b && typeof upgradeBlocked === "function" && !upgradeBlocked(b);
+    const ok = b && (S.repair ? b.hp < b.maxHp && !(b.fire > 0) && affordable(repairCost(b)) : !upgradeBlocked(b));
     if (b) diamond(b.gx, b.gy, b.w, b.h, 0, ok ? "rgba(233,185,73,0.25)" : "rgba(255,90,70,0.2)", ok ? "rgba(255,215,110,0.95)" : "rgba(255,90,70,0.9)");
     else diamond(h.gx, h.gy, 1, 1, 0, null, "rgba(233,185,73,0.5)");
     return;
@@ -710,6 +710,13 @@ function drawHoverTile() {
 // ==================== GROUND-LEVEL STRUCTURES ====================
 function drawGround(b, now) {
   const { gx, gy, w, h } = b;
+  if (b.id === "thorn") {
+    if (!drawSprite(`thorn.${b.uid % 2}`, gx, gy)) {
+      ctx.strokeStyle = "#6b5a3a"; ctx.lineWidth = 0.8;
+      for (let i = 0; i < 18; i++) { const p = iso(gx + 0.15 + hash(b.uid, i) * 0.7, gy + 0.15 + hash(i, b.uid) * 0.7, 0); ctx.beginPath(); ctx.moveTo(p.x, p.y); ctx.lineTo(p.x + (hash(i, 3) - 0.5) * 8, p.y - 3 - hash(i, 4) * 6); ctx.stroke(); }
+    }
+    return;
+  }
   if (hasSprite("wewa.base")) {
     if (b.id === "wewa") return drawWewaSprite(b, now);
     if (b.id === "canal" || b.id === "sluice") return drawCanalSprite(b, now);

@@ -189,8 +189,8 @@ details.how summary { cursor: pointer; color: var(--gold); }
 
 .tabs {
   display: grid;
-  grid-template-columns: repeat(3, 60px);
-  gap: 4px;
+  grid-template-columns: repeat(4, 54px);
+  gap: 3px;
   align-content: start;
 }
 .tab {
@@ -271,6 +271,8 @@ details.how summary { cursor: pointer; color: var(--gold); }
 }
 
 /* Sandbox controls in the Decrees tab */
-.card.wide { flex: 0 0 auto; max-width: 300px; }
+.card.wide { flex: 0 0 auto; max-width: 460px; }
 .card.wide .card-desc { display: flex; flex-wrap: wrap; gap: 4px; }
 .card.wide .btn { padding: 3px 8px; font-size: 12px; }
+.card.wide .card-desc span, .card.wide .card-desc b { align-self: center; }
+.card.wide .card-desc b { min-width: 26px; text-align: center; }

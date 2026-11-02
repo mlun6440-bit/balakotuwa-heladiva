@@ -78,7 +78,7 @@ function saveProgress() {
 // field, water networks, cover, staffing) is rebuilt by refreshWorld().
 const RUN_KEY = "balakotuwa.run.v1";
 const RUN_SKIP = new Set(["L", "tiles", "trees", "unlocked", "buildings", "occ", "workers", "units", "shots", "floats", "nets",
-  "netOf", "flooded", "flow", "citadel", "cover", "fx", "tool", "demolish", "upgrade", "mode", "paused"]);
+  "netOf", "flooded", "flow", "citadel", "cover", "fx", "tool", "demolish", "upgrade", "repair", "mode", "paused"]);
 const plain = v => v === null || typeof v !== "object" || Array.isArray(v) || Object.getPrototypeOf(v) === Object.prototype;
 
 function saveRun() {
@@ -394,6 +394,30 @@ function upgradeAt(gx, gy, quiet = false) {
   return true;
 }
 
+// ==================== REPAIR ====================
+// Restoring a building costs 60% of its build cost × the share of health lost.
+const REPAIR_CITADEL = { timber: 40, stone: 40 };
+function repairCost(b) {
+  const base = b === S.citadel ? REPAIR_CITADEL : b.def.cost || {};
+  const lost = 1 - b.hp / b.maxHp, out = {};
+  for (const [k, v] of Object.entries(base)) { const c = Math.ceil(v * 0.6 * lost); if (c > 0) out[k] = c; }
+  return out;
+}
+function repairAt(gx, gy, quiet = false) {
+  const b = buildingAt(gx, gy);
+  if (!b || b.hp >= b.maxHp) { if (!quiet) say(b ? `The ${b.def.name} is not damaged.` : "Nothing to repair here.", !!b); return false; }
+  if (b.fire > 0) { if (!quiet) say("Put the fire out first.", true); return false; }
+  const cost = repairCost(b);
+  if (!affordable(cost)) { if (!quiet) say(`Repairing the ${b.def.name} needs ${costText(cost)}.`, true); return false; }
+  for (const [k, v] of Object.entries(cost)) S[k] -= v;
+  b.hp = b.maxHp;
+  puff(b.gx + b.w / 2, b.gy + b.h / 2, 5, "#cbbd9a");
+  spawnFloat("🔧", b.gx + b.w / 2, b.gy + b.h / 2, "#bff0a8");
+  sfx("build");
+  syncHud();
+  return true;
+}
+
 function demolishAt(gx, gy) {
   const b = buildingAt(gx, gy);
   if (!b) return;
@@ -423,7 +447,7 @@ function enterCost(x, y) {
   const t = S.tiles[y][x].t;
   let c = t === "river" ? 6 : t === "rock" ? 1.6 : 1;
   const b = S.occ[y][x];
-  if (b && b !== S.citadel) c += b.def.solid ? 3 + b.maxHp / 90 : 0.3;
+  if (b && b !== S.citadel) c += b.def.solid ? 3 + b.maxHp / 90 : b.def.thorn ? 4 : 0.3;
   return c;
 }
 
@@ -739,7 +763,13 @@ function updateWorker(w, dt) {
         w.timer -= dt * workMult();
         if (w.timer <= 0) {
           w.timer = 6;
-          if (S.rice > 30) { S.rice -= 5; S.gold += 8; spawnFloat("-5🍚 +8🪙", w.gx, w.gy, "#e9b949"); sfx("coin"); }
+          // Pola orders (👑 tab): sell rice above a level, buy timber/stone below one at a markup
+          const m = S.market || (S.market = { sell: 30, buy: 0 });
+          if (S.rice > m.sell + 5) { S.rice -= 5; S.gold += 8; spawnFloat("-5🍚 +8🪙", w.gx, w.gy, "#e9b949"); sfx("coin"); }
+          else if (S.gold >= 12 && (S.timber < m.buy || S.stone < m.buy)) {
+            const k = S.timber <= S.stone ? "timber" : "stone";
+            S.gold -= 12; S[k] += 5; spawnFloat(`-12🪙 +5${RES[k]}`, w.gx, w.gy, "#e9b949"); sfx("coin");
+          }
         }
       }
       break;
@@ -803,6 +833,7 @@ function terrainMult(u) {
   const x = Math.floor(u.gx), y = Math.floor(u.gy);
   if (!inb(x, y)) return 1;
   if (u.team === "e" && S.flooded.has(y * MAP + x)) return 0.4;
+  if (u.team === "e" && S.occ[y][x] && S.occ[y][x].def.thorn) return 0.45; // pushing through thorns
   if (u.team === "e" && coverAt(u.gx, u.gy) >= 3) return 0.7; // thick jungle
   const t = S.tiles[y][x].t;
   return t === "river" ? 0.55 : t === "rock" ? 0.85 : 1;
@@ -1171,7 +1202,10 @@ function tick() {
   updateCover();
 
   for (const u of S.units) {
-    if (u.team === "e" && S.flooded.has(Math.floor(u.gy) * MAP + Math.floor(u.gx))) u.hp -= 4;
+    if (u.team !== "e") continue;
+    if (S.flooded.has(Math.floor(u.gy) * MAP + Math.floor(u.gx))) u.hp -= 4;
+    const tb = buildingAt(Math.floor(u.gx), Math.floor(u.gy));
+    if (tb && tb.def.thorn) { u.hp -= 3; damageBuilding(tb, 4); } // scratched, and the hedge is trampled
   }
 
   // Economy & harmony
@@ -1342,33 +1376,57 @@ function buildTabs() {
   nav.innerHTML = "";
   for (const c of CATS) {
     const btn = document.createElement("button");
-    btn.className = `tab ${S.cat === c.id && !S.demolish && !S.upgrade ? "active" : ""}`;
+    btn.className = `tab ${S.cat === c.id && !S.demolish && !S.upgrade && !S.repair ? "active" : ""}`;
     btn.innerHTML = `<span>${c.icon}</span><span>${c.label}</span>`;
-    btn.addEventListener("click", () => { S.cat = c.id; S.tool = null; S.demolish = false; S.upgrade = false; buildTabs(); renderPalette(); });
+    btn.addEventListener("click", () => { S.cat = c.id; S.tool = null; S.demolish = false; S.upgrade = false; S.repair = false; buildTabs(); renderPalette(); });
     nav.appendChild(btn);
   }
   const clear = document.createElement("button");
   clear.className = `tab clear ${S.demolish ? "active" : ""}`;
   clear.title = "Demolish (half refund)";
   clear.innerHTML = "<span>⛏️</span><span>Clear</span>";
-  clear.addEventListener("click", () => { S.demolish = !S.demolish; S.upgrade = false; S.tool = null; buildTabs(); renderPalette(); });
+  clear.addEventListener("click", () => { S.demolish = !S.demolish; S.upgrade = false; S.repair = false; S.tool = null; buildTabs(); renderPalette(); });
   nav.appendChild(clear);
   const upg = document.createElement("button");
   upg.className = `tab clear ${S.upgrade ? "active" : ""}`;
   upg.title = "Upgrade in place: palisade → rampart, house → walawwa (drag along walls)";
   upg.innerHTML = "<span>⬆️</span><span>Upgrade</span>";
-  upg.addEventListener("click", () => { S.upgrade = !S.upgrade; S.demolish = false; S.tool = null; buildTabs(); renderPalette(); });
+  upg.addEventListener("click", () => { S.upgrade = !S.upgrade; S.demolish = false; S.repair = false; S.tool = null; buildTabs(); renderPalette(); });
   nav.appendChild(upg);
+  const rep = document.createElement("button");
+  rep.className = `tab clear ${S.repair ? "active" : ""}`;
+  rep.title = "Repair damaged buildings for part of their cost (drag along walls)";
+  rep.innerHTML = "<span>🔧</span><span>Repair</span>";
+  rep.addEventListener("click", () => { S.repair = !S.repair; S.demolish = false; S.upgrade = false; S.tool = null; buildTabs(); renderPalette(); });
+  nav.appendChild(rep);
 }
 
 function affordable(cost) {
   return Object.entries(cost).every(([k, v]) => S[k] >= v);
 }
 
+// Pola orders: two thresholds the market's trader follows.
+function marketCard(pal) {
+  const m = S.market || (S.market = { sell: 30, buy: 0 });
+  const c = document.createElement("div");
+  c.className = "card wide";
+  c.title = "The market's trader sells 5 rice for 8 gold above the first level, and buys 5 timber or stone for 12 gold below the second.";
+  c.innerHTML = `<div class="card-head">⚖️ Pola orders</div><div class="card-desc">
+    <span>Sell 🍚 above</span><button class="btn" data-m="sell,-10">−</button><b>${m.sell}</b><button class="btn" data-m="sell,10">+</button>
+    <span>Buy 🪵🪨 below</span><button class="btn" data-m="buy,-10">−</button><b>${m.buy}</b><button class="btn" data-m="buy,10">+</button></div>`;
+  c.querySelectorAll("[data-m]").forEach(b => b.addEventListener("click", () => {
+    const [k, d] = b.dataset.m.split(",");
+    m[k] = clamp(m[k] + Number(d), 0, k === "sell" ? 500 : 300);
+    renderPalette();
+  }));
+  pal.appendChild(c);
+}
+
 function renderPalette() {
   const pal = document.getElementById("palette");
   pal.innerHTML = "";
   if (S.cat === "realm" && S.L.sandbox) {
+    if (count("market")) marketCard(pal);
     S.raidEdge = S.raidEdge || "east";
     const card = (html, onClick) => { const c = document.createElement("div"); c.className = "card wide"; c.innerHTML = html; pal.appendChild(c); onClick(c); };
     card(`<div class="card-head">🚩 Raid edge</div><div class="card-desc">${["north", "east", "south", "west"].map(e => `<button class="btn ${S.raidEdge === e ? "primary" : ""}" data-edge="${e}">${e}</button>`).join(" ")}</div>`,
@@ -1380,6 +1438,7 @@ function renderPalette() {
       c.querySelector("#sbSeason").addEventListener("click", () => { S.seasonLeft = 1; tick(); });
     });
   } else if (S.cat === "realm") {
+    if (count("market")) marketCard(pal);
     for (const [id, e] of Object.entries(EDICTS)) {
       if (!S.unlocked.edicts.has(id)) continue;
       const why = edictBlocked(id);
@@ -1408,7 +1467,7 @@ function renderPalette() {
       card.dataset.build = id;
       card.title = b.desc;
       card.innerHTML = `<div class="card-head">${b.icon} ${b.name}</div><div class="card-desc">${b.desc}</div><div class="card-cost">${costText(buildCost(b))}</div>`;
-      card.addEventListener("click", () => { S.tool = S.tool === id ? null : id; S.demolish = false; S.upgrade = false; buildTabs(); renderPalette(); });
+      card.addEventListener("click", () => { S.tool = S.tool === id ? null : id; S.demolish = false; S.upgrade = false; S.repair = false; buildTabs(); renderPalette(); });
       pal.appendChild(card);
     }
   }
@@ -1533,6 +1592,7 @@ function spawnFloat(text, gx, gy, color) {
 
 function describe(b) {
   const lines = [`<b>${b.def.icon} ${b.def.name}</b>`, `HP ${Math.ceil(b.hp)}/${b.maxHp}`];
+  if (S.repair) lines.push(b.hp < b.maxHp ? `🔧 Repair: ${costText(repairCost(b)) || "free"}` : "Undamaged");
   if (S.upgrade) lines.push(b.def.upgrade ? `⬆️ ${BUILDINGS[b.def.upgrade.to].name}: ${costText(b.def.upgrade.cost)}` : "No upgrade");
   if (b.fire > 0) lines.push(`🔥 On fire (${b.fire >= 2 ? "raging" : "burning"}). Villagers are carrying water.`);
   if (b.def.worker) lines.push(b.worker ? (b.id === "pansala" ? (b.worker.alms ? "The monk is on his alms round" : "The monk is in meditation") : "Staffed") : "💤 No villager free. Build houses.");
@@ -1720,7 +1780,7 @@ canvas.addEventListener("mousemove", e => {
   }
   const g = screenToGrid(x, y);
   input.hover = { gx: g.gx, gy: g.gy, x: sx, y: sy };
-  if (input.painting && (S.tool || S.upgrade)) paintTo(g.gx, g.gy);
+  if (input.painting && (S.tool || S.upgrade || S.repair)) paintTo(g.gx, g.gy);
   if (input.drag) { input.drag.x2 = x; input.drag.y2 = y; }
   updateTooltip();
 });
@@ -1730,7 +1790,7 @@ function paintTo(gx, gy) {
   let [x, y] = input.lastPaint.split(",").map(Number);
   while (x !== gx || y !== gy) {
     if (Math.abs(gx - x) >= Math.abs(gy - y)) x += Math.sign(gx - x); else y += Math.sign(gy - y);
-    if (S.upgrade) upgradeAt(x, y, true); else tryBuild(x, y, true);
+    if (S.upgrade) upgradeAt(x, y, true); else if (S.repair) repairAt(x, y, true); else tryBuild(x, y, true);
   }
   input.lastPaint = `${gx},${gy}`;
 }
@@ -1756,8 +1816,8 @@ canvas.addEventListener("mousedown", e => {
       return;
     }
     if (S.demolish) { demolishAt(g.gx, g.gy); return; }
-    if (S.upgrade) {
-      upgradeAt(g.gx, g.gy);
+    if (S.upgrade || S.repair) {
+      if (S.upgrade) upgradeAt(g.gx, g.gy); else repairAt(g.gx, g.gy);
       input.painting = true; input.lastPaint = `${g.gx},${g.gy}`;
       return;
     }
@@ -1770,8 +1830,8 @@ canvas.addEventListener("mousedown", e => {
     }
     input.drag = { x1: x, y1: y, x2: x, y2: y };
   } else if (e.button === 2) {
-    if (S.tool || S.demolish || S.upgrade) {
-      S.tool = null; S.demolish = false; S.upgrade = false;
+    if (S.tool || S.demolish || S.upgrade || S.repair) {
+      S.tool = null; S.demolish = false; S.upgrade = false; S.repair = false;
       buildTabs(); renderPalette();
       return;
     }
@@ -1822,7 +1882,7 @@ window.addEventListener("keydown", e => {
     e.preventDefault();
     togglePause();
   } else if (k === "escape") {
-    S.tool = null; S.demolish = false; S.upgrade = false;
+    S.tool = null; S.demolish = false; S.upgrade = false; S.repair = false;
     for (const u of S.units) u.sel = false;
     buildTabs(); renderPalette();
   } else if (k === "c") {
