@@ -78,7 +78,7 @@ function saveProgress() {
 // field, water networks, cover, staffing) is rebuilt by refreshWorld().
 const RUN_KEY = "balakotuwa.run.v1";
 const RUN_SKIP = new Set(["L", "tiles", "trees", "unlocked", "buildings", "occ", "workers", "units", "shots", "floats", "nets",
-  "netOf", "flooded", "flow", "citadel", "cover", "fx", "tool", "demolish", "upgrade", "repair", "mode", "paused"]);
+  "netOf", "flooded", "flow", "citadel", "cover", "fx", "tool", "demolish", "improve", "mode", "paused"]);
 const plain = v => v === null || typeof v !== "object" || Array.isArray(v) || Object.getPrototypeOf(v) === Object.prototype;
 
 function saveRun() {
@@ -419,6 +419,13 @@ function repairAt(gx, gy, quiet = false) {
   return true;
 }
 
+// One tool for both: a damaged building is repaired, a sound one upgraded.
+function improveAt(gx, gy, quiet = false) {
+  const b = buildingAt(gx, gy);
+  return b && b.hp < b.maxHp ? repairAt(gx, gy, quiet) : upgradeAt(gx, gy, quiet);
+}
+const canImprove = b => !!b && (b.hp < b.maxHp ? !(b.fire > 0) && affordable(repairCost(b)) : !upgradeBlocked(b));
+
 function demolishAt(gx, gy) {
   const b = buildingAt(gx, gy);
   if (!b) return;
@@ -620,9 +627,8 @@ function assignShramadana() {
     if (b.id !== "wewa" || (b.silt || 0) < 8) continue;
     let have = S.workers.filter(w => w.job === "shramadana" && w.siltTarget === b).length;
     while (have < 3 && idleVillagers() > 0) {
-      const w = { b: S.citadel, job: "shramadana", temp: true, gx: S.citadel.gx + 1, gy: S.citadel.gy + 2.2, tx: 0, ty: 0, phase: "plan", timer: 0, carry: null, target: null, siltTarget: b };
-      S.workers.push(w); have++;
-      goTo(w, b.gx + 1, b.gy + 2.25, "toSilt");
+      goTo(helper("shramadana", { siltTarget: b }), b.gx + 1, b.gy + 2.25, "toSilt");
+      have++;
     }
   }
   if (!S.warnedSilt && S.buildings.some(b => b.id === "wewa" && b.silt >= 20)) {
@@ -631,6 +637,14 @@ function assignShramadana() {
   }
 }
 const endParty = w => { S.workers = S.workers.filter(x => x !== w); };
+// A temporary helper drawn from the idle villagers (water carrier or work party).
+function helper(job, extra) {
+  const w = { b: S.citadel, job, temp: true, gx: S.citadel.gx + 1, gy: S.citadel.gy + 2.2, tx: 0, ty: 0, phase: "plan", timer: 0, carry: null, target: null, ...extra };
+  S.workers.push(w);
+  return w;
+}
+// Send a helper (or a worker borrowed for a fire) home: helpers leave, workers go back to their job.
+function dismiss(w) { if (w.temp) endParty(w); else planJob(w); }
 
 // ==================== VILLAGERS & JOBS ====================
 function staff() {
@@ -754,7 +768,7 @@ function updateWorker(w, dt) {
         else if (src.net) drainNet(src.net, 2);
         w.carry = { key: "water", n: 1 };
         const b = w.fireTarget;
-        if (!b) { if (w.temp) S.workers = S.workers.filter(x => x !== w); else planJob(w); break; }
+        if (!b) { dismiss(w); break; }
         goTo(w, b.gx + b.w / 2, b.gy + b.h + 0.3, "toFire");
       }
       break;
@@ -768,7 +782,7 @@ function updateWorker(w, dt) {
           sfx("splash");
         }
         if (b && b.fire > 0 && S.buildings.includes(b)) seekWater(w);
-        else { w.fireTarget = null; if (w.temp) S.workers = S.workers.filter(x => x !== w); else planJob(w); }
+        else { w.fireTarget = null; dismiss(w); }
       }
       break;
     case "fetch":
@@ -1243,9 +1257,8 @@ function assignFirefighters() {
     let have = S.workers.filter(w => w.fireTarget === b).length;
     const cx = b.gx + b.w / 2, cy = b.gy + b.h / 2;
     while (have < 3 && idleVillagers() > 0) {
-      const w = { b: S.citadel, job: "bucket", temp: true, gx: S.citadel.gx + 1, gy: S.citadel.gy + 2.2, tx: 0, ty: 0, phase: "plan", timer: 0, carry: null, target: null, fireTarget: b };
-      S.workers.push(w); have++;
-      seekWater(w);
+      seekWater(helper("bucket", { fireTarget: b }));
+      have++;
     }
     const free = S.workers.filter(w => !w.fireTarget && w.b !== b && Math.hypot(w.gx - cx, w.gy - cy) < 11)
       .sort((p, q) => Math.hypot(p.gx - cx, p.gy - cy) - Math.hypot(q.gx - cx, q.gy - cy));
@@ -1274,7 +1287,7 @@ function nearestWater(w) {
 
 function seekWater(w) {
   const src = nearestWater(w);
-  if (!src) { w.fireTarget = null; if (w.temp) S.workers = S.workers.filter(x => x !== w); else planJob(w); return; }
+  if (!src) { w.fireTarget = null; dismiss(w); return; }
   w.waterSrc = src;
   goTo(w, src.x, src.y, "toWater");
 }
@@ -1589,29 +1602,23 @@ function buildTabs() {
   for (const c of CATS) {
     if (c.id === "realm" && !S.realmTab) continue;
     const btn = document.createElement("button");
-    btn.className = `tab ${S.cat === c.id && !S.demolish && !S.upgrade && !S.repair ? "active" : ""}`;
+    btn.className = `tab ${S.cat === c.id && !S.demolish && !S.improve ? "active" : ""}`;
     btn.innerHTML = `<span>${c.icon}</span><span>${c.label}</span>`;
-    btn.addEventListener("click", () => { S.cat = c.id; S.tool = null; S.demolish = false; S.upgrade = false; S.repair = false; buildTabs(); renderPalette(); });
+    btn.addEventListener("click", () => { S.cat = c.id; S.tool = null; S.demolish = false; S.improve = false; buildTabs(); renderPalette(); });
     nav.appendChild(btn);
   }
   const clear = document.createElement("button");
   clear.className = `tab clear ${S.demolish ? "active" : ""}`;
   clear.title = "Demolish (half refund)";
   clear.innerHTML = "<span>⛏️</span><span>Clear</span>";
-  clear.addEventListener("click", () => { S.demolish = !S.demolish; S.upgrade = false; S.repair = false; S.tool = null; buildTabs(); renderPalette(); });
+  clear.addEventListener("click", () => { S.demolish = !S.demolish; S.improve = false; S.tool = null; buildTabs(); renderPalette(); });
   nav.appendChild(clear);
-  const upg = document.createElement("button");
-  upg.className = `tab clear ${S.upgrade ? "active" : ""}`;
-  upg.title = "Upgrade in place: palisade → rampart, house → walawwa (drag along walls)";
-  upg.innerHTML = "<span>⬆️</span><span>Upgrade</span>";
-  upg.addEventListener("click", () => { S.upgrade = !S.upgrade; S.demolish = false; S.repair = false; S.tool = null; buildTabs(); renderPalette(); });
-  nav.appendChild(upg);
-  const rep = document.createElement("button");
-  rep.className = `tab clear ${S.repair ? "active" : ""}`;
-  rep.title = "Repair damaged buildings for part of their cost (drag along walls)";
-  rep.innerHTML = "<span>🔧</span><span>Repair</span>";
-  rep.addEventListener("click", () => { S.repair = !S.repair; S.demolish = false; S.upgrade = false; S.tool = null; buildTabs(); renderPalette(); });
-  nav.appendChild(rep);
+  const imp = document.createElement("button");
+  imp.className = `tab clear ${S.improve ? "active" : ""}`;
+  imp.title = "Improve: repair a damaged building, or upgrade it (palisade → rampart, house → walawwa); drag along walls";
+  imp.innerHTML = "<span>🔨</span><span>Improve</span>";
+  imp.addEventListener("click", () => { S.improve = !S.improve; S.demolish = false; S.tool = null; buildTabs(); renderPalette(); });
+  nav.appendChild(imp);
 }
 
 function affordable(cost) {
@@ -1680,7 +1687,7 @@ function renderPalette() {
       card.dataset.build = id;
       card.title = b.desc;
       card.innerHTML = `<div class="card-head">${b.icon} ${b.name}</div><div class="card-desc">${b.desc}</div><div class="card-cost">${costText(buildCost(b))}</div>`;
-      card.addEventListener("click", () => { S.tool = S.tool === id ? null : id; S.demolish = false; S.upgrade = false; S.repair = false; buildTabs(); renderPalette(); });
+      card.addEventListener("click", () => { S.tool = S.tool === id ? null : id; S.demolish = false; S.improve = false; buildTabs(); renderPalette(); });
       pal.appendChild(card);
     }
   }
@@ -1813,8 +1820,7 @@ function spawnFloat(text, gx, gy, color) {
 
 function describe(b) {
   const lines = [`<b>${b.def.icon} ${b.def.name}</b>`, `HP ${Math.ceil(b.hp)}/${b.maxHp}`];
-  if (S.repair) lines.push(b.hp < b.maxHp ? `🔧 Repair: ${costText(repairCost(b)) || "free"}` : "Undamaged");
-  if (S.upgrade) lines.push(b.def.upgrade ? `⬆️ ${BUILDINGS[b.def.upgrade.to].name}: ${costText(b.def.upgrade.cost)}` : "No upgrade");
+  if (S.improve) lines.push(b.hp < b.maxHp ? `🔨 Repair: ${costText(repairCost(b)) || "free"}` : b.def.upgrade ? `🔨 Upgrade to ${BUILDINGS[b.def.upgrade.to].name}: ${costText(b.def.upgrade.cost)}` : "Nothing to improve");
   if (b.fire > 0) lines.push(`🔥 On fire (${b.fire >= 2 ? "raging" : "burning"}). Villagers are carrying water.`);
   if (b.def.worker) lines.push(b.worker ? (b.id === "pansala" ? (b.worker.alms ? "The monk is on his alms round" : "The monk is in meditation") : "Staffed") : "💤 No villager free. Build houses.");
   if (b.id === "wewa") {
@@ -2004,7 +2010,7 @@ canvas.addEventListener("mousemove", e => {
   }
   const g = screenToGrid(x, y);
   input.hover = { gx: g.gx, gy: g.gy, x: sx, y: sy };
-  if (input.painting && (S.tool || S.upgrade || S.repair)) paintTo(g.gx, g.gy);
+  if (input.painting && (S.tool || S.improve)) paintTo(g.gx, g.gy);
   if (input.drag) { input.drag.x2 = x; input.drag.y2 = y; }
   updateTooltip();
 });
@@ -2014,7 +2020,7 @@ function paintTo(gx, gy) {
   let [x, y] = input.lastPaint.split(",").map(Number);
   while (x !== gx || y !== gy) {
     if (Math.abs(gx - x) >= Math.abs(gy - y)) x += Math.sign(gx - x); else y += Math.sign(gy - y);
-    if (S.upgrade) upgradeAt(x, y, true); else if (S.repair) repairAt(x, y, true); else tryBuild(x, y, true);
+    if (S.improve) improveAt(x, y, true); else tryBuild(x, y, true);
   }
   input.lastPaint = `${gx},${gy}`;
 }
@@ -2040,8 +2046,8 @@ canvas.addEventListener("mousedown", e => {
       return;
     }
     if (S.demolish) { demolishAt(g.gx, g.gy); return; }
-    if (S.upgrade || S.repair) {
-      if (S.upgrade) upgradeAt(g.gx, g.gy); else repairAt(g.gx, g.gy);
+    if (S.improve) {
+      improveAt(g.gx, g.gy);
       input.painting = true; input.lastPaint = `${g.gx},${g.gy}`;
       return;
     }
@@ -2054,8 +2060,8 @@ canvas.addEventListener("mousedown", e => {
     }
     input.drag = { x1: x, y1: y, x2: x, y2: y };
   } else if (e.button === 2) {
-    if (S.tool || S.demolish || S.upgrade || S.repair) {
-      S.tool = null; S.demolish = false; S.upgrade = false; S.repair = false;
+    if (S.tool || S.demolish || S.improve) {
+      S.tool = null; S.demolish = false; S.improve = false;
       buildTabs(); renderPalette();
       return;
     }
@@ -2106,7 +2112,7 @@ window.addEventListener("keydown", e => {
     e.preventDefault();
     togglePause();
   } else if (k === "escape") {
-    S.tool = null; S.demolish = false; S.upgrade = false; S.repair = false;
+    S.tool = null; S.demolish = false; S.improve = false;
     for (const u of S.units) u.sel = false;
     buildTabs(); renderPalette();
   } else if (k === "c") {

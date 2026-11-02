@@ -95,6 +95,14 @@ Recorded so these are not re-added without a strong reason:
   hint ("keep about one watered paddy for each house") fixes it; following it,
   the scripted player wins at ~350s.
 
+## Simplify round 2 (R5)
+
+- **Merged:** the ⬆️ Upgrade and 🔧 Repair tools into one 🔨 Improve tool
+  (repairs a damaged building, else upgrades it). One tab fewer.
+- **Merged (code):** water carriers and shramadana parties now share one
+  helper/dismiss pair instead of two hand-rolled copies (the R1 bug lived in
+  that duplication).
+
 ## From the learning playtest (docs/PLAYTEST-FINDINGS.md)
 
 - [x] Tribute could buy whole levels → final raid can't be bought, price doubles, max 2 stars.

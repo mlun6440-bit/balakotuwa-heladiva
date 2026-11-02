@@ -697,9 +697,9 @@ function drawRock(x, y) {
 function drawHoverTile() {
   const h = input.hover;
   if (S.tool || !inb(h.gx, h.gy) || S.mode !== "play") return;
-  if (S.upgrade || S.repair) {
+  if (S.improve) {
     const b = buildingAt(h.gx, h.gy);
-    const ok = b && (S.repair ? b.hp < b.maxHp && !(b.fire > 0) && affordable(repairCost(b)) : !upgradeBlocked(b));
+    const ok = canImprove(b);
     if (b) diamond(b.gx, b.gy, b.w, b.h, 0, ok ? "rgba(233,185,73,0.25)" : "rgba(255,90,70,0.2)", ok ? "rgba(255,215,110,0.95)" : "rgba(255,90,70,0.9)");
     else diamond(h.gx, h.gy, 1, 1, 0, null, "rgba(233,185,73,0.5)");
     return;
