@@ -47,7 +47,7 @@ to hunger), and loses the finale.
    (harmony 38/60, rice 1/150, undefended north and east, 7 buildings burnt)
    while the learner wins. *Direction:* a mid-level hint when a second raid
    edge opens, and a softer first Hill Kingdom raid.
-4. **The army balloons.** The learner keeps 7 + 4 per raid soldiers (35 by
+4. ✅ *Upkeep raised in R3 (0.06 rice/s).* **The army balloons.** The learner keeps 7 + 4 per raid soldiers (35 by
    L5). Soldiers cost a villager but there is no upkeep. *Direction:* rice
    upkeep per soldier in Yala (already 0.03/s: test raising it), or a barracks
    capacity.
@@ -56,14 +56,14 @@ to hunger), and loses the finale.
 6. **Fire still takes buildings even for a careful player on L5** (2) and
    many for novices (4–7). Check water-carrier throughput and whether the
    advisor warns early enough.
-7. **UI:** building cards clip their third line; the victory screen shows
+7. ✅ *Fixed in R3.* **UI:** building cards clipped their third line; the victory screen shows
    "Rain kept" on levels without a rain goal.
 
 ## Toward Stronghold-class depth (bigger steps, each one roadmap item)
 
 In order of value for this game's pillars:
 
-1. **Sieges with counterplay:** raider stone-thrower that outranges towers
+1. ✅ *Stone thrower vs bolt tower shipped in R4; a canal-fed moat is still open.* **Sieges with counterplay:** raider stone-thrower that outranges towers
    vs a player bolt tower (GENRE-NOTES step 5); a moat fed by your canals.
 2. **Wall height and access:** stairs or ramps so where archers can stand is
    a design choice; tall vs low walls.
