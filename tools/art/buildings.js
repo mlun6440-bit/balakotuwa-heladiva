@@ -141,6 +141,18 @@ for (let v = 0; v < 3; v++) {
   }, { size: 140 });
 }
 
+// Walawwa (manor): an upgraded house: whitewashed walls, tiled two-stage roof, veranda, gate posts.
+ART.add("walawwa", () => {
+  box(0.03, 0.03, 0, 0.94, 0.94, 0.8, { top: M.graniteSlab, left: M.laterite, right: M.laterite }, { edges: false });
+  hall(0.08, 0.08, 0.84, 0.78, { plinth: 3.4, wallH: 14, roofH: 0.01, wall: M.white, veranda: true, windows: 2, doorW: 0.18, overhang: 0, inset: 0.04 });
+  hipRoof(0.02, 0.02, 0.96, 0.9, 17.4, 7, M.tile, { hip: 1, thick: 1.2 });
+  box(0.26, 0.24, 20, 0.48, 0.42, 5, M.white, { eave: 2, top: false });
+  hipRoof(0.2, 0.18, 0.6, 0.54, 25, 9, M.tile, { hip: 1 });
+  finial([0.5, 0.45], 34, "#9a4426");
+  for (const x of [0.12, 0.88]) { box(x - 0.04, 0.9, 0.8, 0.08, 0.08, 9, M.lime); lathe(x, 0.94, [[0.03, 9.8], [0.0, 12]], M.lime, { seg: 8 }); }
+  clayPot(0.95, 0.6, 1, "#a0532c");
+}, { size: 140 });
+
 // Woodcutter (Dara Maduwa): open shed, chopping block, log pile.
 ART.add("woodcutter", () => {
   hall(0, 0, 0.72, 0.72, { plinth: 1, wallH: 10, roofH: 11, roof: M.thatch, wall: M.mud, windows: 0, inset: 0.1 });

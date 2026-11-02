@@ -289,6 +289,33 @@ function tryBuild(gx, gy, quiet = false) {
   return true;
 }
 
+// ==================== UPGRADES ====================
+// Why building b can't be upgraded now, or null.
+function upgradeBlocked(b) {
+  const up = b && b.def.upgrade;
+  if (!up) return b ? `The ${b.def.name} has no upgrade.` : "Nothing to upgrade here.";
+  if (!S.unlocked.buildings.has(up.to)) return `${BUILDINGS[up.to].name} is not known in this region yet.`;
+  if (b.fire > 0) return "Put the fire out first.";
+  if (!affordable(up.cost)) return `Upgrading to ${BUILDINGS[up.to].name} needs ${costText(up.cost)}.`;
+  return null;
+}
+
+// Rebuild in place: same tile, same uid, health kept in proportion.
+function upgradeAt(gx, gy, quiet = false) {
+  const b = buildingAt(gx, gy);
+  const why = upgradeBlocked(b);
+  if (why) { if (!quiet) say(why, true); return false; }
+  const up = b.def.upgrade, def = BUILDINGS[up.to];
+  for (const [k, v] of Object.entries(up.cost)) S[k] -= v;
+  const k = b.hp / b.maxHp;
+  b.id = up.to; b.def = def; b.maxHp = def.hp; b.hp = Math.max(1, Math.round(def.hp * k)); b.at = S.time;
+  puff(b.gx + 0.5, b.gy + 0.5, 6, "#b8a07a");
+  refreshWorld();
+  sfx("build");
+  syncHud();
+  return true;
+}
+
 function demolishAt(gx, gy) {
   const b = buildingAt(gx, gy);
   if (!b) return;
@@ -1009,6 +1036,7 @@ function tick() {
   let target = 55 + Math.min(2, count("dagoba")) * BUILDINGS.dagoba.harmony - S.fear + (S.season === "maha" ? 3 : 0);
   if (edictOn("perahera")) target += EDICTS.perahera.harmonyTarget;
   target += Math.min(2, staffedPansalas()) * 5;
+  target += Math.min(6, count("walawwa")) * BUILDINGS.walawwa.harmony;
   if (S.rice <= 0) target -= 35;
   else if (S.rice >= S.villagers * 3) target += 8;
   target = clamp(target, 5, 100);
@@ -1164,17 +1192,23 @@ function buildTabs() {
   nav.innerHTML = "";
   for (const c of CATS) {
     const btn = document.createElement("button");
-    btn.className = `tab ${S.cat === c.id && !S.demolish ? "active" : ""}`;
+    btn.className = `tab ${S.cat === c.id && !S.demolish && !S.upgrade ? "active" : ""}`;
     btn.innerHTML = `<span>${c.icon}</span><span>${c.label}</span>`;
-    btn.addEventListener("click", () => { S.cat = c.id; S.tool = null; S.demolish = false; buildTabs(); renderPalette(); });
+    btn.addEventListener("click", () => { S.cat = c.id; S.tool = null; S.demolish = false; S.upgrade = false; buildTabs(); renderPalette(); });
     nav.appendChild(btn);
   }
   const clear = document.createElement("button");
   clear.className = `tab clear ${S.demolish ? "active" : ""}`;
   clear.title = "Demolish (half refund)";
   clear.innerHTML = "<span>⛏️</span><span>Clear</span>";
-  clear.addEventListener("click", () => { S.demolish = !S.demolish; S.tool = null; buildTabs(); renderPalette(); });
+  clear.addEventListener("click", () => { S.demolish = !S.demolish; S.upgrade = false; S.tool = null; buildTabs(); renderPalette(); });
   nav.appendChild(clear);
+  const upg = document.createElement("button");
+  upg.className = `tab clear ${S.upgrade ? "active" : ""}`;
+  upg.title = "Upgrade in place: palisade → rampart, house → walawwa (drag along walls)";
+  upg.innerHTML = "<span>⬆️</span><span>Upgrade</span>";
+  upg.addEventListener("click", () => { S.upgrade = !S.upgrade; S.demolish = false; S.tool = null; buildTabs(); renderPalette(); });
+  nav.appendChild(upg);
 }
 
 function affordable(cost) {
@@ -1213,7 +1247,7 @@ function renderPalette() {
       card.dataset.build = id;
       card.title = b.desc;
       card.innerHTML = `<div class="card-head">${b.icon} ${b.name}</div><div class="card-desc">${b.desc}</div><div class="card-cost">${costText(buildCost(b))}</div>`;
-      card.addEventListener("click", () => { S.tool = S.tool === id ? null : id; S.demolish = false; buildTabs(); renderPalette(); });
+      card.addEventListener("click", () => { S.tool = S.tool === id ? null : id; S.demolish = false; S.upgrade = false; buildTabs(); renderPalette(); });
       pal.appendChild(card);
     }
   }
@@ -1337,6 +1371,7 @@ function spawnFloat(text, gx, gy, color) {
 
 function describe(b) {
   const lines = [`<b>${b.def.icon} ${b.def.name}</b>`, `HP ${Math.ceil(b.hp)}/${b.maxHp}`];
+  if (S.upgrade) lines.push(b.def.upgrade ? `⬆️ ${BUILDINGS[b.def.upgrade.to].name}: ${costText(b.def.upgrade.cost)}` : "No upgrade");
   if (b.fire > 0) lines.push(`🔥 On fire (${b.fire >= 2 ? "raging" : "burning"}). Villagers are carrying water.`);
   if (b.def.worker) lines.push(b.worker ? (b.id === "pansala" ? (b.worker.alms ? "The monk is on his alms round" : "The monk is in meditation") : "Staffed") : "💤 No villager free. Build houses.");
   if (b.id === "wewa") {
@@ -1511,7 +1546,7 @@ canvas.addEventListener("mousemove", e => {
   }
   const g = screenToGrid(x, y);
   input.hover = { gx: g.gx, gy: g.gy, x: sx, y: sy };
-  if (input.painting && S.tool) paintTo(g.gx, g.gy);
+  if (input.painting && (S.tool || S.upgrade)) paintTo(g.gx, g.gy);
   if (input.drag) { input.drag.x2 = x; input.drag.y2 = y; }
   updateTooltip();
 });
@@ -1521,7 +1556,7 @@ function paintTo(gx, gy) {
   let [x, y] = input.lastPaint.split(",").map(Number);
   while (x !== gx || y !== gy) {
     if (Math.abs(gx - x) >= Math.abs(gy - y)) x += Math.sign(gx - x); else y += Math.sign(gy - y);
-    tryBuild(x, y, true);
+    if (S.upgrade) upgradeAt(x, y, true); else tryBuild(x, y, true);
   }
   input.lastPaint = `${gx},${gy}`;
 }
@@ -1547,6 +1582,11 @@ canvas.addEventListener("mousedown", e => {
       return;
     }
     if (S.demolish) { demolishAt(g.gx, g.gy); return; }
+    if (S.upgrade) {
+      upgradeAt(g.gx, g.gy);
+      input.painting = true; input.lastPaint = `${g.gx},${g.gy}`;
+      return;
+    }
     const b = buildingAt(g.gx, g.gy);
     if (b && b.id === "sluice") {
       b.open = !b.open;
@@ -1556,8 +1596,8 @@ canvas.addEventListener("mousedown", e => {
     }
     input.drag = { x1: x, y1: y, x2: x, y2: y };
   } else if (e.button === 2) {
-    if (S.tool || S.demolish) {
-      S.tool = null; S.demolish = false;
+    if (S.tool || S.demolish || S.upgrade) {
+      S.tool = null; S.demolish = false; S.upgrade = false;
       buildTabs(); renderPalette();
       return;
     }
@@ -1608,7 +1648,7 @@ window.addEventListener("keydown", e => {
     e.preventDefault();
     togglePause();
   } else if (k === "escape") {
-    S.tool = null; S.demolish = false;
+    S.tool = null; S.demolish = false; S.upgrade = false;
     for (const u of S.units) u.sel = false;
     buildTabs(); renderPalette();
   } else if (k === "c") {

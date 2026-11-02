@@ -20,6 +20,7 @@ const RES = { timber: "🪵", stone: "🪨", rice: "🍚", gold: "🪙", arms: "
 // ==================== BUILDINGS ====================
 // solid: blocks raiders (they must break it). ground: flat, walkable.
 // flammable: thatch or timber that raider fire arrows can set alight.
+// upgrade: { to, cost } lets the ⬆️ Upgrade tool rebuild it in place.
 // worker: job type staffed by one villager. store: drop-off for those resources.
 const BUILDINGS = {
   citadel:    { name: "Maligawa (Citadel)", cat: null, icon: "🏯", w: 2, h: 2, hp: 2500, solid: true, z: 40, store: ["timber", "stone", "rice", "arms"],
@@ -50,12 +51,14 @@ const BUILDINGS = {
 
   pansala:    { name: "Pansala (Monastery)", cat: "town", icon: "🪷", w: 2, h: 2, hp: 600, cost: { timber: 20, stone: 12, gold: 20 }, solid: true, z: 34, worker: "monk",
                 desc: "A monk walks alms rounds among the houses. While staffed: +5 harmony (up to two) and soldiers cost 25% less." },
-  house:      { name: "Gedara (House)", cat: "town", icon: "🏠", w: 1, h: 1, hp: 220, cost: { timber: 8 }, solid: true, flammable: true, z: 18, pop: 5,
+  house:      { name: "Gedara (House)", cat: "town", icon: "🏠", w: 1, h: 1, hp: 220, cost: { timber: 8 }, solid: true, flammable: true, z: 18, pop: 5, upgrade: { to: "walawwa", cost: { timber: 10, stone: 8, gold: 15 } },
                 desc: "Room for 5 more villagers." },
+  walawwa:    { name: "Walawwa (Manor)", cat: null, icon: "🏡", w: 1, h: 1, hp: 420, cost: { timber: 18, stone: 8, gold: 15 }, solid: true, z: 24, pop: 8, harmony: 1,
+                desc: "An upgraded house: room for 8 and +1 harmony each (up to 6)." },
   dagoba:     { name: "Dagoba (Stupa)", cat: "town", icon: "🛕", w: 2, h: 2, hp: 1000, cost: { stone: 30, gold: 40 }, solid: true, z: 44, harmony: 12,
                 desc: "+12 harmony (counts up to two)." },
 
-  palisade:   { name: "Palisade", cat: "defence", icon: "🪵", w: 1, h: 1, hp: 320, cost: { timber: 3 }, solid: true, flammable: true, wall: true, z: 20, paint: true,
+  palisade:   { name: "Palisade", cat: "defence", icon: "🪵", w: 1, h: 1, hp: 320, cost: { timber: 3 }, solid: true, flammable: true, wall: true, z: 20, paint: true, upgrade: { to: "rampart", cost: { stone: 4 } },
                 desc: "Cheap wall. Raiders must break through. Drag to paint." },
   rampart:    { name: "Gal Bamma (Rampart)", cat: "defence", icon: "🧱", w: 1, h: 1, hp: 950, cost: { stone: 5 }, solid: true, wall: true, z: 26, paint: true,
                 desc: "Heavy stone wall. Drag to paint." },
@@ -153,7 +156,7 @@ const LEVELS = [
     rivers: [{ edge: "west", at: 0, width: 2, wobble: 1.5 }],
     rocks: [[15, 6, 19, 9], [5, 16, 8, 19]],
     forests: [[3, 3, 10, 8, 0.45], [18, 17, 25, 24, 0.4], [3, 21, 8, 25, 0.4]],
-    unlocks: { buildings: ["rampart", "gate", "market"], troops: ["angampora"] },
+    unlocks: { buildings: ["rampart", "gate", "market", "walawwa"], troops: ["angampora"] },
     waves: [
       { t: 150, from: ["east"], raider: 5, bowman: 2 },
       { t: 260, from: ["south"], raider: 6, bowman: 2 },
