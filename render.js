@@ -1151,7 +1151,43 @@ function person(p, o, now) {
   }
 }
 
+// Facing and stride tracking for anything that walks (render-local).
+const gait = new WeakMap();
+function stride(o) {
+  let g = gait.get(o);
+  if (!g) { g = { x: o.gx, y: o.gy, d: 0, back: false, flip: false, moving: false }; gait.set(o, g); }
+  const dx = o.gx - g.x, dy = o.gy - g.y, m = Math.hypot(dx, dy);
+  g.moving = m > 0.0005;
+  if (m > 0.002) {
+    const sx = dx - dy, sy = dx + dy;
+    g.back = sy < -0.05 * m; g.flip = sx < 0;
+  }
+  g.d += m; g.x = o.gx; g.y = o.gy;
+  return g;
+}
+function drawWorkerSprite(w, now) {
+  const base = `u.v.${w.job}`;
+  if (!hasSprite(`${base}.f.i0`)) return false;
+  const g = stride(w);
+  const f = g.back ? "b" : "f";
+  const moving = (w.phase === "toSite" || w.phase === "toStore" || w.phase === "wait") && g.moving;
+  const working = w.phase === "work" || (w.phase === "tend" && w.job !== "trader") || (w.job === "trader" && w.phase === "tend");
+  let fr;
+  if (moving) fr = `w${Math.floor(g.d * 7) % 6}`;
+  else if (working) fr = `a${Math.floor(now / (w.job === "farmer" || w.job === "trader" ? 260 : 150) + w.b.uid) % 3}`;
+  else fr = "i0";
+  drawSprite(`${base}.${f}.${fr}`, w.gx, w.gy, 0, { flip: g.flip });
+  if (w.carry && moving) drawSprite(`load.${w.carry.key}.${f}.${fr}`, w.gx, w.gy, 0, { flip: g.flip });
+  if (w.phase === "work" && Math.floor(now / 150) % 3 === 2 && hash(now | 0, 1) > 0.6) {
+    const p = iso(w.gx, w.gy, 0);
+    ctx.fillStyle = w.job === "mason" ? "#ddd" : "#d9b27a";
+    ctx.fillRect(p.x + (g.flip ? -9 : 7), p.y - 6, 1.5, 1.5);
+  }
+  return true;
+}
+
 function drawWorker(w, now) {
+  if (drawWorkerSprite(w, now)) return;
   const p = iso(w.gx, w.gy, 0);
   const moving = w.phase === "toSite" || w.phase === "toStore";
   const working = w.phase === "work";
@@ -1196,7 +1232,6 @@ function drawElephant(p, u, now) {
 }
 
 function drawUnit(u, now) {
-  if (drawSprite(u.type, u.gx, u.gy, u.z)) return;
   const p = iso(u.gx, u.gy, u.z);
   const heavy = u.def.heavy;
   if (u.sel) {
@@ -1204,7 +1239,18 @@ function drawUnit(u, now) {
     ctx.beginPath(); ctx.ellipse(p.x, p.y + 1, heavy ? 16 : 8, heavy ? 7 : 4, 0, 0, Math.PI * 2); ctx.stroke();
   }
   const moving = u.team === "p" ? Math.hypot(u.tx - u.gx, u.ty - u.gy) > 0.15 : true;
-  if (u.type === "elephant") drawElephant(p, u, now);
+  const base = `u.${u.type}`;
+  if (hasSprite(`${base}.f.i0`)) {
+    const g = stride(u);
+    const since = S.time - u.last;
+    let fr;
+    if (since >= 0 && since < 0.45) fr = `a${Math.min(2, Math.floor(since / 0.15))}`;
+    else if (g.moving) fr = `w${Math.floor(g.d * (u.type === "elephant" ? 4 : 7)) % 6}`;
+    else fr = "i0";
+    const f = u.type === "elephant" || !g.back ? "f" : "b";
+    drawSprite(`${base}.${f}.${fr}`, u.gx, u.gy, u.z, { flip: g.flip });
+  }
+  else if (u.type === "elephant") drawElephant(p, u, now);
   else if (u.team === "p") {
     const look = {
       archer: { upper: "#2f8f4e", lower: "#f2efe6", item: "bow", head: "turban", headCol: "#2f8f4e" },
@@ -1227,7 +1273,7 @@ function drawUnit(u, now) {
   }
   const k = Math.max(0, u.hp / u.maxHp);
   if (k < 1 || u.sel) {
-    const top = heavy ? 32 : 26;
+    const top = u.type === "elephant" ? 40 : heavy ? 34 : 26;
     ctx.fillStyle = "rgba(0,0,0,0.75)";
     ctx.fillRect(p.x - 9, p.y - top, 18, 3);
     ctx.fillStyle = u.team === "p" ? "#6cc070" : "#ff5a4a";
