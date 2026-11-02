@@ -24,6 +24,17 @@ villagers-as-soldiers.
 | 12 | **Pathing edge cases**: players seal themselves in completely; AI must still behave. | Flow field already breaks walls when sealed. Add a test that seals the citadel and checks raiders still attack the cheapest wall. | Medium |
 | 13 | **Big armies**: 200+ units on screen. | Performance target for the renderer: 300 units at 60 fps. Spatial hash for `nearestFoe` and `separate()` (both O(n²) now). | **High** for the graphics pass |
 
+Second source: a solo developer's month-long AI-assisted RTS build (a unit-focused fantasy RTS). Again, ideas only.
+
+| # | Genre expectation | Balakotuwa version | Priority |
+|---|-------------------|--------------------|----------|
+| 14 | **Pay instead of fight**: buying off an enemy camp is often wiser than spending your army. | *Tribute*: when a raid is announced, offer gold and rice to turn it back. It costs more each time and lowers harmony a little. A real decision that fits the economy. | **High** |
+| 15 | **Escalation over time**: idle enemies grow stronger on a clock, so delay has a cost. | Raiders gain a level every few minutes of waiting (more HP and damage), shown on the wave timer. Calling a raid early with the conch becomes a meaningful choice. | Medium |
+| 16 | **Home-ground bonus**: units fight better near their own stronghold. | Defenders within 3 tiles of the citadel or a tower get +15% damage; raiders get the same near their spawn edge. Shown by a soft aura. | Medium |
+| 17 | **Hidden routes through dense forest** that reward scouting. | Some forests hide a footpath that raiders may use. Felling trees reveals it; a watchtower nearby shows it. | Low |
+| 18 | **Random finds on the map** that reward exploring. | Buried coin hoards (*nidhana*) that a villager can dig up for gold, sometimes with a harmony bonus. | Low |
+| 19 | **Hard but fair, and readable**: tough fights are fine if the player can see why they lost. | Every defeat screen names the cause (for example "the east wall had no archers", or "the rice ran out in Yala"). Ask fresh players whether the goal is clear. | **High** |
+
 ## Visual targets for the graphics pass
 
 - **Mass battles stay readable**: clear team colours, health bars only when hurt, and selection rings.

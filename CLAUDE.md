@@ -64,6 +64,6 @@ train a soldier, zoom and pan.
 
 ## When a stronger model picks this up
 
-Read `docs/ITERATION-GUARDRAILS.md` before any improvement pass. Work from `ROADMAP.md` top-down, using `docs/GENRE-NOTES.md` for genre expectations (ideas only, never copied content). Before large changes, re-read this file and
+Read `docs/ITERATION-GUARDRAILS.md` before any improvement pass and `docs/DEV-WORKFLOW.md` for how to build new content. Work from `ROADMAP.md` top-down, using `docs/GENRE-NOTES.md` for genre expectations (ideas only, never copied content). Before large changes, re-read this file and
 keep the invariants. Prefer data rows over new branches, keep `game.js` free
 of drawing code, and keep each commit to one roadmap item.
