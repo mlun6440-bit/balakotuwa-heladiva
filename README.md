@@ -1,22 +1,62 @@
-# 🦁 BALAKOTUWA: Citadel of Heladiva
+# Balakotuwa — Keepers of the Wewa
 
-A browser-based **2.5D Isometric Historical Castle-Building & Real-Time Strategy (RTS)** game set in ancient and medieval Sri Lanka (*Heladiva*), featuring two historical eras:
-- **🦁 Rajarata Era (Sigiriya & Polonnaruwa)**: *Raja Maligawa* Citadel, *Badagara* Treasury Yard, *Vee Bissa* Paddy Granary, *Dara Maduwa* Kumbuk Woodcutters, *Veddah* Hunters, *Kalugal* Stone Quarries, *Samanalawewa* Monsoon Wind-Furnaces (Wootz Steel), *Dunuvaya* Longbowmen, *Angampora Soorayas*, and *Kandula* Royal War Elephants.
-- **⚔️ Kandyan Kingdom Era (Senkadagala & Balana Fort)**: *Senkadagala Wasala* Palace, *Maha Gabadawa* Storehouse, *Helmalu* Terraced Paddy Fields, *Kadawatha* Stockades, *Kodituwakku* Bastions, *Patisthana* Pikemen, and *Gajanayake* Tuskers.
+An isometric tank-kingdom builder set in ancient Sri Lanka. Catch the monsoon in
+wewas (reservoirs), carry it by canal to your paddies through the dry season,
+and hold the citadel against raiders across a five-level campaign.
 
----
+Plain HTML, CSS and JavaScript. No build step and no dependencies.
 
-## 🎮 Key Gameplay Systems
-- **True 2.5D Isometric Diamond Grid (`64×32` 2:1 projection)**: Depth-sorted 3D prism buildings, granite ramparts, watchtowers, swaying jungle trees that turn into stumps when felled, and roaming deer herds.
-- **Visual Badagara & Vee Bissa Stacking**: Watch timber planks and granite blocks physically pile up on your courtyard as autonomous *Govi* villagers harvest and deliver goods.
-- **Bastion Elevation Bonus**: Garrison *Dunuvaya* Archers atop *Mura Atuwa* Watchtowers (`z = 38`) for `+45%` range and parabolic arrow trajectories.
-- **Puskola Potha (Ola-Leaf Advisor Book)**: Manage *Rajakariya* taxes, *Vee Bissa* rice rations, and village harmony (*Janapriya*) alongside a live isometric diamond radar minimap.
+## Play
 
----
+- **Online:** https://mlun6440-bit.github.io/balakotuwa-heladiva/
+- **Locally:** serve the folder with any static server, for example
 
-## 🚀 Play Online or Locally
-- **Live Web Version (GitHub Pages)**: https://mlun6440-bit.github.io/balakotuwa-heladiva/
-- **Run Locally**:
   ```bash
-  npx http-server . -p 8456 -o
+  py -m http.server 8137
   ```
+
+  then open http://localhost:8137. Opening `index.html` straight from disk also works in most browsers.
+
+## How it plays
+
+- **Two seasons.** In the 🌧️ Maha monsoon, rain fills every wewa and every paddy grows. In the ☀️ Yala dry season, a paddy grows only beside a watered canal, a wewa or the river.
+- **Water network.** Wewas store up to 100 water and fill all year when they sit beside the river. Canals join on four sides; each watered paddy drinks from its network.
+- **Sluice gates.** Click a sluice to flood its canal network. Raiders wading through floodwater slow down and drown, but the water comes out of your wewas.
+- **Villagers.** They staff farms, woodcutters, quarries and markets. Every soldier you train costs one villager. Houses raise the population cap.
+- **Harmony.** It rises with a full granary and dagobas, and falls with hunger and destruction. New families settle only at 45 or above.
+- **Raiders.** They follow the cheapest path to the citadel. They walk around walls when there is a gap and break through when there isn't.
+
+## Campaign
+
+| # | Level | Era | New |
+|---|-------|-----|-----|
+| 1 | Dawn at Anuradhapura | Early kingdom | Core economy, palisades, archers, spearmen |
+| 2 | The Dry Zone | Rajarata | Sluice gates, watchtowers |
+| 3 | Lion Rock | Sigiriya | Ramparts, gates, market, Angampora fighters |
+| 4 | Sea of Parakrama | Polonnaruwa | Dagoba, war elephants, ram bearers |
+| 5 | Hill Kingdom | Senkadagala | Raids from three sides |
+
+Progress and star ratings are saved in the browser.
+
+## Controls
+
+| Action | Input |
+|--------|-------|
+| Pan | WASD / arrow keys, Shift+drag, middle-drag, or click the minimap |
+| Zoom | Mouse wheel |
+| Build | Pick a card, then left-click. Drag to paint walls and canals |
+| Select soldiers | Left-click or drag a box |
+| Move soldiers | Right-click |
+| Cancel | Right-click or Esc |
+| Pause / centre | Space / C |
+
+## Project layout
+
+| File | Purpose |
+|------|---------|
+| `data.js` | Content: buildings, troops, raiders, levels, tutorial |
+| `game.js` | Simulation, pathfinding, water network, HUD, input |
+| `render.js` | All drawing: terrain cache, buildings, people, effects |
+| `styles.css` | HUD and overlay styles |
+| `CLAUDE.md` | Rules for extending the game (for people and AI models) |
+| `ROADMAP.md` | Prioritised backlog |

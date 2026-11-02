@@ -1,1380 +1,1307 @@
+"use strict";
 // ============================================================================
-// BALAKOTUWA: CITADEL OF HELADIVA — TRUE 2.5D ISOMETRIC CASTLE SIM & RTS ENGINE
-// Historical Sri Lankan Rajarata (Sigiriya/Polonnaruwa) & Kandyan Kingdom Eras
+// BALAKOTUWA — Keepers of the Wewa
+// An isometric tank-kingdom builder. Store monsoon rain in wewas, carry it by
+// canal to the paddies through the dry season, and hold the citadel against
+// raiders across a five-level campaign.
+//
+// This file is the simulation and UI. Content tables live in data.js and all
+// drawing lives in render.js. Extend content by adding rows, not branches.
+// See CLAUDE.md for the extension rules and ROADMAP.md for the backlog.
 // ============================================================================
 
-const MAP_SIZE = 26;
-const ISO_W = 64;
-const ISO_H = 32;
-
-// ==================== HISTORICAL ERA DICTIONARY (RAJARATA vs KANDYAN ERA) ====================
-const THEMES = {
-  srilanka: {
-    label: "🦁 Era: Rajarata (Polonnaruwa)",
-    scribeTitle: "Maha Adigar (Purohita)",
-    keep: "Raja Maligawa (Citadel)",
-    stockpile: "Badagara (Treasury Yard)",
-    granary: "Vee Bissa (Paddy Granary)",
-    woodcutter: "Dara Maduwa (Kumbuk Logger)",
-    hunter: "Veddah Hunter Post",
-    quarry: "Kalugal Granite Quarry",
-    ox_tether: "Mee Harak Buffalo Cart",
-    iron_mine: "Samanalawewa Wootz Furnace",
-    paddy: "Samba Paddy Field",
-    orchard: "Kos & Pol Orchard",
-    hovel: "Govi Gedara (Homestead)",
-    stupa: "Dagoba Stupa Shrine",
-    wood_wall: "Kumbuk Palisade Wall",
-    stone_wall: "Kalugal Granite Rampart",
-    gatehouse: "Simhadvara Lion Gate",
-    tower: "Mura Atuwa Watchtower",
-    barracks: "Angam Maduwa Barracks",
-    armoury: "Ayudhagaraya Armoury",
-    fletcher: "Dunu Bowyer Workshop",
-    poleturner: "Hella Spear Smithy",
-    blacksmith: "Kastane Wootz Smithy",
-    mill: "Vee Mola Rice Mill",
-    bakery: "Bath Maduwa Royal Kitchen",
-    brewery: "Ra Salawa Toddy Tavern",
-    archer: "Dunuvaya Longbowman",
-    spearman: "Hella Spearman",
-    maceman: "Angampora Sooraya",
-    elephant: "Kandula War Elephant"
-  },
-  classic: {
-    label: "⚔️ Era: Kandyan Kingdom (Senkadagala)",
-    scribeTitle: "Maha Nilame (Adigar)",
-    keep: "Senkadagala Wasala (Palace)",
-    stockpile: "Maha Gabadawa (Storehouse)",
-    granary: "Atuwa (Royal Granary)",
-    woodcutter: "Halamba Timber Camp",
-    hunter: "Dada Maduwa (Royal Hunter)",
-    quarry: "Balana Rock Quarry",
-    ox_tether: "Tavalam Pack Bullocks",
-    iron_mine: "Kotmale Steel Furnace",
-    paddy: "Helmalu Terraced Paddy",
-    orchard: "Jak & Spice Garden",
-    hovel: "Gamarala Walawwa",
-    stupa: "Vihara Tampita Shrine",
-    wood_wall: "Kadawatha Thorn Stockade",
-    stone_wall: "Balana Stone Rampart",
-    gatehouse: "Wahalkada Gatehouse",
-    tower: "Kodituwakku Bastion",
-    barracks: "Ilangam Maduwa (Barracks)",
-    armoury: "Ayudha Gabadawa",
-    fletcher: "Dunu Wada Workshop",
-    poleturner: "Patisthana Pike Smithy",
-    blacksmith: "Kastane & Urumi Smithy",
-    mill: "Diya Mola Water Mill",
-    bakery: "Muluthenge Royal Kitchen",
-    brewery: "Kithul Ra Ambalama",
-    archer: "Hevaya Bowmen",
-    spearman: "Patisthana Pikeman",
-    maceman: "Maru-Kala Angam Master",
-    elephant: "Gajanayake Tusker"
-  }
-};
-
-// ==================== BUILDING CATALOG ====================
-const CATALOG = {
-  // Castle Category
-  wood_wall:  { id: "wood_wall",  cat: "castle", icon: "🪵", w: 1, h: 1, hp: 300, cost: { wood: 3 }, isWall: true, zHeight: 22, sub: "Blocks enemy raiders" },
-  stone_wall: { id: "stone_wall", cat: "castle", icon: "🧱", w: 1, h: 1, hp: 850, cost: { stone: 6 }, isWall: true, zHeight: 28, sub: "Heavy fortification wall" },
-  gatehouse:  { id: "gatehouse",  cat: "castle", icon: "⛩️", w: 1, h: 1, hp: 950, cost: { wood: 10, stone: 8 }, isGate: true, zHeight: 34, sub: "Lets your villagers & troops pass" },
-  tower:      { id: "tower",      cat: "castle", icon: "🗼", w: 1, h: 1, hp: 900, cost: { wood: 12, stone: 10 }, isTower: true, zHeight: 44, sub: "Archers climb top for +45% range" },
-  barracks:   { id: "barracks",   cat: "castle", icon: "⚔️", w: 2, h: 2, hp: 800, cost: { wood: 15, stone: 10 }, zHeight: 24, sub: "Recruit Archers & Infantry" },
-  armoury:    { id: "armoury",    cat: "castle", icon: "🛡️", w: 1, h: 1, hp: 600, cost: { wood: 12 }, zHeight: 22, sub: "Stores crafted bows, spears & swords" },
-
-  // Industry Category
-  stockpile:  { id: "stockpile",  cat: "industry", icon: "📦", w: 2, h: 2, hp: 500, cost: { wood: 5 }, zHeight: 4, sub: "Visual yard for Wood, Stone & Iron" },
-  woodcutter: { id: "woodcutter", cat: "industry", icon: "🪓", w: 1, h: 1, hp: 220, cost: { wood: 3 }, workers: 1, zHeight: 18, sub: "Chops forest trees into timber" },
-  quarry:     { id: "quarry",     cat: "industry", icon: "⛏️", w: 2, h: 2, hp: 350, cost: { wood: 15 }, workers: 1, zHeight: 22, sub: "Carves stone from northern boulders" },
-  ox_tether:  { id: "ox_tether",  cat: "industry", icon: "🐃", w: 1, h: 1, hp: 200, cost: { wood: 6 }, workers: 1, zHeight: 12, sub: "Hauls stone blocks to Stockpile" },
-  iron_mine:  { id: "iron_mine",  cat: "industry", icon: "🌋", w: 1, h: 1, hp: 350, cost: { wood: 20 }, workers: 1, zHeight: 26, sub: "Smelts iron/Wootz on rocky hills" },
-
-  // Farm Category
-  granary:    { id: "granary",    cat: "farm", icon: "🏺", w: 2, h: 2, hp: 500, cost: { wood: 10 }, zHeight: 24, sub: "Stores Meat, Fruit & Grain rations" },
-  hunter:     { id: "hunter",     cat: "farm", icon: "🦌", w: 1, h: 1, hp: 200, cost: { wood: 5 }, workers: 1, zHeight: 16, sub: "Hunts roaming deer for meat" },
-  orchard:    { id: "orchard",    cat: "farm", icon: "🌴", w: 2, h: 2, hp: 220, cost: { wood: 6 }, workers: 1, zHeight: 14, sub: "Harvests fruit directly to Granary" },
-  paddy:      { id: "paddy",      cat: "farm", icon: "🌾", w: 2, h: 2, hp: 200, cost: { wood: 8 }, workers: 1, zHeight: 6, sub: "Grows grain near the river water" },
-
-  // Town Category
-  hovel:      { id: "hovel",      cat: "town", icon: "🏡", w: 1, h: 1, hp: 240, cost: { wood: 6 }, popCap: 6, zHeight: 20, sub: "+6 peasant housing capacity" },
-  stupa:      { id: "stupa",      cat: "town", icon: "🛕", w: 2, h: 2, hp: 900, cost: { stone: 20, gold: 40 }, popBonus: 6, zHeight: 38, sub: "+6 Popularity & blessing" },
-
-  // Weapons Category
-  fletcher:   { id: "fletcher",   cat: "weapons", icon: "🏹", w: 1, h: 1, hp: 280, cost: { wood: 12, gold: 20 }, workers: 1, zHeight: 20, weaponOut: "bows", sub: "Turns 2 Wood into 1 Bow" },
-  poleturner: { id: "poleturner", cat: "weapons", icon: "🔱", w: 1, h: 1, hp: 280, cost: { wood: 10, gold: 15 }, workers: 1, zHeight: 20, weaponOut: "spears", sub: "Turns 2 Wood into 1 Spear" },
-  blacksmith: { id: "blacksmith", cat: "weapons", icon: "🗡️", w: 1, h: 1, hp: 320, cost: { wood: 15, gold: 35 }, workers: 1, zHeight: 22, weaponOut: "swords", sub: "Forges Iron into Swords" },
-
-  // Food Processing Category
-  mill:       { id: "mill",       cat: "foodproc", icon: "⚙️", w: 1, h: 1, hp: 300, cost: { wood: 15 }, workers: 1, zHeight: 34, sub: "Mills grain into flour" },
-  bakery:     { id: "bakery",     cat: "foodproc", icon: "🍞", w: 1, h: 1, hp: 280, cost: { wood: 12 }, workers: 1, zHeight: 20, sub: "Bakes large food batches (+12)" },
-  brewery:    { id: "brewery",    cat: "foodproc", icon: "🍺", w: 1, h: 1, hp: 280, cost: { wood: 12, gold: 15 }, workers: 1, popBonus: 4, zHeight: 20, sub: "Brews Ale/Ra (+4 Popularity)" }
-};
-
-const TROOP_DEFS = {
-  archer:   { id: "archer",   icon: "🏹", gold: 12, req: { bows: 1 },   hp: 85,  dmg: 14, range: 5.5, speed: 0.032, isRanged: true, canClimb: true, sub: "Climbs towers & walls" },
-  spearman: { id: "spearman", icon: "🔱", gold: 8,  req: { spears: 1 }, hp: 120, dmg: 16, range: 0.9, speed: 0.038, isRanged: false, canClimb: false, sub: "Fast melee defender" },
-  maceman:  { id: "maceman",  icon: "⚡", gold: 20, req: { swords: 1 }, hp: 175, dmg: 28, range: 0.9, speed: 0.045, isRanged: false, canClimb: false, sub: "High-speed shock infantry" },
-  elephant: { id: "elephant", icon: "🐘", gold: 65, req: { swords: 1, spears: 1 }, hp: 520, dmg: 48, range: 1.1, speed: 0.028, isRanged: false, isHeavy: true, sub: "Crushes raiders & walls" }
-};
-
-// ==================== GAME STATE ====================
-const state = {
-  theme: "srilanka",
-  paused: false,
-  audioOn: false,
-
-  // Camera pan offset in screen pixels
-  camX: 0,
-  camY: 90,
-  isPanning: false,
-  panStart: { x: 0, y: 0 },
-
-  // Economy & Popularity
-  wood: 80,
-  stone: 40,
-  iron: 10,
-  wheat: 10,
-  food: 90,
-  ale: 10,
-  gold: 250,
-  weapons: { bows: 4, spears: 4, swords: 2 },
-  popularity: 85,
-  taxLevel: 0,
-  rationLevel: 2,
-  peasantsTotal: 10,
-  peasantsCap: 14,
-
-  // Active UI Tool
-  activeCat: "castle",
-  selectedBuildId: null,
-  demolishMode: false,
-
-  // Wave timer
-  waveTimer: 80,
-  waveNum: 0,
-
-  // World Map Data
-  tiles: [],      // [gy][gx] = { type: 'grass'|'water'|'road'|'stone'|'iron', elev: 0|1 }
-  trees: [],      // { gx, gy, stage: 1..100, falling: 0 }
-  deer: [],       // { gx, gy, tx, ty }
-  buildings: [],  // { uid, id, gx, gy, w, h, hp, maxHp }
-  workers: [],    // Autonomous villagers with real tasks (woodcutter, hunter, quarryman, farmer, baker)
-  units: [],      // Military units (Lord, Archers, Spearmen, Raiders)
-  arrows: [],     // Projectiles in flight
-  floats: [],     // Floating +Wood / +Meat labels
-
-  // Mouse & Selection
-  hoverTile: { gx: -1, gy: -1 },
-  dragSelect: { active: false, x1: 0, y1: 0, x2: 0, y2: 0 }
-};
-
-// ==================== ISOMETRIC PROJECTION MATH ====================
-const canvas = document.getElementById("isoCanvas");
-const ctx = canvas.getContext("2d");
-
-function resizeCanvas() {
-  const vp = document.getElementById("isoViewport");
-  canvas.width = vp.clientWidth;
-  canvas.height = vp.clientHeight;
-  if (state.camX === 0) {
-    state.camX = canvas.width / 2;
-    state.camY = 85;
-  }
-}
-window.addEventListener("resize", resizeCanvas);
-
-function gridToIso(gx, gy, z = 0) {
-  const sx = state.camX + (gx - gy) * (ISO_W / 2);
-  const sy = state.camY + (gx + gy) * (ISO_H / 2) - z;
-  return { x: sx, y: sy };
-}
-
-function isoToGrid(sx, sy) {
-  const dx = sx - state.camX;
-  const dy = sy - state.camY;
-  const gx = (dx / (ISO_W / 2) + dy / (ISO_H / 2)) / 2;
-  const gy = (dy / (ISO_H / 2) - dx / (ISO_W / 2)) / 2;
-  return { gx: Math.floor(gx), gy: Math.floor(gy), exactX: gx, exactY: gy };
-}
-
-// ==================== INITIALIZE MISSION 1 & 2 MAP ====================
-function initWorld() {
-  state.tiles = [];
-  for (let y = 0; y < MAP_SIZE; y++) {
-    const row = [];
-    for (let x = 0; x < MAP_SIZE; x++) {
-      let type = "grass";
-      let elev = 0;
-      // Western River / Wewa
-      if (x <= 2) type = "water";
-      // Northern Stone & Iron Ridge
-      else if (y <= 3 && x >= 5 && x <= 11) { type = "stone"; elev = 1; }
-      else if (y <= 3 && x >= 13 && x <= 17) { type = "iron"; elev = 1; }
-      // Dirt Road leading from the Southern Enemy Signpost (gx=23, gy=12) to Keep (gx=11, gy=12)
-      else if (y === 12 && x >= 11 && x <= 25) type = "road";
-
-      row.push({ type, elev, shade: ((x * 7 + y * 13) % 5) * 0.015 });
-    }
-    state.tiles.push(row);
-  }
-
-  // Dense Forests (Like Stronghold HD Mission 1)
-  const forestZones = [
-    { x1: 4, y1: 5, x2: 8, y2: 10 },
-    { x1: 4, y1: 15, x2: 9, y2: 21 },
-    { x1: 15, y1: 16, x2: 20, y2: 22 }
-  ];
-  for (const z of forestZones) {
-    for (let y = z.y1; y <= z.y2; y++) {
-      for (let x = z.x1; x <= z.x2; x++) {
-        if ((x + y) % 2 === 0 || Math.random() < 0.45) {
-          state.trees.push({ gx: x + 0.5, gy: y + 0.5, stage: 100 });
-        }
-      }
-    }
-  }
-
-  // Roaming Wild Deer Herd in the Eastern Meadow (Mission 1)
-  for (let i = 0; i < 8; i++) {
-    const dx = 15 + Math.random() * 5;
-    const dy = 5 + Math.random() * 5;
-    state.deer.push({ gx: dx, gy: dy, tx: dx, ty: dy, hp: 40 });
-  }
-
-  // Place Starting Saxon Hall / Raja Maligawa Keep, Campfire, Stockpile & Granary
-  addBuildingInternal("keep", 10, 10, 2, 2, 2000);
-  addBuildingInternal("campfire", 10, 13, 1, 1, 500);
-  addBuildingInternal("stockpile", 7, 10, 2, 2, 600);
-  addBuildingInternal("granary", 13, 10, 2, 2, 600);
-  addBuildingInternal("woodcutter", 8, 9, 1, 1, 220);
-  addBuildingInternal("hunter", 14, 8, 1, 1, 200);
-  addBuildingInternal("hovel", 8, 13, 1, 1, 240);
-  addBuildingInternal("barracks", 11, 14, 2, 2, 800);
-
-  // Initial Eastern Palisade & Lookout Tower facing the Enemy Signpost Road
-  for (let wy = 9; wy <= 15; wy++) {
-    if (wy === 12) addBuildingInternal("gatehouse", 16, wy, 1, 1, 950);
-    else if (wy === 11) addBuildingInternal("tower", 16, wy, 1, 1, 900);
-    else addBuildingInternal("wood_wall", 16, wy, 1, 1, 300);
-  }
-
-  // Spawn The Lord atop the Keep Roof
-  state.units.push({
-    uid: "lord", id: "lord", team: "player", isLord: true,
-    gx: 11.0, gy: 11.0, tx: 11.0, ty: 11.0, z: 42,
-    hp: 800, maxHp: 800, dmg: 30, range: 1.2, speed: 0, lastAttack: 0, selected: false
-  });
-
-  // Spawn 3 Starting Archers on/near the Lookout Tower & 2 Spearmen by the Gatehouse
-  spawnUnit("archer", 16.5, 11.5, "player");
-  spawnUnit("archer", 15.5, 10.5, "player");
-  spawnUnit("spearman", 15.3, 12.2, "player");
-  spawnUnit("spearman", 15.3, 13.0, "player");
-}
-
-function addBuildingInternal(id, gx, gy, w, h, hp) {
-  const b = {
-    uid: "b_" + Math.random().toString(36).slice(2, 8),
-    id, gx, gy, w, h, hp, maxHp: hp
+// ==================== UTILITIES ====================
+function mulberry32(a) {
+  return function () {
+    a |= 0; a = (a + 0x6D2B79F5) | 0;
+    let t = Math.imul(a ^ (a >>> 15), 1 | a);
+    t = (t + Math.imul(t ^ (t >>> 7), 61 | t)) ^ t;
+    return ((t ^ (t >>> 14)) >>> 0) / 4294967296;
   };
-  state.buildings.push(b);
+}
+const inb = (x, y) => x >= 0 && y >= 0 && x < MAP && y < MAP;
+const clamp = (v, a, b) => Math.max(a, Math.min(b, v));
+const dist = (a, b) => Math.hypot(a.gx - b.gx, a.gy - b.gy);
+const DIRS8 = [[1, 0], [-1, 0], [0, 1], [0, -1], [1, 1], [1, -1], [-1, 1], [-1, -1]];
+const DIRS4 = [[1, 0], [-1, 0], [0, 1], [0, -1]];
 
-  const def = CATALOG[id];
-  if (def && def.workers) {
-    state.workers.push({
-      bUid: b.uid,
-      job: id,
-      gx: 10.5,
-      gy: 13.5,
-      tx: gx + 0.5,
-      ty: gy + 0.5,
-      phase: "to_hut", // 'to_hut' -> 'to_resource' -> 'working' -> 'to_hut_back' -> 'to_storage'
-      workTimer: 0,
-      carryType: null
-    });
+class MinHeap {
+  constructor() { this.a = []; }
+  get size() { return this.a.length; }
+  push(item) {
+    const a = this.a; a.push(item);
+    let i = a.length - 1;
+    while (i > 0) {
+      const p = (i - 1) >> 1;
+      if (a[p][0] <= a[i][0]) break;
+      [a[p], a[i]] = [a[i], a[p]]; i = p;
+    }
+  }
+  pop() {
+    const a = this.a, top = a[0], last = a.pop();
+    if (a.length) {
+      a[0] = last;
+      let i = 0;
+      for (;;) {
+        const l = i * 2 + 1, r = l + 1;
+        let m = i;
+        if (l < a.length && a[l][0] < a[m][0]) m = l;
+        if (r < a.length && a[r][0] < a[m][0]) m = r;
+        if (m === i) break;
+        [a[m], a[i]] = [a[i], a[m]]; i = m;
+      }
+    }
+    return top;
   }
 }
 
-function spawnUnit(typeId, gx, gy, team = "player") {
-  const def = TROOP_DEFS[typeId] || { hp: 100, dmg: 14, range: 1.0, speed: 0.032, isRanged: false };
-  state.units.push({
-    uid: "u_" + Math.random().toString(36).slice(2, 9),
-    id: typeId,
-    team,
-    gx, gy, tx: gx, ty: gy, z: 0,
-    hp: def.hp, maxHp: def.hp,
-    dmg: def.dmg, range: def.range, speed: def.speed,
-    isRanged: def.isRanged || false,
-    canClimb: def.canClimb || false,
-    isHeavy: def.isHeavy || false,
-    lastAttack: 0,
-    selected: false
-  });
+function costText(cost) {
+  return Object.entries(cost).map(([k, v]) => `${v}${RES[k]}`).join(" ");
 }
 
-// ==================== AUTONOMOUS VILLAGER AI (CHOP TREES, HUNT DEER, QUARRY STONE) ====================
-function updateWorkersAndWildlife(dt) {
-  // 1. Roaming Deer Herd
-  for (const d of state.deer) {
-    if (Math.hypot(d.tx - d.gx, d.ty - d.gy) < 0.2) {
-      if (Math.random() < 0.02) {
-        d.tx = Math.max(4, Math.min(22, d.gx + (Math.random() * 4 - 2)));
-        d.ty = Math.max(4, Math.min(22, d.gy + (Math.random() * 4 - 2)));
-      }
-    } else {
-      const ang = Math.atan2(d.ty - d.gy, d.tx - d.gx);
-      d.gx += Math.cos(ang) * 0.012 * dt;
-      d.gy += Math.sin(ang) * 0.012 * dt;
-    }
-  }
-  // Respawn deer if herd gets low
-  if (state.deer.length < 5 && Math.random() < 0.005) {
-    state.deer.push({ gx: 17 + Math.random() * 4, gy: 5 + Math.random() * 4, tx: 18, ty: 7, hp: 40 });
-  }
-
-  // Regrow chopped trees slowly
-  for (const tr of state.trees) {
-    if (tr.stage < 100) tr.stage = Math.min(100, tr.stage + 0.04 * dt);
-  }
-
-  const stockpile = state.buildings.find(b => b.id === "stockpile") || state.buildings[0];
-  const granary = state.buildings.find(b => b.id === "granary") || stockpile;
-  const armoury = state.buildings.find(b => b.id === "armoury") || stockpile;
-
-  // 2. Update Each Worker's Physical Routine
-  for (const w of state.workers) {
-    const hut = state.buildings.find(b => b.uid === w.bUid);
-    if (!hut) continue;
-
-    const dx = w.tx - w.gx;
-    const dy = w.ty - w.gy;
-    const dist = Math.hypot(dx, dy);
-
-    if (dist > 0.15) {
-      w.gx += (dx / dist) * 0.028 * dt;
-      w.gy += (dy / dist) * 0.028 * dt;
-      continue;
-    }
-
-    // Reached target waypoint
-    if (w.phase === "to_hut") {
-      w.phase = "to_resource";
-      if (w.job === "woodcutter") {
-        // Find nearest standing tree
-        let bestTree = null, bestD = 999;
-        for (const tr of state.trees) {
-          if (tr.stage >= 60) {
-            const td = Math.hypot(tr.gx - hut.gx, tr.gy - hut.gy);
-            if (td < bestD) { bestD = td; bestTree = tr; }
-          }
-        }
-        w.targetRef = bestTree;
-        w.tx = bestTree ? bestTree.gx : hut.gx - 1;
-        w.ty = bestTree ? bestTree.gy : hut.gy - 1;
-      } else if (w.job === "hunter") {
-        const deer = state.deer[0];
-        w.targetRef = deer;
-        w.tx = deer ? deer.gx : hut.gx + 2;
-        w.ty = deer ? deer.gy : hut.gy - 1;
-      } else if (w.job === "quarry" || w.job === "ox_tether") {
-        w.tx = 8; w.ty = 2.5;
-      } else if (w.job === "iron_mine") {
-        w.tx = 15; w.ty = 2.5;
-      } else {
-        w.tx = hut.gx + 0.8; w.ty = hut.gy + 0.8;
-      }
-    } else if (w.phase === "to_resource") {
-      w.phase = "working";
-      w.workTimer = 45;
-    } else if (w.phase === "working") {
-      w.workTimer -= dt;
-      if (w.workTimer <= 0) {
-        if (w.job === "woodcutter" && w.targetRef) {
-          w.targetRef.stage = 10; // Chopped into stump!
-          w.carryType = "wood";
-        } else if (w.job === "hunter") {
-          w.carryType = "meat";
-        } else if (w.job === "quarry" || w.job === "ox_tether") {
-          w.carryType = "stone";
-        } else if (w.job === "iron_mine") {
-          w.carryType = "iron";
-        } else if (w.job === "paddy") {
-          w.carryType = "wheat";
-        } else if (w.job === "orchard" || w.job === "bakery" || w.job === "mill") {
-          w.carryType = "food";
-        } else if (w.job === "brewery") {
-          w.carryType = "ale";
-        } else if (CATALOG[w.job]?.weaponOut) {
-          w.carryType = CATALOG[w.job].weaponOut;
-        }
-
-        // Choose drop-off building
-        let dropB = stockpile;
-        if (w.carryType === "meat" || w.carryType === "food") dropB = granary;
-        else if (w.carryType === "bows" || w.carryType === "spears" || w.carryType === "swords") dropB = armoury;
-
-        w.phase = "to_storage";
-        w.tx = dropB.gx + 0.8;
-        w.ty = dropB.gy + 0.8;
-      }
-    } else if (w.phase === "to_storage") {
-      // Deliver goods to Stockpile / Granary / Armoury!
-      if (w.carryType === "wood") { state.wood += 6; spawnFloat("+6 Wood", w.gx, w.gy, "#a8e673"); }
-      else if (w.carryType === "stone") { state.stone += 6; spawnFloat("+6 Stone", w.gx, w.gy, "#d9d9d9"); }
-      else if (w.carryType === "iron") { state.iron += 3; spawnFloat("+3 Iron", w.gx, w.gy, "#f5b042"); }
-      else if (w.carryType === "wheat") { state.wheat += 5; spawnFloat("+5 Grain", w.gx, w.gy, "#f5d742"); }
-      else if (w.carryType === "meat" || w.carryType === "food") { state.food += 8; spawnFloat("+8 Food", w.gx, w.gy, "#7ce87c"); }
-      else if (w.carryType === "ale") { state.ale += 4; spawnFloat("+4 Ale", w.gx, w.gy, "#f5c342"); }
-      else if (w.carryType === "bows" || w.carryType === "spears" || w.carryType === "swords") {
-        if (state.wood >= 2) {
-          state.wood -= 2;
-          state.weapons[w.carryType] = (state.weapons[w.carryType] || 0) + 1;
-          spawnFloat(`+1 ${w.carryType}`, w.gx, w.gy, "#f5c342");
-        }
-      }
-      w.carryType = null;
-      w.phase = "to_hut";
-      w.tx = hut.gx + 0.5;
-      w.ty = hut.gy + 0.5;
-      syncUI();
-    }
-  }
+// ==================== SAVE DATA ====================
+function loadProgress() {
+  try {
+    const p = JSON.parse(localStorage.getItem(SAVE_KEY));
+    if (p && typeof p.unlocked === "number") return { unlocked: p.unlocked, stars: p.stars || {} };
+  } catch (e) { /* storage blocked or corrupt: start fresh */ }
+  return { unlocked: 0, stars: {} };
+}
+function saveProgress() {
+  try { localStorage.setItem(SAVE_KEY, JSON.stringify(progress)); } catch (e) { /* ignore */ }
 }
 
-// ==================== MILITARY COMBAT & TOWER ELEVATION ====================
-function updateUnitsAndProjectiles(now, dt) {
-  for (let i = state.units.length - 1; i >= 0; i--) {
-    const u = state.units[i];
-    if (u.hp <= 0) {
-      if (u.isLord) {
-        u.hp = u.maxHp;
-        showScribeBanner("The Lord was wounded defending the Keep! Royal guards rally!");
-      } else {
-        if (u.team === "enemy") {
-          state.gold += 10;
-          spawnFloat("+10 Gold", u.gx, u.gy, "#f5c342");
-        }
-        state.units.splice(i, 1);
-      }
-      continue;
-    }
+// ==================== GLOBAL STATE ====================
+let S = null; // current level state
+let progress = loadProgress();
+// camX/camY are in world pixels at zoom 1; w/h are the viewport in CSS pixels.
+const view = { camX: 0, camY: 0, zoom: 1, w: 0, h: 0, dpr: 1 };
+const input = { hover: { gx: -1, gy: -1, x: 0, y: 0 }, panning: false, panFrom: null, drag: null, painting: false, lastPaint: "" };
+const audio = { on: false, ctx: null };
 
-    // Check if unit is standing on a Tower or Wall for 3D Z-elevation & range bonus
-    const underB = state.buildings.find(b =>
-      Math.floor(u.gx) >= b.gx && Math.floor(u.gx) < b.gx + b.w &&
-      Math.floor(u.gy) >= b.gy && Math.floor(u.gy) < b.gy + b.h
-    );
-    let rangeBonus = 1.0;
-    if (u.isLord) {
-      u.z = 42;
-    } else if (underB && CATALOG[underB.id]?.isTower && u.canClimb) {
-      u.z = 38;
-      rangeBonus = 1.45;
-    } else if (underB && CATALOG[underB.id]?.isWall && u.canClimb) {
-      u.z = 22;
-      rangeBonus = 1.2;
-    } else {
-      u.z = 0;
-    }
+const canvas = document.getElementById("world");
+let ctx = canvas.getContext("2d"); // render.js swaps this while baking the terrain cache
+const mini = document.getElementById("minimap");
+const mctx = mini.getContext("2d");
 
-    // Find closest enemy unit
-    let closestFoe = null, minDist = 999;
-    for (const other of state.units) {
-      if (other.team !== u.team && other.hp > 0) {
-        const d = Math.hypot(other.gx - u.gx, other.gy - u.gy);
-        if (d < minDist) { minDist = d; closestFoe = other; }
-      }
-    }
+// ==================== MAP GENERATION ====================
+function genMap(L) {
+  const rnd = mulberry32(L.seed);
+  const tiles = Array.from({ length: MAP }, () => Array.from({ length: MAP }, () => ({ t: "grass", v: rnd() })));
 
-    // Check if an enemy raider is blocked by a Wall/Gate
-    let blockingWall = null;
-    if (u.team === "enemy") {
-      for (const b of state.buildings) {
-        const def = CATALOG[b.id];
-        if ((def && (def.isWall || def.isGate || def.isTower)) || b.id === "keep") {
-          const d = Math.hypot((b.gx + b.w / 2) - u.gx, (b.gy + b.h / 2) - u.gy);
-          if (d < 1.15) { blockingWall = b; break; }
-        }
-      }
-    }
-
-    const effRange = u.range * rangeBonus;
-    if (closestFoe && minDist <= effRange) {
-      if (now - u.lastAttack > 950) {
-        u.lastAttack = now;
-        if (u.isRanged) {
-          state.arrows.push({
-            gx: u.gx, gy: u.gy, z: u.z + 12,
-            tx: closestFoe.gx, ty: closestFoe.gy, tz: closestFoe.z + 8,
-            target: closestFoe, dmg: u.dmg, progress: 0
-          });
-        } else {
-          closestFoe.hp -= u.dmg;
-        }
-      }
-    } else if (u.team === "enemy" && blockingWall) {
-      if (now - u.lastAttack > 950) {
-        u.lastAttack = now;
-        blockingWall.hp -= u.dmg;
-        if (blockingWall.hp <= 0) {
-          state.buildings = state.buildings.filter(b => b !== blockingWall);
-          spawnFloat("Wall Breached!", u.gx, u.gy, "#ff5555");
-        }
-      }
-    } else if (!u.isLord) {
-      let destX = u.tx, destY = u.ty;
-      if (u.team === "enemy" && closestFoe) {
-        destX = closestFoe.gx;
-        destY = closestFoe.gy;
-      } else if (u.team === "player" && !u.isRanged && closestFoe && minDist < 4.5) {
-        destX = closestFoe.gx;
-        destY = closestFoe.gy;
-      }
-      const dx = destX - u.gx, dy = destY - u.gy, d = Math.hypot(dx, dy);
-      if (d > 0.12) {
-        u.gx += (dx / d) * u.speed * dt;
-        u.gy += (dy / d) * u.speed * dt;
+  for (const r of L.rivers || []) {
+    const phase = rnd() * 6;
+    for (let i = 0; i < MAP; i++) {
+      const off = Math.round(Math.sin(i * 0.35 + phase) * r.wobble);
+      for (let k = 0; k < r.width; k++) {
+        const d = Math.max(0, r.at + off + k);
+        let x, y;
+        if (r.edge === "west") { x = d; y = i; }
+        else if (r.edge === "east") { x = MAP - 1 - d; y = i; }
+        else if (r.edge === "north") { x = i; y = d; }
+        else { x = i; y = MAP - 1 - d; }
+        if (inb(x, y)) tiles[y][x].t = "river";
       }
     }
   }
-
-  // Update Parabolic 3D Arrows
-  for (let i = state.arrows.length - 1; i >= 0; i--) {
-    const a = state.arrows[i];
-    a.progress += 0.065 * dt;
-    if (a.progress >= 1) {
-      if (a.target && a.target.hp > 0) a.target.hp -= a.dmg;
-      state.arrows.splice(i, 1);
-    }
-  }
-
-  // Update Floating Labels
-  for (let i = state.floats.length - 1; i >= 0; i--) {
-    const f = state.floats[i];
-    f.z += 0.6 * dt;
-    f.life -= dt;
-    if (f.life <= 0) state.floats.splice(i, 1);
-  }
-}
-
-function spawnFloat(text, gx, gy, color = "#fff") {
-  state.floats.push({ text, gx, gy, z: 24, color, life: 42 });
-}
-
-// ==================== TRUE 2.5D ISOMETRIC RENDERER ====================
-function drawIsoDiamond(gx, gy, w, h, z, fillStyle, strokeStyle) {
-  const p0 = gridToIso(gx, gy, z);
-  const p1 = gridToIso(gx + w, gy, z);
-  const p2 = gridToIso(gx + w, gy + h, z);
-  const p3 = gridToIso(gx, gy + h, z);
-
-  ctx.beginPath();
-  ctx.moveTo(p0.x, p0.y);
-  ctx.lineTo(p1.x, p1.y);
-  ctx.lineTo(p2.x, p2.y);
-  ctx.lineTo(p3.x, p3.y);
-  ctx.closePath();
-  if (fillStyle) { ctx.fillStyle = fillStyle; ctx.fill(); }
-  if (strokeStyle) { ctx.strokeStyle = strokeStyle; ctx.lineWidth = 1; ctx.stroke(); }
-}
-
-// Draw an extruded 3D Isometric Prism (Left Wall, Right Wall, Top Roof)
-function drawIsoBlock(gx, gy, w, h, zBase, zHeight, topCol, leftCol, rightCol) {
-  const b0 = gridToIso(gx, gy, zBase);
-  const b1 = gridToIso(gx + w, gy, zBase);
-  const b2 = gridToIso(gx + w, gy + h, zBase);
-  const b3 = gridToIso(gx, gy + h, zBase);
-
-  const t0 = gridToIso(gx, gy, zBase + zHeight);
-  const t1 = gridToIso(gx + w, gy, zBase + zHeight);
-  const t2 = gridToIso(gx + w, gy + h, zBase + zHeight);
-  const t3 = gridToIso(gx, gy + h, zBase + zHeight);
-
-  // Left Face (South-West)
-  ctx.beginPath();
-  ctx.moveTo(b3.x, b3.y);
-  ctx.lineTo(b2.x, b2.y);
-  ctx.lineTo(t2.x, t2.y);
-  ctx.lineTo(t3.x, t3.y);
-  ctx.closePath();
-  ctx.fillStyle = leftCol;
-  ctx.fill();
-  ctx.strokeStyle = "rgba(0,0,0,0.35)";
-  ctx.stroke();
-
-  // Right Face (South-East)
-  ctx.beginPath();
-  ctx.moveTo(b1.x, b1.y);
-  ctx.lineTo(b2.x, b2.y);
-  ctx.lineTo(t2.x, t2.y);
-  ctx.lineTo(t1.x, t1.y);
-  ctx.closePath();
-  ctx.fillStyle = rightCol;
-  ctx.fill();
-  ctx.stroke();
-
-  // Top Face (Roof)
-  ctx.beginPath();
-  ctx.moveTo(t0.x, t0.y);
-  ctx.lineTo(t1.x, t1.y);
-  ctx.lineTo(t2.x, t2.y);
-  ctx.lineTo(t3.x, t3.y);
-  ctx.closePath();
-  ctx.fillStyle = topCol;
-  ctx.fill();
-  ctx.stroke();
-}
-
-function renderIsoWorld(now) {
-  ctx.fillStyle = "#111c0d";
-  ctx.fillRect(0, 0, canvas.width, canvas.height);
-
-  // 1. Render Terrain Diamond Tiles
-  for (let y = 0; y < MAP_SIZE; y++) {
-    for (let x = 0; x < MAP_SIZE; x++) {
-      const tile = state.tiles[y][x];
-      const z = tile.elev * 10;
-
-      let col = "#3b6628";
-      if (tile.type === "grass") {
-        col = (x + y) % 2 === 0 ? "#3f6b2b" : "#396126";
-      } else if (tile.type === "road") {
-        col = (x + y) % 2 === 0 ? "#8c7248" : "#80663e";
-      } else if (tile.type === "water") {
-        const wave = Math.sin(now * 0.003 + x + y) * 8;
-        col = `rgb(${25 + wave}, ${95 + wave}, ${145 + wave})`;
-      } else if (tile.type === "stone") {
-        col = "#7a7a80";
-      } else if (tile.type === "iron") {
-        col = "#734830";
-      }
-
-      if (tile.elev > 0) {
-        drawIsoBlock(x, y, 1, 1, 0, z, col, "#524e4a", "#3d3a37");
-      } else {
-        drawIsoDiamond(x, y, 1, 1, 0, col, "rgba(0,0,0,0.12)");
+  for (const [cx, cy, rad] of L.lakes || []) {
+    for (let y = cy - rad; y <= cy + rad; y++) {
+      for (let x = cx - rad; x <= cx + rad; x++) {
+        if (inb(x, y) && Math.hypot(x - cx, y - cy) <= rad + 0.3) tiles[y][x].t = "river";
       }
     }
   }
-
-  // Draw the Iconic Stronghold HD "Enemy Signpost" at the end of the dirt road (gx=24.5, gy=12.5)
-  const sp = gridToIso(24.5, 12.5, 0);
-  ctx.fillStyle = "#4a3219";
-  ctx.fillRect(sp.x - 2, sp.y - 22, 4, 22);
-  ctx.fillStyle = "#c9ab75";
-  ctx.fillRect(sp.x - 16, sp.y - 22, 32, 9);
-  ctx.fillStyle = "#5c140e";
-  ctx.font = "bold 8px Georgia";
-  ctx.textAlign = "center";
-  ctx.fillText("☠️ RAIDERS", sp.x, sp.y - 15);
-
-  // Build Ghost Preview
-  const ht = state.hoverTile;
-  if (ht.gx >= 0 && ht.gx < MAP_SIZE && ht.gy >= 0 && ht.gy < MAP_SIZE && state.selectedBuildId) {
-    const def = CATALOG[state.selectedBuildId];
-    const ok = canPlaceAt(def, ht.gx, ht.gy);
-    drawIsoBlock(
-      ht.gx, ht.gy, def.w, def.h, 0, def.zHeight || 16,
-      ok ? "rgba(110, 240, 110, 0.55)" : "rgba(245, 75, 75, 0.55)",
-      ok ? "rgba(70, 180, 70, 0.45)" : "rgba(190, 45, 45, 0.45)",
-      ok ? "rgba(50, 150, 50, 0.45)" : "rgba(150, 35, 35, 0.45)"
-    );
-  }
-
-  // 2. Collect Depth-Sorted Renderables (Trees, Deer, Buildings, Workers, Military Units)
-  const renderList = [];
-
-  for (const tr of state.trees) {
-    renderList.push({ depth: tr.gx + tr.gy, kind: "tree", obj: tr });
-  }
-  for (const d of state.deer) {
-    renderList.push({ depth: d.gx + d.gy, kind: "deer", obj: d });
-  }
-  for (const b of state.buildings) {
-    renderList.push({ depth: b.gx + b.gy + (b.w + b.h) * 0.5, kind: "building", obj: b });
-  }
-  for (const w of state.workers) {
-    renderList.push({ depth: w.gx + w.gy, kind: "worker", obj: w });
-  }
-  for (const u of state.units) {
-    renderList.push({ depth: u.gx + u.gy + (u.z > 0 ? 0.8 : 0), kind: "unit", obj: u });
-  }
-
-  renderList.sort((a, b) => a.depth - b.depth);
-
-  // 3. Draw Sorted Isometric Entities
-  for (const item of renderList) {
-    if (item.kind === "tree") drawIsoTree(item.obj, now);
-    else if (item.kind === "deer") drawIsoDeer(item.obj);
-    else if (item.kind === "building") drawIsoBuilding(item.obj, now);
-    else if (item.kind === "worker") drawIsoWorker(item.obj);
-    else if (item.kind === "unit") drawIsoUnit(item.obj);
-  }
-
-  // 4. Draw Parabolic Arrows in Flight
-  for (const a of state.arrows) {
-    const curGx = a.gx + (a.tx - a.gx) * a.progress;
-    const curGy = a.gy + (a.ty - a.gy) * a.progress;
-    const arcZ = a.z + (a.tz - a.z) * a.progress + Math.sin(a.progress * Math.PI) * 28;
-    const pt = gridToIso(curGx, curGy, arcZ);
-
-    ctx.strokeStyle = "#f5e4a8";
-    ctx.lineWidth = 2;
-    ctx.beginPath();
-    ctx.moveTo(pt.x - 4, pt.y - 2);
-    ctx.lineTo(pt.x + 4, pt.y + 2);
-    ctx.stroke();
-  }
-
-  // 5. Draw Floating Resource / Combat Texts
-  for (const f of state.floats) {
-    const pt = gridToIso(f.gx, f.gy, f.z);
-    ctx.fillStyle = f.color;
-    ctx.font = "bold 11px Georgia";
-    ctx.textAlign = "center";
-    ctx.fillText(f.text, pt.x, pt.y);
-  }
-
-  // 6. Drag Selection Box
-  if (state.dragSelect.active) {
-    const { x1, y1, x2, y2 } = state.dragSelect;
-    ctx.fillStyle = "rgba(120, 245, 120, 0.16)";
-    ctx.fillRect(Math.min(x1, x2), Math.min(y1, y2), Math.abs(x2 - x1), Math.abs(y2 - y1));
-    ctx.strokeStyle = "#7ce87c";
-    ctx.lineWidth = 1.5;
-    ctx.strokeRect(Math.min(x1, x2), Math.min(y1, y2), Math.abs(x2 - x1), Math.abs(y2 - y1));
-  }
-}
-
-function drawIsoTree(tr, now) {
-  const pt = gridToIso(tr.gx, tr.gy, 0);
-  if (tr.stage < 40) {
-    // Chopped Tree Stump!
-    ctx.fillStyle = "#5c3d1e";
-    ctx.fillRect(pt.x - 3, pt.y - 5, 6, 5);
-    return;
-  }
-  const sway = Math.sin(now * 0.002 + tr.gx) * 1.5;
-  // Shadow
-  ctx.fillStyle = "rgba(0,0,0,0.25)";
-  ctx.beginPath();
-  ctx.ellipse(pt.x + 5, pt.y + 2, 10, 5, 0, 0, Math.PI * 2);
-  ctx.fill();
-
-  // Trunk
-  ctx.fillStyle = "#4f3317";
-  ctx.fillRect(pt.x - 2, pt.y - 16, 4, 16);
-
-  // Layered 3D Conifer / Kumbuk Canopy
-  ctx.fillStyle = "#1e4714";
-  ctx.beginPath();
-  ctx.arc(pt.x + sway, pt.y - 20, 11, 0, Math.PI * 2);
-  ctx.fill();
-  ctx.fillStyle = "#2b611d";
-  ctx.beginPath();
-  ctx.arc(pt.x - 2 + sway, pt.y - 25, 8, 0, Math.PI * 2);
-  ctx.fill();
-}
-
-function drawIsoDeer(d) {
-  const pt = gridToIso(d.gx, d.gy, 0);
-  ctx.fillStyle = "rgba(0,0,0,0.22)";
-  ctx.beginPath();
-  ctx.ellipse(pt.x, pt.y + 2, 6, 3, 0, 0, Math.PI * 2);
-  ctx.fill();
-
-  ctx.fillStyle = "#9e6330";
-  ctx.fillRect(pt.x - 5, pt.y - 8, 10, 5);
-  ctx.fillRect(pt.x + 2, pt.y - 13, 4, 6);
-}
-
-function drawIsoBuilding(b, now) {
-  const id = b.id;
-
-  if (id === "keep") {
-    // 3D Isometric Keep / Raja Maligawa
-    drawIsoBlock(b.gx, b.gy, b.w, b.h, 0, 32, "#c2a878", "#8f754d", "#6e5838");
-    drawIsoBlock(b.gx + 0.25, b.gy + 0.25, 1.5, 1.5, 32, 14, "#8c2419", "#6b4f2c", "#4f391d");
-    const roofPt = gridToIso(b.gx + 1, b.gy + 1, 48);
-    ctx.fillStyle = "#f5c342";
-    ctx.font = "bold 11px Georgia";
-    ctx.textAlign = "center";
-    ctx.fillText(state.theme === "srilanka" ? "🦁 MALIGAWA" : "🏰 KEEP", roofPt.x, roofPt.y - 18);
-  } else if (id === "campfire") {
-    drawIsoDiamond(b.gx, b.gy, 1, 1, 0, "#5e4930");
-    const pt = gridToIso(b.gx + 0.5, b.gy + 0.5, 0);
-    // Flickering fire
-    ctx.fillStyle = Math.sin(now * 0.02) > 0 ? "#ff7722" : "#ffcc22";
-    ctx.beginPath();
-    ctx.arc(pt.x, pt.y - 5, 6, 0, Math.PI * 2);
-    ctx.fill();
-    // Idle peasants sitting around the campfire
-    const idleCount = Math.min(6, Math.max(1, state.peasantsTotal - state.workers.length));
-    for (let i = 0; i < idleCount; i++) {
-      const ang = (i / 6) * Math.PI * 2;
-      const px = pt.x + Math.cos(ang) * 16;
-      const py = pt.y + Math.sin(ang) * 8;
-      ctx.fillStyle = "#d99b52";
-      ctx.fillRect(px - 2, py - 8, 4, 8);
-    }
-  } else if (id === "stockpile") {
-    // Authentic Stronghold Stockpile with visible 3D piles of Wood, Stone & Iron!
-    drawIsoBlock(b.gx, b.gy, b.w, b.h, 0, 3, "#8a6d43", "#634c2c", "#4a381f");
-    const woodStacks = Math.min(4, Math.ceil(state.wood / 35));
-    for (let i = 0; i < woodStacks; i++) {
-      drawIsoBlock(b.gx + 0.15 + i * 0.35, b.gy + 0.2, 0.3, 0.6, 3, 7, "#a66f38", "#7d5125", "#5c3b19");
-    }
-    const stoneStacks = Math.min(4, Math.ceil(state.stone / 25));
-    for (let i = 0; i < stoneStacks; i++) {
-      drawIsoBlock(b.gx + 0.15 + i * 0.35, b.gy + 1.1, 0.3, 0.6, 3, 8, "#b5b5bd", "#888891", "#64646b");
-    }
-  } else if (id === "granary") {
-    // 3D Raised Timber Granary / Vee Bissa with visible food crates
-    drawIsoBlock(b.gx, b.gy, b.w, b.h, 0, 18, "#9e3b24", "#7d5935", "#5c4024");
-    const pt = gridToIso(b.gx + 1, b.gy + 1, 22);
-    ctx.fillStyle = "#fae6b1";
-    ctx.font = "bold 9px Georgia";
-    ctx.textAlign = "center";
-    ctx.fillText(`🍖 ${state.food}`, pt.x, pt.y);
-  } else if (id === "wood_wall") {
-    drawIsoBlock(b.gx, b.gy, 1, 1, 0, 22, "#875a2c", "#69441f", "#4d3115");
-  } else if (id === "stone_wall") {
-    drawIsoBlock(b.gx, b.gy, 1, 1, 0, 28, "#9e9c96", "#7a7873", "#595854");
-  } else if (id === "gatehouse") {
-    drawIsoBlock(b.gx, b.gy, 1, 1, 0, 32, "#8f281e", "#696660", "#4d4a46");
-  } else if (id === "tower") {
-    drawIsoBlock(b.gx, b.gy, 1, 1, 0, 40, "#a8a59e", "#78756e", "#57544f");
-  } else if (id === "paddy" || id === "orchard") {
-    drawIsoBlock(b.gx, b.gy, b.w, b.h, 0, 3, id === "paddy" ? "#6da832" : "#387523", "#466b20", "#324d16");
-  } else {
-    const def = CATALOG[id] || { zHeight: 18, icon: "🏠" };
-    drawIsoBlock(b.gx, b.gy, b.w, b.h, 0, def.zHeight || 18, "#944526", "#80623e", "#5e472b");
-    const topPt = gridToIso(b.gx + b.w / 2, b.gy + b.h / 2, (def.zHeight || 18) + 4);
-    ctx.font = "14px serif";
-    ctx.textAlign = "center";
-    ctx.fillText(def.icon, topPt.x, topPt.y);
-  }
-
-  // Damaged Building HP Bar
-  if (b.hp < b.maxHp) {
-    const pt = gridToIso(b.gx + b.w / 2, b.gy + b.h / 2, 34);
-    ctx.fillStyle = "rgba(0,0,0,0.7)";
-    ctx.fillRect(pt.x - 16, pt.y - 6, 32, 4);
-    ctx.fillStyle = "#5ce65c";
-    ctx.fillRect(pt.x - 16, pt.y - 6, 32 * Math.max(0, b.hp / b.maxHp), 4);
-  }
-}
-
-function drawIsoWorker(w) {
-  const pt = gridToIso(w.gx, w.gy, 0);
-  // Shadow
-  ctx.fillStyle = "rgba(0,0,0,0.28)";
-  ctx.beginPath();
-  ctx.ellipse(pt.x, pt.y + 1, 5, 2.5, 0, 0, Math.PI * 2);
-  ctx.fill();
-  // Peasant Body & Head
-  ctx.fillStyle = "#c98b42";
-  ctx.fillRect(pt.x - 3, pt.y - 11, 6, 10);
-  ctx.fillStyle = "#f2c99d";
-  ctx.beginPath();
-  ctx.arc(pt.x, pt.y - 13, 3, 0, Math.PI * 2);
-  ctx.fill();
-
-  // Carried Resource Bundle above shoulder
-  if (w.carryType) {
-    ctx.fillStyle = w.carryType === "wood" ? "#8c5828" : w.carryType === "stone" ? "#ccc" : "#6be06b";
-    ctx.fillRect(pt.x - 4, pt.y - 18, 8, 4);
-  }
-}
-
-function drawIsoUnit(u) {
-  const pt = gridToIso(u.gx, u.gy, u.z || 0);
-  const rad = u.isHeavy ? 10 : 6;
-
-  if (u.selected) {
-    ctx.strokeStyle = "#5ce65c";
-    ctx.lineWidth = 2;
-    ctx.beginPath();
-    ctx.ellipse(pt.x, pt.y + 1, rad + 4, (rad + 4) * 0.55, 0, 0, Math.PI * 2);
-    ctx.stroke();
-  }
-
-  // Unit Body
-  if (u.isHeavy && state.theme === "srilanka") {
-    // 3D War Elephant Body
-    ctx.fillStyle = "#59595e";
-    ctx.beginPath();
-    ctx.ellipse(pt.x, pt.y - 9, 12, 9, 0, 0, Math.PI * 2);
-    ctx.fill();
-    ctx.fillStyle = "#b8251e";
-    ctx.fillRect(pt.x - 6, pt.y - 18, 12, 6);
-  } else {
-    ctx.fillStyle = u.team === "player" ? (u.isLord ? "#f5c342" : "#1f7a31") : "#a82019";
-    ctx.fillRect(pt.x - 3.5, pt.y - 13, 7, 12);
-    ctx.fillStyle = "#f5d0a9";
-    ctx.beginPath();
-    ctx.arc(pt.x, pt.y - 15, 3.2, 0, Math.PI * 2);
-    ctx.fill();
-  }
-
-  // Health Bar
-  const hpPct = Math.max(0, u.hp / u.maxHp);
-  ctx.fillStyle = "rgba(0,0,0,0.75)";
-  ctx.fillRect(pt.x - 10, pt.y - 23, 20, 3);
-  ctx.fillStyle = u.team === "player" ? "#63eb63" : "#ff5252";
-  ctx.fillRect(pt.x - 10, pt.y - 23, 20 * hpPct, 3);
-}
-
-// ==================== SCRIBE FACE & DIAMOND RADAR RENDERERS ====================
-function renderScribeFace() {
-  const fc = document.getElementById("scribeFaceCanvas");
-  const fctx = fc.getContext("2d");
-  fctx.clearRect(0, 0, fc.width, fc.height);
-
-  const pop = state.popularity;
-  fctx.fillStyle = pop >= 65 ? "#46a842" : pop >= 45 ? "#d4a82a" : "#b82c21";
-  fctx.beginPath();
-  fctx.arc(27, 27, 23, 0, Math.PI * 2);
-  fctx.fill();
-  fctx.strokeStyle = "#4a3319";
-  fctx.lineWidth = 2.5;
-  fctx.stroke();
-
-  // Eyes
-  fctx.fillStyle = "#1c1208";
-  fctx.beginPath();
-  fctx.arc(19, 21, 3, 0, Math.PI * 2);
-  fctx.arc(35, 21, 3, 0, Math.PI * 2);
-  fctx.fill();
-
-  // Smile / Scowl
-  fctx.beginPath();
-  if (pop >= 60) {
-    fctx.arc(27, 28, 10, 0.15 * Math.PI, 0.85 * Math.PI);
-  } else if (pop >= 45) {
-    fctx.moveTo(18, 34);
-    fctx.lineTo(36, 34);
-  } else {
-    fctx.arc(27, 39, 10, 1.15 * Math.PI, 1.85 * Math.PI);
-  }
-  fctx.stroke();
-}
-
-function renderDiamondRadar() {
-  const rc = document.getElementById("radarCanvas");
-  const rctx = rc.getContext("2d");
-  rctx.fillStyle = "#172411";
-  rctx.fillRect(0, 0, rc.width, rc.height);
-
-  const cx = rc.width / 2;
-  const cy = 12;
-  const scale = 2.4;
-
-  for (const tr of state.trees) {
-    if (tr.stage >= 50) {
-      rctx.fillStyle = "#2b6e1b";
-      rctx.fillRect(cx + (tr.gx - tr.gy) * scale, cy + (tr.gx + tr.gy) * (scale * 0.5), 2, 2);
+  for (const [x1, y1, x2, y2] of L.rocks || []) {
+    for (let y = y1; y <= y2; y++) for (let x = x1; x <= x2; x++) {
+      if (inb(x, y) && tiles[y][x].t === "grass" && rnd() < 0.85) tiles[y][x].t = "rock";
     }
   }
-  for (const b of state.buildings) {
-    rctx.fillStyle = b.id === "keep" ? "#f5c342" : "#c7b28f";
-    rctx.fillRect(cx + (b.gx - b.gy) * scale, cy + (b.gx + b.gy) * (scale * 0.5), 3.5, 3.5);
-  }
-  for (const u of state.units) {
-    rctx.fillStyle = u.team === "player" ? "#63eb63" : "#ff4444";
-    rctx.fillRect(cx + (u.gx - u.gy) * scale, cy + (u.gx + u.gy) * (scale * 0.5), 3, 3);
-  }
-}
-
-// ==================== BUILDING PLACEMENT & PATROL RAIDS ====================
-function canPlaceAt(def, gx, gy) {
-  if (gx < 0 || gy < 0 || gx + def.w > MAP_SIZE || gy + def.h > MAP_SIZE) return false;
-  for (let y = gy; y < gy + def.h; y++) {
-    for (let x = gx; x < gx + def.w; x++) {
-      if (state.tiles[y][x].type === "water") return false;
-      if (state.buildings.some(b => x >= b.gx && x < b.gx + b.w && y >= b.gy && y < b.gy + b.h)) return false;
+  const trees = [];
+  for (const [x1, y1, x2, y2, dens] of L.forests || []) {
+    for (let y = y1; y <= y2; y++) for (let x = x1; x <= x2; x++) {
+      if (inb(x, y) && tiles[y][x].t === "grass" && rnd() < dens) {
+        trees.push({ gx: x + 0.3 + rnd() * 0.4, gy: y + 0.3 + rnd() * 0.4, stage: 100, reserved: false });
+      }
     }
   }
+  // Keep the citadel's surroundings open.
+  const [cx, cy] = L.citadel;
+  for (let y = cy - 2; y <= cy + 3; y++) for (let x = cx - 2; x <= cx + 3; x++) {
+    if (inb(x, y)) tiles[y][x].t = "grass";
+  }
+  return { tiles, trees: trees.filter(t => !(t.gx >= cx - 2 && t.gx < cx + 4 && t.gy >= cy - 2 && t.gy < cy + 4)) };
+}
+
+// ==================== LEVEL SETUP ====================
+function unlockedFor(idx) {
+  const b = new Set(), t = new Set();
+  for (let i = 0; i <= idx; i++) {
+    (LEVELS[i].unlocks.buildings || []).forEach(x => b.add(x));
+    (LEVELS[i].unlocks.troops || []).forEach(x => t.add(x));
+  }
+  return { buildings: b, troops: t };
+}
+
+function startLevel(idx, mode = "brief") {
+  const L = LEVELS[idx];
+  const { tiles, trees } = genMap(L);
+  S = {
+    idx, L, tiles, trees,
+    unlocked: unlockedFor(idx),
+    buildings: [], occ: [], workers: [], units: [], shots: [], floats: [], spawnQueue: [],
+    timber: L.start.timber, stone: L.start.stone, rice: L.start.rice, gold: L.start.gold,
+    villagers: L.start.villagers, cap: 0, harmony: 60, fear: 0,
+    season: L.season, seasonLeft: SEASONS[L.season].len,
+    time: 0, tickAcc: 0, waveClock: 0, nextWave: 0,
+    nets: [], netOf: null, flooded: new Set(), flow: null,
+    tool: null, demolish: false, cat: "water",
+    paused: true, speed: 1, mode, growAcc: 0, starveAcc: 0, tutorialStep: 0, warnedWave: -1, uid: 0
+  };
+  const [cx, cy] = L.citadel;
+  S.citadel = addBuilding("citadel", cx, cy);
+  for (const [id, x, y] of L.prebuilt || []) addBuilding(id, x, y);
+  let n = 0;
+  for (const [type, qty] of Object.entries(L.army || {})) {
+    for (let i = 0; i < qty; i++, n++) {
+      spawnSoldier(type, cx + 2.6 + (n % 3) * 0.6, cy + 0.4 + Math.floor(n / 3) * 0.6);
+    }
+  }
+  refreshWorld();
+  centerCamera();
+  buildTabs();
+  renderPalette();
+  syncHud();
+  if (mode === "brief") showBriefing();
+}
+
+// ==================== BUILDINGS ====================
+function addBuilding(id, gx, gy) {
+  const def = BUILDINGS[id];
+  const b = { uid: ++S.uid, id, def, gx, gy, w: def.w, h: def.h, hp: def.hp, maxHp: def.hp, worker: null, water: 0, growth: 0, open: false, next: 0 };
+  S.buildings.push(b);
+  S.trees = S.trees.filter(t => !(t.gx >= gx && t.gx < gx + def.w && t.gy >= gy && t.gy < gy + def.h));
+  return b;
+}
+
+function removeBuilding(b) {
+  S.buildings = S.buildings.filter(x => x !== b);
+  for (const w of S.workers.filter(w => w.b === b)) releaseWorker(w);
+  S.workers = S.workers.filter(w => w.b !== b);
+  refreshWorld();
+}
+
+// Rebuild everything derived from the building layout.
+function refreshWorld() {
+  S.occ = Array.from({ length: MAP }, () => Array(MAP).fill(null));
+  for (const b of S.buildings) {
+    for (let y = b.gy; y < b.gy + b.h; y++) for (let x = b.gx; x < b.gx + b.w; x++) S.occ[y][x] = b;
+  }
+  S.cap = 6 + S.buildings.reduce((n, b) => n + (b.def.pop || 0), 0);
+  computeFlow();
+  computeNets();
+  staff();
+}
+
+const count = id => S ? S.buildings.filter(b => b.id === id).length : 0;
+const buildingAt = (x, y) => (inb(x, y) ? S.occ[y][x] : null);
+
+function canPlace(def, gx, gy) {
+  if (gx < 0 || gy < 0 || gx + def.w > MAP || gy + def.h > MAP) return "Outside the kingdom.";
+  for (let y = gy; y < gy + def.h; y++) for (let x = gx; x < gx + def.w; x++) {
+    const t = S.tiles[y][x].t;
+    if (t === "river") return "Can't build on the river.";
+    if (t === "rock") return "Rock is in the way.";
+    if (S.occ[y][x]) return "Something is already there.";
+  }
+  if (def.needsRock && !rockNear(gx, gy, def.w, def.h, 2)) return "A quarry must stand within 2 tiles of rock.";
+  return null;
+}
+
+function rockNear(gx, gy, w, h, r) {
+  for (let y = gy - r; y < gy + h + r; y++) for (let x = gx - r; x < gx + w + r; x++) {
+    if (inb(x, y) && S.tiles[y][x].t === "rock") return true;
+  }
+  return false;
+}
+
+function tryBuild(gx, gy, quiet = false) {
+  const def = BUILDINGS[S.tool];
+  const why = canPlace(def, gx, gy);
+  if (why) { if (!quiet) say(why, true); return false; }
+  for (const [k, v] of Object.entries(def.cost)) {
+    if (S[k] < v) { if (!quiet) say(`We need ${v} ${k} for the ${def.name}, and have ${Math.floor(S[k])}.`, true); return false; }
+  }
+  for (const [k, v] of Object.entries(def.cost)) S[k] -= v;
+  addBuilding(S.tool, gx, gy);
+  puff(gx + def.w / 2, gy + def.h / 2, 6, "#b8a07a");
+  refreshWorld();
+  sfx("build");
+  syncHud();
   return true;
 }
 
-function tryPlaceOrDemolish(gx, gy) {
-  if (state.demolishMode) {
-    const idx = state.buildings.findIndex(b => gx >= b.gx && gx < b.gx + b.w && gy >= b.gy && gy < b.gy + b.h);
-    if (idx !== -1) {
-      const b = state.buildings[idx];
-      if (b.id === "keep" || b.id === "campfire") return;
-      state.buildings.splice(idx, 1);
-      state.workers = state.workers.filter(w => w.bUid !== b.uid);
-      recalcHousing();
-      syncUI();
+function demolishAt(gx, gy) {
+  const b = buildingAt(gx, gy);
+  if (!b) return;
+  if (b.id === "citadel") { say("The Maligawa cannot be torn down.", true); return; }
+  for (const [k, v] of Object.entries(b.def.cost || {})) S[k] += Math.floor(v / 2);
+  removeBuilding(b);
+  spawnFloat("Cleared (half refunded)", b.gx + b.w / 2, b.gy + b.h / 2, "#e9b949");
+  syncHud();
+}
+
+function damageBuilding(b, amt) {
+  if (!S.buildings.includes(b)) return;
+  b.hp -= amt;
+  if (b.hp > 0) return;
+  if (b === S.citadel) { endLevel(false); return; }
+  puff(b.gx + b.w / 2, b.gy + b.h / 2, 14, "#7a6a58");
+  spawnFloat(`${b.def.name} destroyed!`, b.gx + b.w / 2, b.gy + b.h / 2, "#ff6b5b");
+  S.fear = Math.min(30, S.fear + 6);
+  removeBuilding(b);
+}
+
+// ==================== RAIDER PATHFINDING ====================
+// Dijkstra flow field from the citadel. Solid buildings cost more the
+// tougher they are, so raiders walk around walls when a gap exists and
+// break through when it doesn't.
+function enterCost(x, y) {
+  const t = S.tiles[y][x].t;
+  let c = t === "river" ? 6 : t === "rock" ? 1.6 : 1;
+  const b = S.occ[y][x];
+  if (b && b !== S.citadel) c += b.def.solid ? 3 + b.maxHp / 90 : 0.3;
+  return c;
+}
+
+function cornerBlocked(x, y, dx, dy) {
+  if (!dx || !dy) return false;
+  const a = buildingAt(x + dx, y), b = buildingAt(x, y + dy);
+  return (a && a.def.solid) || (b && b.def.solid);
+}
+
+function computeFlow() {
+  const flow = new Float32Array(MAP * MAP).fill(Infinity);
+  const heap = new MinHeap();
+  const c = S.citadel;
+  for (let y = c.gy; y < c.gy + c.h; y++) for (let x = c.gx; x < c.gx + c.w; x++) {
+    flow[y * MAP + x] = 0; heap.push([0, y * MAP + x]);
+  }
+  while (heap.size) {
+    const [d, i] = heap.pop();
+    if (d > flow[i]) continue;
+    const x = i % MAP, y = (i / MAP) | 0;
+    const ce = enterCost(x, y);
+    for (const [dx, dy] of DIRS8) {
+      const nx = x + dx, ny = y + dy;
+      if (!inb(nx, ny) || cornerBlocked(nx, ny, -dx, -dy)) continue;
+      const nd = d + ce * (dx && dy ? 1.414 : 1);
+      const ni = ny * MAP + nx;
+      if (nd < flow[ni]) { flow[ni] = nd; heap.push([nd, ni]); }
     }
+  }
+  S.flow = flow;
+}
+
+function nextFlowTile(cx, cy) {
+  let best = null, bd = S.flow[cy * MAP + cx];
+  for (const [dx, dy] of DIRS8) {
+    const nx = cx + dx, ny = cy + dy;
+    if (!inb(nx, ny) || cornerBlocked(cx, cy, dx, dy)) continue;
+    const d = S.flow[ny * MAP + nx];
+    if (d < bd) { bd = d; best = { x: nx, y: ny }; }
+  }
+  return best;
+}
+
+// ==================== WATER NETWORK ====================
+function computeNets() {
+  const netOf = Array.from({ length: MAP }, () => Array(MAP).fill(-1));
+  const nets = [];
+  for (const b of S.buildings) {
+    if (!b.def.water || netOf[b.gy][b.gx] !== -1) continue;
+    const net = { id: nets.length, tiles: [], wewas: new Set(), sluices: new Set(), water: 0 };
+    const queue = [[b.gx, b.gy]];
+    netOf[b.gy][b.gx] = net.id;
+    while (queue.length) {
+      const [x, y] = queue.pop();
+      const tb = S.occ[y][x];
+      net.tiles.push([x, y]);
+      if (tb.id === "wewa") net.wewas.add(tb);
+      if (tb.id === "sluice") net.sluices.add(tb);
+      for (const [dx, dy] of DIRS4) {
+        const nx = x + dx, ny = y + dy;
+        const nb = buildingAt(nx, ny);
+        if (nb && nb.def.water && netOf[ny][nx] === -1) { netOf[ny][nx] = net.id; queue.push([nx, ny]); }
+      }
+    }
+    nets.push(net);
+  }
+  S.nets = nets;
+  S.netOf = netOf;
+  updateNetWater();
+}
+
+function updateNetWater() {
+  S.flooded = new Set();
+  for (const net of S.nets) {
+    net.water = [...net.wewas].reduce((n, w) => n + w.water, 0);
+    if (net.water > 0 && [...net.sluices].some(s => s.open)) {
+      for (const [x, y] of net.tiles) if (S.occ[y][x].id !== "wewa") S.flooded.add(y * MAP + x);
+    }
+  }
+}
+
+function drainNet(net, amt) {
+  const ws = [...net.wewas].sort((a, b) => b.water - a.water);
+  for (const w of ws) {
+    const take = Math.min(w.water, amt);
+    w.water -= take; amt -= take;
+    if (amt <= 0) break;
+  }
+}
+
+function edgeTiles(b) {
+  const out = [];
+  for (let x = b.gx; x < b.gx + b.w; x++) out.push([x, b.gy - 1], [x, b.gy + b.h]);
+  for (let y = b.gy; y < b.gy + b.h; y++) out.push([b.gx - 1, y], [b.gx + b.w, y]);
+  return out.filter(([x, y]) => inb(x, y));
+}
+
+const riverBeside = b => edgeTiles(b).some(([x, y]) => S.tiles[y][x].t === "river");
+
+// Returns "river", a network object, or null.
+function waterSource(b) {
+  if (riverBeside(b)) return "river";
+  for (const [x, y] of edgeTiles(b)) {
+    const id = S.netOf[y][x];
+    if (id !== -1 && S.nets[id].water >= 1) return S.nets[id];
+  }
+  return null;
+}
+
+function tickWater() {
+  const maha = S.season === "maha";
+  for (const w of S.buildings) {
+    if (w.id !== "wewa") continue;
+    w.water = clamp(w.water + (maha ? 2.4 : -0.3) + (riverBeside(w) ? 1.2 : 0), 0, WEWA_CAP);
+  }
+  updateNetWater();
+  for (const p of S.buildings) {
+    if (p.id !== "paddy") continue;
+    const src = waterSource(p);
+    p.irrigated = !!src;
+    if (!p.worker || p.growth >= 100) continue;
+    const rate = src ? 4 : maha ? 2 : 0;
+    p.growth = Math.min(100, p.growth + rate);
+    if (src && src !== "river") drainNet(src, 0.4);
+  }
+  for (const net of S.nets) {
+    if ([...net.sluices].some(s => s.open) && net.water > 0) drainNet(net, 2.5);
+  }
+  updateNetWater();
+}
+
+// ==================== VILLAGERS & JOBS ====================
+function staff() {
+  while (S.workers.length > S.villagers) releaseWorker(S.workers.pop());
+  for (const b of S.buildings) {
+    if (!b.def.worker || b.worker) continue;
+    if (S.workers.length >= S.villagers) break;
+    const w = { b, job: b.def.worker, gx: S.citadel.gx + 1, gy: S.citadel.gy + 2.2, tx: 0, ty: 0, phase: "plan", timer: 0, carry: null, target: null };
+    b.worker = w;
+    S.workers.push(w);
+    planJob(w);
+  }
+}
+
+function releaseWorker(w) {
+  if (w.target && w.target.reserved) w.target.reserved = false;
+  if (w.b.worker === w) w.b.worker = null;
+}
+
+const idleVillagers = () => S.villagers - S.workers.length;
+
+function goTo(w, x, y, phase) { w.tx = x; w.ty = y; w.phase = phase; }
+
+function planJob(w) {
+  const b = w.b;
+  const hx = b.gx + b.w / 2, hy = b.gy + b.h / 2;
+  if (w.job === "woodcutter") {
+    let best = null, bd = 9;
+    for (const t of S.trees) {
+      if (t.stage < 100 || t.reserved) continue;
+      const d = Math.hypot(t.gx - hx, t.gy - hy);
+      if (d < bd) { bd = d; best = t; }
+    }
+    if (!best) { goTo(w, hx, hy + 0.6, "wait"); w.timer = 3; return; }
+    best.reserved = true;
+    w.target = best;
+    goTo(w, best.gx, best.gy + 0.3, "toSite");
+  } else if (w.job === "mason") {
+    let best = null, bd = 99;
+    for (let y = b.gy - 3; y <= b.gy + 3; y++) for (let x = b.gx - 3; x <= b.gx + 3; x++) {
+      if (!inb(x, y) || S.tiles[y][x].t !== "rock") continue;
+      const d = Math.hypot(x + 0.5 - hx, y + 0.5 - hy);
+      if (d < bd) { bd = d; best = [x, y]; }
+    }
+    if (!best) { goTo(w, hx, hy + 0.6, "wait"); w.timer = 3; return; }
+    goTo(w, best[0] + 0.5, best[1] + 0.9, "toSite");
+  } else {
+    goTo(w, hx + 0.2, hy + 0.3, "toSite");
+  }
+}
+
+function nearestStore(w, key) {
+  let best = S.citadel, bd = Infinity;
+  for (const b of S.buildings) {
+    if (!(b.def.store || []).includes(key)) continue;
+    const d = Math.hypot(b.gx + b.w / 2 - w.gx, b.gy + b.h / 2 - w.gy);
+    if (d < bd) { bd = d; best = b; }
+  }
+  return best;
+}
+
+function carryHome(w, key, n) {
+  w.carry = { key, n };
+  const s = nearestStore(w, key);
+  goTo(w, s.gx + s.w / 2, s.gy + s.h + 0.2, "toStore");
+}
+
+function walk(w, dt) {
+  const dx = w.tx - w.gx, dy = w.ty - w.gy, d = Math.hypot(dx, dy);
+  if (d < 0.08) return true;
+  const step = Math.min(d, 2.0 * terrainMult(w) * dt);
+  w.gx += (dx / d) * step; w.gy += (dy / d) * step;
+  return false;
+}
+
+function updateWorker(w, dt) {
+  switch (w.phase) {
+    case "plan": planJob(w); break;
+    case "wait":
+      walk(w, dt);
+      w.timer -= dt;
+      if (w.timer <= 0) planJob(w);
+      break;
+    case "toSite":
+      if (walk(w, dt)) {
+        if (w.job === "woodcutter" || w.job === "mason") { w.phase = "work"; w.timer = w.job === "mason" ? 4.5 : 3.5; }
+        else { w.phase = "tend"; w.timer = 6; }
+      }
+      break;
+    case "work":
+      w.timer -= dt;
+      if (w.timer > 0) break;
+      if (w.job === "woodcutter") {
+        const t = w.target;
+        w.target = null;
+        if (!t || !S.trees.includes(t)) { planJob(w); break; }
+        t.stage = 0; t.reserved = false;
+        carryHome(w, "timber", 5);
+      } else {
+        carryHome(w, "stone", 4);
+      }
+      break;
+    case "tend":
+      if (w.job === "farmer") {
+        if (w.b.growth >= 100) { w.b.growth = 0; carryHome(w, "rice", 12); }
+      } else if (w.job === "trader") {
+        w.timer -= dt;
+        if (w.timer <= 0) {
+          w.timer = 6;
+          if (S.rice > 30) { S.rice -= 5; S.gold += 8; spawnFloat("-5🍚 +8🪙", w.gx, w.gy, "#e9b949"); }
+        }
+      }
+      break;
+    case "toStore":
+      if (walk(w, dt)) {
+        S[w.carry.key] += w.carry.n;
+        spawnFloat(`+${w.carry.n} ${RES[w.carry.key]}`, w.gx, w.gy, "#bff0a8");
+        if (w.carry.key === "rice") sfx("harvest");
+        w.carry = null;
+        planJob(w);
+      }
+      break;
+  }
+}
+
+// ==================== SOLDIERS & RAIDERS ====================
+function spawnSoldier(type, gx, gy) {
+  const d = TROOPS[type];
+  S.units.push({ uid: ++S.uid, team: "p", type, def: d, gx, gy, tx: gx, ty: gy, hp: d.hp, maxHp: d.hp, last: -9, z: 0, sel: false, ordered: false });
+}
+
+function spawnFoe(type, edge) {
+  const d = FOES[type];
+  const hp = Math.round(d.hp * S.L.hpScale);
+  const [x, y] = edgeSpawn(edge);
+  S.units.push({ uid: ++S.uid, team: "e", type, def: d, gx: x, gy: y, hp, maxHp: hp, last: -9, z: 0 });
+}
+
+function edgeSpawn(edge) {
+  for (let tries = 0; tries < 30; tries++) {
+    const i = 6 + Math.floor(Math.random() * (MAP - 12));
+    let x, y;
+    if (edge === "east") { x = MAP - 1; y = i; }
+    else if (edge === "west") { x = 0; y = i; }
+    else if (edge === "north") { x = i; y = 0; }
+    else { x = i; y = MAP - 1; }
+    if (S.tiles[y][x].t !== "river" || tries === 29) return [x + 0.5, y + 0.5];
+  }
+}
+
+function terrainMult(u) {
+  const x = Math.floor(u.gx), y = Math.floor(u.gy);
+  if (!inb(x, y)) return 1;
+  if (u.team === "e" && S.flooded.has(y * MAP + x)) return 0.4;
+  const t = S.tiles[y][x].t;
+  return t === "river" ? 0.55 : t === "rock" ? 0.85 : 1;
+}
+
+function moveToward(u, tx, ty, dt) {
+  const dx = tx - u.gx, dy = ty - u.gy, d = Math.hypot(dx, dy);
+  if (d < 0.05) return;
+  const step = Math.min(d, u.def.speed * terrainMult(u) * dt);
+  u.gx += (dx / d) * step; u.gy += (dy / d) * step;
+}
+
+function nearestFoe(u, radius, from = u) {
+  let best = null, bd = radius;
+  for (const v of S.units) {
+    if (v.team === u.team || v.hp <= 0) continue;
+    const d = Math.hypot(v.gx - from.gx, v.gy - from.gy);
+    if (d <= bd) { bd = d; best = v; }
+  }
+  return best;
+}
+
+function attack(u, target, dmg) {
+  if (S.time - u.last < 1.0) return;
+  u.last = S.time;
+  if (u.def.ranged) fireShot(u.gx, u.gy, u.z + 12, target, dmg);
+  else hitUnit(target, dmg, u.def.splash);
+}
+
+function hitUnit(target, dmg, splash) {
+  target.hp -= dmg;
+  if (!splash) return;
+  for (const v of S.units) {
+    if (v !== target && v.team === target.team && dist(v, target) <= splash) v.hp -= dmg * 0.6;
+  }
+}
+
+function fireShot(gx, gy, z, target, dmg) {
+  const d = Math.hypot(target.gx - gx, target.gy - gy);
+  S.shots.push({ sx: gx, sy: gy, sz: z, target, dmg, t: 0, dur: Math.max(0.25, d / 9) });
+}
+
+function rectDist(u, b) {
+  const dx = Math.max(b.gx - u.gx, 0, u.gx - (b.gx + b.w));
+  const dy = Math.max(b.gy - u.gy, 0, u.gy - (b.gy + b.h));
+  return Math.hypot(dx, dy);
+}
+
+function hitBuilding(u, b) {
+  if (S.time - u.last < 1.0) return;
+  u.last = S.time;
+  damageBuilding(b, u.def.bdmg);
+  sfx("hit");
+}
+
+function updateFoe(u, dt) {
+  const d = u.def;
+  const foe = nearestFoe(u, d.ranged ? d.range : 2.2);
+  if (foe) {
+    if (dist(u, foe) <= d.range) attack(u, foe, d.dmg);
+    else moveToward(u, foe.gx, foe.gy, dt);
     return;
   }
+  const cx = clamp(Math.floor(u.gx), 0, MAP - 1), cy = clamp(Math.floor(u.gy), 0, MAP - 1);
+  if (S.occ[cy][cx] === S.citadel || rectDist(u, S.citadel) < 0.45) { hitBuilding(u, S.citadel); return; }
+  const nxt = nextFlowTile(cx, cy);
+  if (!nxt) { moveToward(u, S.citadel.gx + 1, S.citadel.gy + 1, dt); return; }
+  const b = S.occ[nxt.y][nxt.x];
+  if (b && b.def.solid && rectDist(u, b) <= 0.45) { hitBuilding(u, b); return; }
+  moveToward(u, nxt.x + 0.5, nxt.y + 0.5, dt);
+}
 
-  if (!state.selectedBuildId) return;
-  const def = CATALOG[state.selectedBuildId];
-  if (!canPlaceAt(def, gx, gy)) {
-    showScribeBanner("Can't place that there, M'Lord! The ground is blocked.");
+function updateSoldier(u, dt) {
+  const d = u.def;
+  const under = buildingAt(Math.floor(u.gx), Math.floor(u.gy));
+  const high = d.ranged && under && (under.def.wall || under.def.tower);
+  u.z = high ? (under.def.tower ? 40 : 20) : 0;
+  const range = d.range * (high ? 1.4 : 1);
+  const toPost = Math.hypot(u.tx - u.gx, u.ty - u.gy);
+  if (u.ordered && toPost < 0.15) u.ordered = false;
+
+  const foe = nearestFoe(u, u.ordered || d.ranged ? range : 4);
+  if (foe && dist(u, foe) <= range) {
+    attack(u, foe, d.dmg);
+    if (!u.ordered) return;
+  } else if (foe && !u.ordered && Math.hypot(foe.gx - u.tx, foe.gy - u.ty) < 5) {
+    moveToward(u, foe.gx, foe.gy, dt);
     return;
   }
+  if (toPost > 0.15) moveToward(u, u.tx, u.ty, dt);
+}
 
-  for (const [k, amt] of Object.entries(def.cost)) {
-    if ((state[k] || 0) < amt) {
-      showScribeBanner(`More ${k} needed in the Stockpile, Sire!`);
-      return;
+function separate() {
+  const us = S.units;
+  for (let i = 0; i < us.length; i++) {
+    for (let j = i + 1; j < us.length; j++) {
+      const a = us[i], b = us[j];
+      const dx = b.gx - a.gx, dy = b.gy - a.gy, d = Math.hypot(dx, dy);
+      if (d > 0.001 && d < 0.32) {
+        const push = (0.32 - d) * 0.25;
+        a.gx -= (dx / d) * push; a.gy -= (dy / d) * push;
+        b.gx += (dx / d) * push; b.gy += (dy / d) * push;
+      }
     }
   }
-  for (const [k, amt] of Object.entries(def.cost)) state[k] -= amt;
-
-  // Clear trees under building footprint
-  state.trees = state.trees.filter(tr => !(tr.gx >= gx && tr.gx <= gx + def.w && tr.gy >= gy && tr.gy <= gy + def.h));
-
-  addBuildingInternal(def.id, gx, gy, def.w, def.h, def.hp);
-  recalcHousing();
-  syncUI();
 }
 
-function recalcHousing() {
-  let cap = 8;
-  for (const b of state.buildings) {
-    if (CATALOG[b.id]?.popCap) cap += CATALOG[b.id].popCap;
+function updateCombat(dt) {
+  for (const u of S.units) {
+    if (u.hp <= 0) continue;
+    if (u.team === "p") updateSoldier(u, dt); else updateFoe(u, dt);
   }
-  state.peasantsCap = cap;
-}
+  separate();
 
-function triggerEnemyRaid() {
-  state.waveNum++;
-  state.waveTimer = 85;
-  const count = 4 + Math.min(6, state.waveNum * 2);
+  for (const b of S.buildings) {
+    const tw = b.def.tower;
+    if (!tw || S.time < b.next) continue;
+    const c = { gx: b.gx + b.w / 2, gy: b.gy + b.h / 2, team: "p" };
+    const foe = nearestFoe(c, tw.range);
+    if (foe) { fireShot(c.gx, c.gy, 48, foe, tw.dmg); b.next = S.time + tw.cd; }
+  }
 
-  showScribeBanner(
-    state.theme === "srilanka"
-      ? "Sound the Hakgediya conch! Invader vanguards march down the border road toward our Simhadvara gate!"
-      : "Maha Nilame Warning: 'Enemy columns are ascending the Balana pass toward Senkadagala!'"
-  );
+  for (let i = S.shots.length - 1; i >= 0; i--) {
+    const s = S.shots[i];
+    s.t += dt;
+    if (s.t >= s.dur) {
+      if (s.target.hp > 0) s.target.hp -= s.dmg;
+      S.shots.splice(i, 1);
+    }
+  }
 
-  for (let i = 0; i < count; i++) {
-    const isBow = i % 3 === 2;
-    state.units.push({
-      uid: "raider_" + Math.random().toString(36).slice(2, 9),
-      id: isBow ? "archer" : "spearman",
-      team: "enemy",
-      gx: 24.2 - (i % 2) * 0.6,
-      gy: 11.2 + (i * 0.45) % 2.5,
-      tx: 11.0,
-      ty: 11.0,
-      z: 0,
-      hp: isBow ? 70 : 110,
-      maxHp: isBow ? 70 : 110,
-      dmg: isBow ? 10 : 15,
-      range: isBow ? 4.5 : 0.9,
-      speed: 0.026,
-      isRanged: isBow,
-      lastAttack: 0,
-      selected: false
-    });
+  for (let i = S.units.length - 1; i >= 0; i--) {
+    const u = S.units[i];
+    if (u.hp > 0) continue;
+    if (u.team === "e") {
+      S.gold += u.def.gold;
+      spawnFloat(`+${u.def.gold}🪙`, u.gx, u.gy, "#e9b949");
+    }
+    S.units.splice(i, 1);
   }
 }
 
-function showScribeBanner(msg) {
-  document.getElementById("sbQuoteText").textContent = `"${msg}"`;
-  const alertEl = document.getElementById("scribeAlert");
-  document.getElementById("saText").textContent = `"${msg}"`;
-  alertEl.classList.remove("hidden");
-  clearTimeout(window._alertTimer);
-  window._alertTimer = setTimeout(() => alertEl.classList.add("hidden"), 5500);
+// ==================== RAIDS ====================
+const nextWaveIn = () => (S.nextWave < S.L.waves.length ? S.L.waves[S.nextWave].t - S.waveClock : Infinity);
+const foesAlive = () => S.units.some(u => u.team === "e");
+
+function launchWave() {
+  const w = S.L.waves[S.nextWave++];
+  const list = [];
+  for (const type of Object.keys(FOES)) for (let i = 0; i < (w[type] || 0); i++) list.push(type);
+  list.forEach((type, i) => S.spawnQueue.push({ at: S.time + i * 0.7, type, edge: w.from[i % w.from.length] }));
+  say(`Raid ${S.nextWave} of ${S.L.waves.length}: ${list.length} raiders from the ${w.from.join(" and ")}!`, true);
+  sfx("conch");
 }
 
-// ==================== UI PALETTE & HUD SYNC ====================
+function callRaidEarly() {
+  if (!S || S.mode !== "play" || S.nextWave >= S.L.waves.length) return;
+  S.waveClock = S.L.waves[S.nextWave].t;
+  S.gold += 15;
+  spawnFloat("+15🪙 for courage", S.citadel.gx + 1, S.citadel.gy, "#e9b949");
+  launchWave();
+}
+
+// ==================== ONE-SECOND TICK ====================
+function tick() {
+  S.seasonLeft--;
+  if (S.seasonLeft <= 0) {
+    S.season = SEASONS[S.season].next;
+    S.seasonLeft = SEASONS[S.season].len;
+    say(S.season === "maha"
+      ? "The Maha monsoon breaks! The wewas fill and every paddy drinks."
+      : "Yala, the dry season. Only paddies beside water will grow now.");
+  }
+
+  S.waveClock++;
+  while (nextWaveIn() <= 0) launchWave();
+  if (nextWaveIn() === 20 && S.warnedWave !== S.nextWave) {
+    S.warnedWave = S.nextWave;
+    say(`Scouts report raiders from the ${S.L.waves[S.nextWave].from.join(" and ")} in 20 seconds.`, true);
+  }
+
+  tickWater();
+
+  for (const u of S.units) {
+    if (u.team === "e" && S.flooded.has(Math.floor(u.gy) * MAP + Math.floor(u.gx))) u.hp -= 4;
+  }
+
+  // Economy & harmony
+  const soldiers = S.units.filter(u => u.team === "p").length;
+  S.rice = Math.max(0, S.rice - S.villagers * 0.04 - soldiers * 0.03);
+  S.gold += S.villagers * 0.02 * (S.harmony / 60);
+  S.fear = Math.max(0, S.fear - 0.5);
+
+  let target = 55 + Math.min(2, count("dagoba")) * BUILDINGS.dagoba.harmony - S.fear + (S.season === "maha" ? 3 : 0);
+  if (S.rice <= 0) target -= 35;
+  else if (S.rice >= S.villagers * 3) target += 8;
+  target = clamp(target, 5, 100);
+  S.harmony += clamp(target - S.harmony, -1, 1);
+
+  if (S.rice <= 0) {
+    S.starveAcc += 0.25;
+    if (S.starveAcc >= 1 && S.villagers > 0) {
+      S.starveAcc = 0;
+      S.villagers--;
+      spawnFloat("A family left — no rice!", S.citadel.gx + 1, S.citadel.gy + 1, "#ff6b5b");
+      say("The granary is empty and families are leaving. Plant paddies beside water!", true);
+    }
+  } else {
+    S.starveAcc = 0;
+    if (S.harmony >= 45 && S.villagers < S.cap && S.rice > S.villagers) {
+      S.growAcc += 0.12 + S.harmony / 400;
+      if (S.growAcc >= 1) {
+        S.growAcc = 0;
+        S.villagers++;
+        spawnFloat("+1 villager", S.citadel.gx + 1, S.citadel.gy + 2, "#bff0a8");
+      }
+    }
+  }
+  staff();
+
+  if (S.L.tutorial && S.tutorialStep < TUTORIAL.length && TUTORIAL[S.tutorialStep].when()) {
+    say(TUTORIAL[S.tutorialStep++].text);
+  }
+
+  checkVictory();
+  syncHud();
+}
+
+// ==================== OBJECTIVES & ENDINGS ====================
+function objective(o) {
+  const L = S.L;
+  switch (o.type) {
+    case "res": return { label: `${RES[o.key]} Store ${o.n} ${o.key}`, cur: Math.floor(S[o.key]), n: o.n };
+    case "build": return { label: `${BUILDINGS[o.id].icon} Build ${o.n} ${BUILDINGS[o.id].name}`, cur: count(o.id), n: o.n };
+    case "water": return { label: `💧 Hold ${o.n} water in wewas`, cur: Math.floor(totalWater()), n: o.n };
+    case "harmony": return { label: `😊 Harmony ${o.n}+`, cur: Math.floor(S.harmony), n: o.n };
+    case "pop": return { label: `👥 ${o.n} villagers`, cur: S.villagers, n: o.n };
+    case "waves": {
+      const busy = foesAlive() || S.spawnQueue.length > 0;
+      return { label: `🛡️ Survive ${L.waves.length} raids`, cur: Math.max(0, S.nextWave - (busy ? 1 : 0)), n: L.waves.length };
+    }
+  }
+  return { label: "?", cur: 0, n: 1 };
+}
+
+const totalWater = () => S.buildings.reduce((n, b) => n + (b.id === "wewa" ? b.water : 0), 0);
+
+function checkVictory() {
+  if (S.mode !== "play") return;
+  if (S.L.objectives.every(o => { const r = objective(o); return r.cur >= r.n; })) endLevel(true);
+}
+
+function endLevel(won) {
+  if (S.mode !== "play") return;
+  S.mode = "end";
+  S.paused = true;
+  const pct = Math.max(0, S.citadel.hp) / S.citadel.maxHp;
+  const stars = won ? (pct >= 0.9 ? 3 : pct >= 0.5 ? 2 : 1) : 0;
+  if (won) {
+    progress.stars[S.L.id] = Math.max(progress.stars[S.L.id] || 0, stars);
+    progress.unlocked = Math.max(progress.unlocked, Math.min(LEVELS.length - 1, S.idx + 1));
+    saveProgress();
+  }
+  sfx(won ? "win" : "lose");
+  syncHud();
+  showEnd(won, stars);
+}
+
+// ==================== MAIN LOOP ====================
+function step(dt) {
+  S.time += dt;
+  S.tickAcc += dt;
+  while (S.tickAcc >= 1 && S.mode === "play") { S.tickAcc -= 1; tick(); }
+  while (S.spawnQueue.length && S.time >= S.spawnQueue[0].at) {
+    const q = S.spawnQueue.shift();
+    spawnFoe(q.type, q.edge);
+  }
+  for (const t of S.trees) if (t.stage < 100) t.stage = Math.min(100, t.stage + 0.6 * dt);
+  for (const w of S.workers) updateWorker(w, dt);
+  updateCombat(dt);
+  updateFx(dt);
+  for (let i = S.floats.length - 1; i >= 0; i--) {
+    const f = S.floats[i];
+    f.z += 22 * dt; f.life -= dt;
+    if (f.life <= 0) S.floats.splice(i, 1);
+  }
+}
+
+let lastTs = performance.now();
+function frame(now) {
+  requestAnimationFrame(frame);
+  const realDt = Math.min(0.05, (now - lastTs) / 1000);
+  lastTs = now;
+  if (S && S.mode === "play" && !S.paused) {
+    // Sub-step so fast speeds don't let units skip tiles or shots resolve early.
+    for (let sim = realDt * S.speed; sim > 0 && S.mode === "play"; sim -= 0.1) step(Math.min(0.1, sim));
+  }
+  if (S) { render(now); renderMinimap(); }
+}
+
+// Rendering lives in render.js.
+
+// ==================== CAMERA ====================
+function resizeCanvas() {
+  const vp = document.getElementById("viewport");
+  const oldW = view.w, oldH = view.h;
+  view.dpr = window.devicePixelRatio || 1;
+  view.w = vp.clientWidth;
+  view.h = vp.clientHeight;
+  canvas.width = Math.round(view.w * view.dpr);
+  canvas.height = Math.round(view.h * view.dpr);
+  if (oldW) { view.camX += (view.w - oldW) / 2 / view.zoom; view.camY += (view.h - oldH) / 2 / view.zoom; }
+}
+
+function centerCamera(gx, gy) {
+  if (gx === undefined) { gx = S.citadel.gx + 1; gy = S.citadel.gy + 1; }
+  view.camX = view.w / 2 / view.zoom - (gx - gy) * (TW / 2);
+  view.camY = view.h / 2 / view.zoom - (gx + gy) * (TH / 2);
+}
+
+// Zoom about a screen point (CSS pixels) so the world under the cursor stays put.
+function zoomAt(factor, sx = view.w / 2, sy = view.h / 2) {
+  const z0 = view.zoom, z1 = clamp(z0 * factor, 0.55, 2.2);
+  view.camX += sx / z1 - sx / z0;
+  view.camY += sy / z1 - sy / z0;
+  view.zoom = z1;
+}
+
+// ==================== HUD ====================
+function buildTabs() {
+  const nav = document.getElementById("tabs");
+  nav.innerHTML = "";
+  for (const c of CATS) {
+    const btn = document.createElement("button");
+    btn.className = `tab ${S.cat === c.id && !S.demolish ? "active" : ""}`;
+    btn.innerHTML = `<span>${c.icon}</span><span>${c.label}</span>`;
+    btn.addEventListener("click", () => { S.cat = c.id; S.tool = null; S.demolish = false; buildTabs(); renderPalette(); });
+    nav.appendChild(btn);
+  }
+  const clear = document.createElement("button");
+  clear.className = `tab clear ${S.demolish ? "active" : ""}`;
+  clear.title = "Demolish (half refund)";
+  clear.innerHTML = "<span>⛏️</span><span>Clear</span>";
+  clear.addEventListener("click", () => { S.demolish = !S.demolish; S.tool = null; buildTabs(); renderPalette(); });
+  nav.appendChild(clear);
+}
+
+function affordable(cost) {
+  return Object.entries(cost).every(([k, v]) => S[k] >= v);
+}
+
 function renderPalette() {
-  const strip = document.getElementById("shPaletteStrip");
-  strip.innerHTML = "";
-  const tDict = THEMES[state.theme];
-
-  if (state.activeCat === "troops") {
-    for (const td of Object.values(TROOP_DEFS)) {
-      const reqStr = Object.entries(td.req).map(([k, v]) => `${v} ${k}`).join(" + ");
-      const card = document.createElement("div");
-      card.className = "iso-card";
-      card.innerHTML = `
-        <div class="ic-head"><span>${td.icon}</span> <span>${tDict[td.id] || td.id}</span></div>
-        <div class="ic-sub">${td.sub}</div>
-        <div class="ic-cost">🪙${td.gold} • ${reqStr}</div>
-      `;
-      card.addEventListener("click", () => recruitMilitaryUnit(td));
-      strip.appendChild(card);
+  const pal = document.getElementById("palette");
+  pal.innerHTML = "";
+  if (S.cat === "army") {
+    for (const [id, t] of Object.entries(TROOPS)) {
+      if (!S.unlocked.troops.has(id)) continue;
+      const card = document.createElement("button");
+      card.className = "card";
+      card.dataset.troop = id;
+      card.innerHTML = `<div class="card-head">${t.icon} ${t.name}</div><div class="card-desc">${t.desc}</div><div class="card-cost">${costText(t.cost)} + 1 👥</div>`;
+      card.addEventListener("click", () => recruit(id));
+      pal.appendChild(card);
     }
-    return;
-  }
-
-  const items = Object.values(CATALOG).filter(b => b.cat === state.activeCat);
-  for (const b of items) {
-    const costStr = Object.entries(b.cost).map(([k, v]) => `${v}${k === "wood" ? "🪵" : k === "stone" ? "🪨" : "🪙"}`).join(" ");
-    const card = document.createElement("div");
-    card.className = `iso-card ${state.selectedBuildId === b.id ? "selected" : ""}`;
-    card.innerHTML = `
-      <div class="ic-head"><span>${b.icon}</span> <span>${tDict[b.id] || b.id}</span></div>
-      <div class="ic-sub">${b.sub}</div>
-      <div class="ic-cost">${costStr}</div>
-    `;
-    card.addEventListener("click", () => {
-      state.demolishMode = false;
-      document.getElementById("demolishBtn").classList.remove("active");
-      state.selectedBuildId = state.selectedBuildId === b.id ? null : b.id;
-      renderPalette();
-    });
-    strip.appendChild(card);
-  }
-}
-
-function recruitMilitaryUnit(td) {
-  if (state.gold < td.gold) {
-    showScribeBanner("Not enough Gold in the treasury, Sire!");
-    return;
-  }
-  for (const [wk, qty] of Object.entries(td.req)) {
-    if ((state.weapons[wk] || 0) < qty) {
-      showScribeBanner(`Weapons needed! Craft more ${wk} in your weapons workshops!`);
-      return;
+  } else {
+    for (const [id, b] of Object.entries(BUILDINGS)) {
+      if (b.cat !== S.cat || !S.unlocked.buildings.has(id)) continue;
+      const card = document.createElement("button");
+      card.className = `card ${S.tool === id ? "selected" : ""}`;
+      card.dataset.build = id;
+      card.title = b.desc;
+      card.innerHTML = `<div class="card-head">${b.icon} ${b.name}</div><div class="card-desc">${b.desc}</div><div class="card-cost">${costText(b.cost)}</div>`;
+      card.addEventListener("click", () => { S.tool = S.tool === id ? null : id; S.demolish = false; buildTabs(); renderPalette(); });
+      pal.appendChild(card);
     }
   }
-  state.gold -= td.gold;
-  for (const [wk, qty] of Object.entries(td.req)) state.weapons[wk] -= qty;
-
-  const barracks = state.buildings.find(b => b.id === "barracks") || state.buildings[0];
-  spawnUnit(td.id, barracks.gx + 1.2 + Math.random() * 0.6, barracks.gy + 2.2 + Math.random() * 0.6, "player");
-  syncUI();
+  if (!pal.children.length) pal.innerHTML = `<div class="card-desc">Nothing unlocked here yet. Later levels add more.</div>`;
+  updateAffordability();
 }
 
-function syncUI() {
-  document.getElementById("stWood").textContent = state.wood;
-  document.getElementById("stStone").textContent = state.stone;
-  document.getElementById("stIron").textContent = state.iron;
-  document.getElementById("stWheat").textContent = state.wheat;
-  document.getElementById("stFood").textContent = state.food;
-  document.getElementById("stAle").textContent = state.ale;
-  document.getElementById("stBows").textContent = state.weapons.bows;
-  document.getElementById("stSpears").textContent = state.weapons.spears;
-  document.getElementById("stSwords").textContent = state.weapons.swords;
-
-  document.getElementById("sbPop").textContent = state.popularity;
-  document.getElementById("sbPop").className = `sb-val ${state.popularity >= 50 ? "pos" : "neg"}`;
-  document.getElementById("sbGold").textContent = state.gold;
-  document.getElementById("sbPeasants").textContent = `${state.peasantsTotal}/${state.peasantsCap}`;
-
-  const m = String(Math.floor(state.waveTimer / 60)).padStart(2, "0");
-  const s = String(state.waveTimer % 60).padStart(2, "0");
-  document.getElementById("sbWaveTimer").textContent = `${m}:${s}`;
-
-  renderScribeFace();
+function updateAffordability() {
+  for (const card of document.querySelectorAll("#palette .card")) {
+    const cost = card.dataset.troop ? TROOPS[card.dataset.troop].cost : BUILDINGS[card.dataset.build].cost;
+    card.classList.toggle("poor", !affordable(cost));
+  }
 }
 
-// ==================== INPUT & CAMERA CONTROLS ====================
-canvas.addEventListener("mousemove", e => {
+function recruit(id) {
+  const t = TROOPS[id];
+  const barracks = S.buildings.filter(b => b.id === "barracks");
+  if (!barracks.length) { say("Build an Angam Maduwa (Defence tab) first.", true); return; }
+  if (!affordable(t.cost)) { say(`A ${t.name} needs ${costText(t.cost)}.`, true); return; }
+  if (idleVillagers() < 1 && S.villagers < 1) { say("No villagers left to take up arms.", true); return; }
+  if (idleVillagers() < 1) {
+    // Pull the most recently staffed worker off their job.
+    releaseWorker(S.workers.pop());
+  }
+  for (const [k, v] of Object.entries(t.cost)) S[k] -= v;
+  S.villagers--;
+  const b = barracks[0];
+  spawnSoldier(id, b.gx + 1 + Math.random() * 0.5, b.gy + b.h + 0.3 + Math.random() * 0.4);
+  staff();
+  sfx("build");
+  syncHud();
+}
+
+function syncHud() {
+  document.getElementById("levelName").textContent = `${S.idx + 1}. ${S.L.name}`;
+  document.getElementById("seasonBadge").textContent = `${SEASONS[S.season].label} · ${S.seasonLeft}s`;
+  document.getElementById("objectives").innerHTML = S.L.objectives.map(o => {
+    const r = objective(o);
+    return `<li class="${r.cur >= r.n ? "done" : ""}">${r.label} (${Math.min(r.cur, r.n)}/${r.n})</li>`;
+  }).join("");
+  document.getElementById("resources").innerHTML = Object.entries(RES)
+    .map(([k, ic]) => `<span>${ic} ${k}: <strong>${Math.floor(S[k])}</strong></span>`).join("") +
+    `<span>💧 water: <strong>${Math.floor(totalWater())}</strong></span>`;
+  const hv = Math.round(S.harmony);
+  document.getElementById("harmonyVal").textContent = hv;
+  const fill = document.getElementById("harmonyFill");
+  fill.style.width = `${hv}%`;
+  fill.style.background = hv >= 60 ? "#6cc070" : hv >= 40 ? "#e9b949" : "#d9473a";
+  document.getElementById("popVal").textContent = `${S.villagers}/${S.cap} (${Math.max(0, idleVillagers())} idle)`;
+  document.getElementById("armyVal").textContent = S.units.filter(u => u.team === "p").length;
+  document.getElementById("citadelVal").textContent = `${Math.max(0, Math.round(100 * S.citadel.hp / S.citadel.maxHp))}%`;
+  const n = nextWaveIn();
+  document.getElementById("raidVal").textContent = n === Infinity
+    ? (foesAlive() || S.spawnQueue.length ? "Under attack!" : "None left")
+    : `${String(Math.floor(n / 60)).padStart(2, "0")}:${String(n % 60).padStart(2, "0")}`;
+  document.getElementById("conchBtn").disabled = n === Infinity || S.mode !== "play";
+  document.getElementById("pauseBtn").textContent = S.paused ? "▶ Resume" : "⏸ Pause";
+  document.getElementById("pauseBtn").disabled = S.mode !== "play";
+  document.getElementById("speedBtn").textContent = `⏩ ${S.speed}×`;
+  updateAffordability();
+}
+
+let advisorTimer = null;
+function say(text, warn = false) {
+  const el = document.getElementById("advisor");
+  document.getElementById("advisorText").textContent = text;
+  el.classList.toggle("warn", warn);
+  el.classList.remove("hidden");
+  clearTimeout(advisorTimer);
+  advisorTimer = setTimeout(() => el.classList.add("hidden"), 6500);
+}
+
+function spawnFloat(text, gx, gy, color) {
+  S.floats.push({ text, gx, gy, z: 24, color, life: 1.6 });
+}
+
+function describe(b) {
+  const lines = [`<b>${b.def.icon} ${b.def.name}</b>`, `HP ${Math.ceil(b.hp)}/${b.maxHp}`];
+  if (b.def.worker) lines.push(b.worker ? "Staffed" : "💤 No villager free. Build houses.");
+  if (b.id === "wewa") lines.push(`Water ${Math.round(b.water)}/${WEWA_CAP}${riverBeside(b) ? " · river-fed" : ""}`);
+  if (b.id === "paddy") lines.push(`Growth ${Math.round(b.growth)}% · ${b.irrigated ? "irrigated" : "dry"}`);
+  if (b.id === "sluice") lines.push(b.open ? "Open: flooding canals. Click to close." : "Closed. Click to flood the canals.");
+  if (b.def.water && b.id !== "wewa") {
+    const id = S.netOf[b.gy][b.gx];
+    lines.push(id !== -1 && S.nets[id].wewas.size ? `Network water ${Math.round(S.nets[id].water)}` : "Not connected to a wewa");
+  }
+  return lines.join("<br>");
+}
+
+function updateTooltip() {
+  const tip = document.getElementById("tooltip");
+  const h = input.hover;
+  const b = !S.tool && S.mode === "play" ? buildingAt(h.gx, h.gy) : null;
+  if (!b) { tip.classList.add("hidden"); return; }
+  tip.innerHTML = describe(b);
+  tip.style.left = `${Math.min(h.x + 16, view.w - 270)}px`;
+  tip.style.top = `${Math.max(4, h.y - 20)}px`;
+  tip.classList.remove("hidden");
+}
+
+// ==================== OVERLAYS ====================
+const overlay = document.getElementById("overlay");
+
+function stars(n) { return "★".repeat(n) + "☆".repeat(3 - n); }
+
+function showMenu() {
+  if (S) { S.paused = true; if (S.mode === "play") S.mode = "menu"; }
+  overlay.classList.remove("hidden");
+  overlay.innerHTML = `
+    <div class="card-screen">
+      <h1>Balakotuwa — Keepers of the Wewa</h1>
+      <div class="tagline">Catch the monsoon, feed the kingdom, hold the citadel.</div>
+      <div class="level-list">
+        ${LEVELS.map((L, i) => `
+          <button class="level-card" data-level="${i}" ${i > progress.unlocked ? "disabled" : ""}>
+            <div class="lc-num">Level ${i + 1}${i > progress.unlocked ? " · 🔒" : ""}</div>
+            <div class="lc-name">${L.name}</div>
+            <div class="lc-era">${L.era}</div>
+            <div class="lc-stars">${stars(progress.stars[L.id] || 0)}</div>
+          </button>`).join("")}
+      </div>
+      <details class="how">
+        <summary>How to play</summary>
+        <ul>
+          <li><b>Two seasons.</b> In the 🌧️ Maha monsoon, rain fills every wewa and all paddies grow. In the ☀️ Yala dry season, paddies grow only beside water.</li>
+          <li><b>Water.</b> Wewas store rain. Canals carry it to paddies; each watered paddy drinks from the network. Wewas beside the river fill all year.</li>
+          <li><b>Villagers</b> staff farms, woodcutters, quarries and markets. Each soldier you train is one villager fewer. Houses raise the cap.</li>
+          <li><b>Harmony</b> rises with full granaries and dagobas, and falls with hunger and destruction. People only settle when it is 45 or more.</li>
+          <li><b>Raiders</b> follow the cheapest path to the citadel and break through walls only when there's no way round. Open a <b>sluice</b> to flood canals under them.</li>
+          <li>Finish every objective and survive every raid to win. Stars depend on how much of the citadel is left standing.</li>
+        </ul>
+      </details>
+      ${S && S.mode === "menu" ? `<div class="actions"><button class="btn primary" id="resumeBtn">▶ Resume level ${S.idx + 1}</button></div>` : ""}
+    </div>`;
+  overlay.querySelectorAll(".level-card").forEach(btn => btn.addEventListener("click", () => startLevel(Number(btn.dataset.level))));
+  const resume = document.getElementById("resumeBtn");
+  if (resume) resume.addEventListener("click", () => { S.mode = "play"; S.paused = false; overlay.classList.add("hidden"); syncHud(); });
+}
+
+function showBriefing() {
+  const L = S.L;
+  overlay.classList.remove("hidden");
+  const unlocks = [...(L.unlocks.buildings || []).map(id => BUILDINGS[id].name), ...(L.unlocks.troops || []).map(id => TROOPS[id].name)];
+  overlay.innerHTML = `
+    <div class="card-screen">
+      <div class="lc-num">Level ${S.idx + 1} · ${L.era}</div>
+      <h2>${L.name}</h2>
+      <p>${L.intro}</p>
+      <b>Objectives</b>
+      <ul>${L.objectives.map(o => `<li>${objective(o).label}</li>`).join("")}</ul>
+      ${unlocks.length ? `<b>New this level</b><ul><li>${unlocks.join("</li><li>")}</li></ul>` : ""}
+      <div class="actions">
+        <button class="btn primary" id="beginBtn">Begin</button>
+        <button class="btn" id="backBtn">Back to campaign</button>
+      </div>
+    </div>`;
+  document.getElementById("beginBtn").addEventListener("click", () => {
+    overlay.classList.add("hidden");
+    S.mode = "play";
+    S.paused = false;
+    unlockAudio();
+    tick();
+  });
+  document.getElementById("backBtn").addEventListener("click", showMenu);
+}
+
+function showEnd(won, starCount) {
+  overlay.classList.remove("hidden");
+  const hasNext = won && S.idx + 1 < LEVELS.length;
+  overlay.innerHTML = `
+    <div class="card-screen">
+      <h2>${won ? "Victory!" : "The citadel has fallen"}</h2>
+      ${won ? `<div class="lc-stars" style="font-size:28px">${stars(starCount)}</div>` : ""}
+      <p>${won
+        ? (S.idx + 1 === LEVELS.length ? "The hill kingdom endures. You have completed the campaign." : "The kingdom is fed and the walls still stand. A new region awaits.")
+        : "Raiders breached the Maligawa. Build more wewas, wall the approaches and keep soldiers at home."}</p>
+      <div class="actions">
+        ${hasNext ? `<button class="btn primary" id="nextBtn">Next level ▶</button>` : ""}
+        <button class="btn" id="retryBtn">↻ Replay</button>
+        <button class="btn" id="toMenuBtn">Campaign</button>
+      </div>
+    </div>`;
+  if (hasNext) document.getElementById("nextBtn").addEventListener("click", () => startLevel(S.idx + 1));
+  document.getElementById("retryBtn").addEventListener("click", () => startLevel(S.idx));
+  document.getElementById("toMenuBtn").addEventListener("click", showMenu);
+}
+
+// ==================== AUDIO ====================
+function unlockAudio() {
+  if (!audio.on) return;
+  try { audio.ctx = audio.ctx || new AudioContext(); audio.ctx.resume(); } catch (e) { audio.on = false; }
+}
+
+function sfx(kind) {
+  if (!audio.on || !audio.ctx) return;
+  const spec = { build: [330, 0.08, "triangle"], conch: [146, 0.9, "sawtooth"], harvest: [660, 0.1, "sine"], hit: [110, 0.05, "square"], win: [523, 0.6, "triangle"], lose: [98, 0.8, "sawtooth"] }[kind];
+  try {
+    const o = audio.ctx.createOscillator(), g = audio.ctx.createGain();
+    o.type = spec[2];
+    o.frequency.value = spec[0];
+    g.gain.setValueAtTime(0.08, audio.ctx.currentTime);
+    g.gain.exponentialRampToValueAtTime(0.0001, audio.ctx.currentTime + spec[1]);
+    o.connect(g).connect(audio.ctx.destination);
+    o.start();
+    o.stop(audio.ctx.currentTime + spec[1]);
+  } catch (e) { /* audio unavailable */ }
+}
+
+// ==================== INPUT ====================
+// x/y are unzoomed world-screen pixels (what iso() returns); sx/sy are CSS pixels.
+function canvasPoint(e) {
   const r = canvas.getBoundingClientRect();
-  const sx = e.clientX - r.left;
-  const sy = e.clientY - r.top;
+  const sx = e.clientX - r.left, sy = e.clientY - r.top;
+  return { x: sx / view.zoom, y: sy / view.zoom, sx, sy };
+}
 
-  if (state.isPanning) {
-    state.camX += sx - state.panStart.x;
-    state.camY += sy - state.panStart.y;
-    state.panStart = { x: sx, y: sy };
+canvas.addEventListener("wheel", e => {
+  e.preventDefault();
+  const { sx, sy } = canvasPoint(e);
+  zoomAt(e.deltaY < 0 ? 1.12 : 1 / 1.12, sx, sy);
+}, { passive: false });
+
+canvas.addEventListener("mousemove", e => {
+  if (!S) return;
+  const { x, y, sx, sy } = canvasPoint(e);
+  if (input.panning) {
+    view.camX += x - input.panFrom.x;
+    view.camY += y - input.panFrom.y;
+    input.panFrom = { x, y };
     return;
   }
+  const g = screenToGrid(x, y);
+  input.hover = { gx: g.gx, gy: g.gy, x: sx, y: sy };
+  if (input.painting && S.tool) paintTo(g.gx, g.gy);
+  if (input.drag) { input.drag.x2 = x; input.drag.y2 = y; }
+  updateTooltip();
+});
 
-  state.hoverTile = isoToGrid(sx, sy);
-  if (state.dragSelect.active) {
-    state.dragSelect.x2 = sx;
-    state.dragSelect.y2 = sy;
+// Fill every tile between the last painted tile and this one, so fast drags leave no gaps.
+function paintTo(gx, gy) {
+  let [x, y] = input.lastPaint.split(",").map(Number);
+  while (x !== gx || y !== gy) {
+    if (Math.abs(gx - x) >= Math.abs(gy - y)) x += Math.sign(gx - x); else y += Math.sign(gy - y);
+    tryBuild(x, y, true);
   }
+  input.lastPaint = `${gx},${gy}`;
+}
+
+canvas.addEventListener("mouseleave", () => {
+  input.hover = { gx: -1, gy: -1, x: 0, y: 0 };
+  document.getElementById("tooltip").classList.add("hidden");
 });
 
 canvas.addEventListener("mousedown", e => {
-  const r = canvas.getBoundingClientRect();
-  const sx = e.clientX - r.left;
-  const sy = e.clientY - r.top;
-  const g = isoToGrid(sx, sy);
-
+  if (!S || S.mode !== "play") return;
+  const { x, y } = canvasPoint(e);
+  const g = screenToGrid(x, y);
   if (e.button === 1 || (e.button === 0 && e.shiftKey)) {
-    state.isPanning = true;
-    state.panStart = { x: sx, y: sy };
+    e.preventDefault();
+    input.panning = true;
+    input.panFrom = { x, y };
     return;
   }
-
   if (e.button === 0) {
-    if (state.selectedBuildId || state.demolishMode) {
-      tryPlaceOrDemolish(g.gx, g.gy);
+    if (S.tool) {
+      if (tryBuild(g.gx, g.gy) && BUILDINGS[S.tool].paint) { input.painting = true; input.lastPaint = `${g.gx},${g.gy}`; }
       return;
     }
-    state.dragSelect = { active: true, x1: sx, y1: sy, x2: sx, y2: sy };
+    if (S.demolish) { demolishAt(g.gx, g.gy); return; }
+    const b = buildingAt(g.gx, g.gy);
+    if (b && b.id === "sluice") {
+      b.open = !b.open;
+      updateNetWater();
+      say(b.open ? "Sluice open! The canals flood." : "Sluice closed. Water is held in the wewas.");
+      return;
+    }
+    input.drag = { x1: x, y1: y, x2: x, y2: y };
   } else if (e.button === 2) {
-    if (state.selectedBuildId || state.demolishMode) {
-      state.selectedBuildId = null;
-      state.demolishMode = false;
-      document.getElementById("demolishBtn").classList.remove("active");
-      renderPalette();
+    if (S.tool || S.demolish) {
+      S.tool = null; S.demolish = false;
+      buildTabs(); renderPalette();
       return;
     }
-    // Command selected units to march to clicked isometric coordinate
-    const selected = state.units.filter(u => u.team === "player" && u.selected);
-    selected.forEach((u, idx) => {
-      u.tx = g.exactX + (idx % 3) * 0.4;
-      u.ty = g.exactY + Math.floor(idx / 3) * 0.4;
+    const sel = S.units.filter(u => u.team === "p" && u.sel);
+    const cols = Math.ceil(Math.sqrt(sel.length));
+    sel.forEach((u, i) => {
+      u.tx = clamp(g.ex + (i % cols) * 0.45 - (cols - 1) * 0.22, 0.2, MAP - 0.2);
+      u.ty = clamp(g.ey + Math.floor(i / cols) * 0.45, 0.2, MAP - 0.2);
+      u.ordered = true;
     });
-    if (selected.length > 0) spawnFloat("🚩 Moving!", g.exactX, g.exactY, "#7ce87c");
+    if (sel.length) spawnFloat("🚩", g.ex, g.ey, "#6cc070");
   }
 });
 
 window.addEventListener("mouseup", () => {
-  state.isPanning = false;
-  if (!state.dragSelect.active) return;
-  state.dragSelect.active = false;
-
-  const { x1, y1, x2, y2 } = state.dragSelect;
-  const minX = Math.min(x1, x2), maxX = Math.max(x1, x2);
-  const minY = Math.min(y1, y2), maxY = Math.max(y1, y2);
-  const singleClick = (maxX - minX < 8 && maxY - minY < 8);
-
-  for (const u of state.units) {
-    if (u.team !== "player" || u.isLord) continue;
-    const pt = gridToIso(u.gx, u.gy, u.z || 0);
-    if (singleClick) {
-      u.selected = Math.hypot(pt.x - x1, pt.y - y1) < 22;
+  input.panning = false;
+  input.painting = false;
+  if (!input.drag || !S) return;
+  const { x1, y1, x2, y2 } = input.drag;
+  input.drag = null;
+  const single = Math.abs(x2 - x1) < 8 && Math.abs(y2 - y1) < 8;
+  let best = null, bd = 22;
+  for (const u of S.units) {
+    if (u.team !== "p") continue;
+    const p = iso(u.gx, u.gy, u.z);
+    if (single) {
+      u.sel = false;
+      const d = Math.hypot(p.x - x1, p.y - 8 - y1);
+      if (d < bd) { bd = d; best = u; }
     } else {
-      u.selected = pt.x >= minX && pt.x <= maxX && pt.y >= minY && pt.y <= maxY;
+      u.sel = p.x >= Math.min(x1, x2) && p.x <= Math.max(x1, x2) && p.y >= Math.min(y1, y2) && p.y <= Math.max(y1, y2);
     }
   }
+  if (best) best.sel = true;
 });
 
 canvas.addEventListener("contextmenu", e => e.preventDefault());
 
+const PAN_KEYS = { arrowleft: [1, 0], a: [1, 0], arrowright: [-1, 0], d: [-1, 0], arrowup: [0, 1], w: [0, 1], arrowdown: [0, -1], s: [0, -1] };
 window.addEventListener("keydown", e => {
-  const step = 28;
-  if (e.key === "ArrowLeft" || e.key === "a") state.camX += step;
-  if (e.key === "ArrowRight" || e.key === "d") state.camX -= step;
-  if (e.key === "ArrowUp" || e.key === "w") state.camY += step;
-  if (e.key === "ArrowDown" || e.key === "s") state.camY -= step;
-});
-
-// ==================== UI BUTTON LISTENERS ====================
-document.querySelectorAll(".sh-shield[data-cat]").forEach(btn => {
-  btn.addEventListener("click", () => {
-    document.querySelectorAll(".sh-shield").forEach(b => b.classList.remove("active"));
-    btn.classList.add("active");
-    state.activeCat = btn.dataset.cat;
-    state.selectedBuildId = null;
-    state.demolishMode = false;
-    renderPalette();
-  });
-});
-
-document.getElementById("demolishBtn").addEventListener("click", () => {
-  state.selectedBuildId = null;
-  state.demolishMode = !state.demolishMode;
-  document.getElementById("demolishBtn").classList.toggle("active", state.demolishMode);
-  renderPalette();
-});
-
-document.getElementById("themeToggleBtn").addEventListener("click", e => {
-  state.theme = state.theme === "srilanka" ? "classic" : "srilanka";
-  const tDict = THEMES[state.theme];
-  e.target.textContent = tDict.label;
-  document.getElementById("scribeTitleLabel").textContent = tDict.scribeTitle;
-  renderPalette();
-});
-
-document.getElementById("triggerRaidBtn").addEventListener("click", triggerEnemyRaid);
-
-document.getElementById("pauseGameBtn").addEventListener("click", e => {
-  state.paused = !state.paused;
-  e.target.textContent = state.paused ? "▶️ Resume" : "⏸️ Pause";
-});
-
-document.getElementById("centerCameraBtn").addEventListener("click", () => {
-  state.camX = canvas.width / 2;
-  state.camY = 85;
-});
-
-document.getElementById("soundToggleBtn").addEventListener("click", e => {
-  state.audioOn = !state.audioOn;
-  e.target.textContent = state.audioOn ? "🔊 Audio: ON" : "🔇 Audio: OFF";
-});
-
-document.getElementById("openTaxModalBtn").addEventListener("click", () => {
-  const modal = document.getElementById("shInspector");
-  const body = document.getElementById("shiBody");
-  modal.classList.remove("hidden");
-  body.innerHTML = `
-    <div style="margin-bottom:8px;">
-      <label style="display:flex;justify-content:space-between;font-weight:bold;">
-        <span>🪙 Tax Rate:</span> <span id="txLbl">Level ${state.taxLevel}</span>
-      </label>
-      <input type="range" id="txRng" min="-2" max="4" value="${state.taxLevel}" style="width:100%;" />
-    </div>
-    <div>
-      <label style="display:flex;justify-content:space-between;font-weight:bold;">
-        <span>🍖 Granary Rations:</span> <span id="rtLbl">${state.rationLevel}x Rations</span>
-      </label>
-      <input type="range" id="rtRng" min="0" max="4" value="${state.rationLevel}" style="width:100%;" />
-    </div>
-  `;
-  document.getElementById("txRng").addEventListener("input", ev => {
-    state.taxLevel = Number(ev.target.value);
-    document.getElementById("txLbl").textContent = `Level ${state.taxLevel}`;
-  });
-  document.getElementById("rtRng").addEventListener("input", ev => {
-    state.rationLevel = Number(ev.target.value);
-    document.getElementById("rtLbl").textContent = `${state.rationLevel}x Rations`;
-  });
-});
-
-document.getElementById("shiCloseBtn").addEventListener("click", () => {
-  document.getElementById("shInspector").classList.add("hidden");
-});
-
-// ==================== 1-SECOND GOVERNANCE & WAVE TIMER ====================
-setInterval(() => {
-  if (state.paused) return;
-  state.waveTimer--;
-  if (state.waveTimer <= 0) triggerEnemyRaid();
-
-  // Food & Tax calculation
-  const foodUse = Math.max(0, Math.round(state.peasantsTotal * state.rationLevel * 0.1));
-  state.food = Math.max(0, state.food - foodUse);
-  state.gold = Math.max(0, state.gold + Math.round(state.peasantsTotal * state.taxLevel * 0.4));
-
-  const targetPop = Math.max(10, Math.min(100, 68 + (state.rationLevel - 2) * 8 - state.taxLevel * 5 + (state.ale > 0 ? 6 : 0)));
-  state.popularity += Math.sign(targetPop - state.popularity);
-
-  if (state.popularity >= 55 && state.peasantsTotal < state.peasantsCap && Math.random() < 0.35) {
-    state.peasantsTotal++;
+  if (!S) return;
+  const k = e.key.toLowerCase();
+  if (PAN_KEYS[k]) {
+    e.preventDefault();
+    view.camX += PAN_KEYS[k][0] * 32;
+    view.camY += PAN_KEYS[k][1] * 32;
+  } else if (k === " " && S.mode === "play") {
+    e.preventDefault();
+    togglePause();
+  } else if (k === "escape") {
+    S.tool = null; S.demolish = false;
+    for (const u of S.units) u.sel = false;
+    buildTabs(); renderPalette();
+  } else if (k === "c") {
+    centerCamera();
   }
-  syncUI();
-}, 1000);
+});
 
-// ==================== MAIN 60FPS LOOP ====================
-let lastTs = performance.now();
-function loop(now) {
-  const dt = Math.min(50, now - lastTs) / 16.667;
-  lastTs = now;
-
-  if (!state.paused) {
-    updateWorkersAndWildlife(dt);
-    updateUnitsAndProjectiles(now, dt);
-  }
-  renderIsoWorld(now);
-  renderDiamondRadar();
-
-  requestAnimationFrame(loop);
+function togglePause() {
+  if (!S || S.mode !== "play") return;
+  S.paused = !S.paused;
+  syncHud();
 }
 
-resizeCanvas();
-initWorld();
-recalcHousing();
-renderPalette();
-syncUI();
-requestAnimationFrame(loop);
+mini.addEventListener("mousedown", e => {
+  if (!S) return;
+  const r = mini.getBoundingClientRect();
+  const s = mini.width / (MAP * 2);
+  const mx = (e.clientX - r.left) - mini.width / 2, my = (e.clientY - r.top) - 2;
+  const a = mx / s, b = (my / s) * 2; // a = gx - gy, b = gx + gy
+  centerCamera((a + b) / 2, (b - a) / 2);
+});
+
+document.getElementById("conchBtn").addEventListener("click", callRaidEarly);
+document.getElementById("pauseBtn").addEventListener("click", togglePause);
+document.getElementById("speedBtn").addEventListener("click", () => {
+  if (!S) return;
+  const speeds = [1, 2, 4, 8];
+  S.speed = speeds[(speeds.indexOf(S.speed) + 1) % speeds.length];
+  syncHud();
+});
+document.getElementById("centerBtn").addEventListener("click", () => S && centerCamera());
+document.getElementById("audioBtn").addEventListener("click", e => {
+  audio.on = !audio.on;
+  e.currentTarget.textContent = audio.on ? "🔊" : "🔇";
+  unlockAudio();
+});
+document.getElementById("menuBtn").addEventListener("click", showMenu);
+
+new ResizeObserver(resizeCanvas).observe(document.getElementById("viewport"));
+
+// ==================== BOOT ====================
+// Wait until render.js (loaded after this file) is in place.
+window.addEventListener("DOMContentLoaded", () => {
+  resizeCanvas();
+  startLevel(Math.min(progress.unlocked, LEVELS.length - 1), "idle");
+  showMenu();
+  requestAnimationFrame(frame);
+});
