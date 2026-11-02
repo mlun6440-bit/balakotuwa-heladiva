@@ -71,6 +71,63 @@ function saveProgress() {
   try { localStorage.setItem(SAVE_KEY, JSON.stringify(progress)); } catch (e) { /* ignore */ }
 }
 
+// ==================== SAVE A RUN ====================
+// The level in progress is saved to localStorage (every 15s of play, when the
+// tab is hidden or closed, and when the menu opens) and can be continued from
+// the menu. Only primary state is stored; everything derived (occupancy, flow
+// field, water networks, cover, staffing) is rebuilt by refreshWorld().
+const RUN_KEY = "balakotuwa.run.v1";
+const RUN_SKIP = new Set(["L", "tiles", "trees", "unlocked", "buildings", "occ", "workers", "units", "shots", "floats", "nets",
+  "netOf", "flooded", "flow", "citadel", "cover", "fx", "tool", "demolish", "upgrade", "mode", "paused"]);
+const plain = v => v === null || typeof v !== "object" || Array.isArray(v) || Object.getPrototypeOf(v) === Object.prototype;
+
+function saveRun() {
+  if (!S || (S.mode !== "play" && S.mode !== "menu")) return;
+  const st = {};
+  for (const [k, v] of Object.entries(S)) if (!RUN_SKIP.has(k) && plain(v)) st[k] = v;
+  const r3 = v => Math.round(v * 1000) / 1000;
+  const data = {
+    v: 1, idx: S.idx, saved: Date.now(), name: levelTitle(),
+    L: S.L.skirmish ? { ...S.L, all: undefined } : null, st,
+    trees: S.trees.map(t => [r3(t.gx), r3(t.gy), r3(t.stage)]),
+    buildings: S.buildings.map(b => ({ uid: b.uid, id: b.id, gx: b.gx, gy: b.gy, hp: b.hp, maxHp: b.maxHp, water: b.water, growth: b.growth,
+      open: b.open, next: b.next, at: b.at, fire: b.fire, irrigated: b.irrigated })),
+    units: S.units.map(u => ({ uid: u.uid, team: u.team, type: u.type, gx: r3(u.gx), gy: r3(u.gy), tx: u.tx, ty: u.ty, hp: u.hp, maxHp: u.maxHp,
+      last: u.last, z: u.z, ordered: u.ordered, lastFire: u.lastFire }))
+  };
+  try { localStorage.setItem(RUN_KEY, JSON.stringify(data)); } catch (e) { /* storage full or blocked */ }
+  S.lastSave = S.time;
+}
+
+function savedRun() {
+  try { const d = JSON.parse(localStorage.getItem(RUN_KEY)); return d && d.v === 1 ? d : null; } catch (e) { return null; }
+}
+function clearRun() { try { localStorage.removeItem(RUN_KEY); } catch (e) { /* ignore */ } }
+
+function continueRun() {
+  const d = savedRun();
+  if (!d) return false;
+  const custom = d.L ? { ...d.L, all: unlockedFor(LEVELS.length - 1) } : null;
+  startLevel(d.idx, "idle", custom);
+  Object.assign(S, d.st);
+  S.trees = d.trees.map(([gx, gy, stage]) => ({ gx, gy, stage, reserved: false }));
+  S.buildings = d.buildings.map(o => {
+    const def = BUILDINGS[o.id];
+    return { ...o, def, w: def.w, h: def.h, maxHp: o.maxHp || def.hp, worker: null, fire: o.fire || 0 };
+  });
+  S.citadel = S.buildings.find(b => b.id === "citadel");
+  S.units = d.units.map(o => ({ ...o, def: o.team === "p" ? TROOPS[o.type] : FOES[o.type], sel: false, lastFire: o.lastFire ?? -9 }));
+  S.workers = []; S.shots = []; S.floats = []; S.fx = [];
+  refreshWorld();
+  updateCover();
+  staff();
+  S.mode = "play"; S.paused = true;
+  overlay.classList.add("hidden");
+  buildTabs(); renderPalette(); syncHud(); centerCamera();
+  say("Welcome back. The kingdom waits, paused: press Space or ▶ Resume.");
+  return true;
+}
+
 // ==================== GLOBAL STATE ====================
 let S = null; // current level state
 let progress = loadProgress();
@@ -1068,6 +1125,7 @@ function tick() {
   }
 
   checkVictory();
+  if (S.mode === "play" && S.time - (S.lastSave || 0) >= 15) saveRun();
   syncHud();
 }
 
@@ -1104,6 +1162,7 @@ function checkVictory() {
 
 function endLevel(won) {
   if (S.mode !== "play") return;
+  clearRun();
   S.mode = "end";
   S.paused = true;
   const pct = Math.max(0, S.citadel.hp) / S.citadel.maxHp;
@@ -1405,12 +1464,15 @@ const overlay = document.getElementById("overlay");
 function stars(n) { return "★".repeat(n) + "☆".repeat(3 - n); }
 
 function showMenu() {
-  if (S) { S.paused = true; if (S.mode === "play") S.mode = "menu"; }
+  if (S) { S.paused = true; if (S.mode === "play") S.mode = "menu"; saveRun(); }
+  const run = savedRun();
+  const canContinue = run && !(S && S.mode === "menu");
   overlay.classList.remove("hidden");
   overlay.innerHTML = `
     <div class="card-screen">
       <h1>Balakotuwa — Keepers of the Wewa</h1>
       <div class="tagline">Catch the monsoon, feed the kingdom, hold the citadel.</div>
+      ${canContinue ? `<div class="actions"><button class="btn primary" id="continueBtn">▶ Continue ${run.name} · ${Math.floor(run.st.time / 60)} min in</button></div>` : ""}
       <div class="level-list">
         ${LEVELS.map((L, i) => `
           <button class="level-card" data-level="${i}" ${i > progress.unlocked ? "disabled" : ""}>
@@ -1441,6 +1503,8 @@ function showMenu() {
     </div>`;
   overlay.querySelectorAll(".level-card[data-level]").forEach(btn => btn.addEventListener("click", () => startLevel(Number(btn.dataset.level))));
   document.getElementById("skirmishCard").addEventListener("click", () => startSkirmish());
+  const cont = document.getElementById("continueBtn");
+  if (cont) cont.addEventListener("click", continueRun);
   const resume = document.getElementById("resumeBtn");
   if (resume) resume.addEventListener("click", () => { S.mode = "play"; S.paused = false; overlay.classList.add("hidden"); syncHud(); });
 }
@@ -1688,6 +1752,8 @@ document.getElementById("audioBtn").addEventListener("click", e => {
 document.getElementById("menuBtn").addEventListener("click", showMenu);
 
 new ResizeObserver(resizeCanvas).observe(document.getElementById("viewport"));
+document.addEventListener("visibilitychange", () => { if (document.hidden) saveRun(); });
+window.addEventListener("pagehide", saveRun);
 
 // ==================== BOOT ====================
 // Wait until render.js (loaded after this file) is in place.
