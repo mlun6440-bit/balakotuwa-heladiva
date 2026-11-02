@@ -1528,11 +1528,12 @@ function drawUnit(u, now) {
 function drawShots() {
   for (const s of S.shots) {
     const k = s.t / s.dur;
-    const x = s.sx + (s.target.gx - s.sx) * k, y = s.sy + (s.target.gy - s.sy) * k;
+    const tgx = s.target.gx + (s.ox || 0), tgy = s.target.gy + (s.oy || 0);
+    const x = s.sx + (tgx - s.sx) * k, y = s.sy + (tgy - s.sy) * k;
     const z = s.sz * (1 - k) + 10 * k + Math.sin(k * Math.PI) * 26;
     const p = iso(x, y, z);
     const k2 = Math.min(1, k + 0.05);
-    const q = iso(s.sx + (s.target.gx - s.sx) * k2, s.sy + (s.target.gy - s.sy) * k2, s.sz * (1 - k2) + 10 * k2 + Math.sin(k2 * Math.PI) * 26);
+    const q = iso(s.sx + (tgx - s.sx) * k2, s.sy + (tgy - s.sy) * k2, s.sz * (1 - k2) + 10 * k2 + Math.sin(k2 * Math.PI) * 26);
     const a = Math.atan2(q.y - p.y, q.x - p.x);
     line({ x: p.x - Math.cos(a) * 6, y: p.y - Math.sin(a) * 6 }, p, "#e8dcb0", 1.4);
     if (s.fire) {

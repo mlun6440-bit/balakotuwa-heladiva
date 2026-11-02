@@ -93,7 +93,7 @@ function saveRun() {
     buildings: S.buildings.map(b => ({ uid: b.uid, id: b.id, gx: b.gx, gy: b.gy, hp: b.hp, maxHp: b.maxHp, water: b.water, growth: b.growth,
       open: b.open, next: b.next, at: b.at, fire: b.fire, irrigated: b.irrigated })),
     units: S.units.map(u => ({ uid: u.uid, team: u.team, type: u.type, gx: r3(u.gx), gy: r3(u.gy), tx: u.tx, ty: u.ty, hp: u.hp, maxHp: u.maxHp,
-      last: u.last, z: u.z, ordered: u.ordered, lastFire: u.lastFire }))
+      last: u.last, z: u.z, ordered: u.ordered, lastFire: u.lastFire, party: u.party, hx: u.hx, hy: u.hy, flee: u.flee }))
   };
   try { localStorage.setItem(RUN_KEY, JSON.stringify(data)); } catch (e) { /* storage full or blocked */ }
   S.lastSave = S.time;
@@ -740,11 +740,12 @@ function spawnSoldier(type, gx, gy) {
   S.units.push({ uid: ++S.uid, team: "p", type, def: d, gx, gy, tx: gx, ty: gy, hp: d.hp, maxHp: d.hp, last: -9, z: 0, sel: false, ordered: false });
 }
 
-function spawnFoe(type, edge) {
+function spawnFoe(type, edge, party = null) {
   const d = FOES[type];
   const hp = Math.round(d.hp * S.L.hpScale);
   const [x, y] = edgeSpawn(edge);
-  S.units.push({ uid: ++S.uid, team: "e", type, def: d, gx: x, gy: y, hp, maxHp: hp, last: -9, z: 0 });
+  S.units.push({ uid: ++S.uid, team: "e", type, def: d, gx: x, gy: y, hp, maxHp: hp, last: -9, z: 0, party, hx: x, hy: y });
+  if (party !== null && S.parties && S.parties[party]) S.parties[party].spawned++;
 }
 
 function edgeSpawn(edge) {
@@ -804,6 +805,20 @@ function nearestFoe(u, radius, from = u) {
   return best;
 }
 
+// Ranged volleys spread over the crowd: pick at random among the nearest few
+// enemies in range instead of everyone shooting the same one.
+function volleyTarget(u, range, from = u) {
+  const near = [];
+  for (const v of S.units) {
+    if (v.team === u.team || v.hp <= 0 || v.flee) continue;
+    const d = Math.hypot(v.gx - from.gx, v.gy - from.gy);
+    if (d <= range && !(u.team === "e" && d > 1.5 && inCover(v))) near.push([d, v]);
+  }
+  if (!near.length) return null;
+  near.sort((a, b) => a[0] - b[0]);
+  return near[Math.floor(Math.random() * Math.min(4, near.length))][1];
+}
+
 function attack(u, target, dmg) {
   if (S.time - u.last < 1.0) return;
   if (u.team === "p" && inCover(u) && S.time - u.last > AMBUSH_RESET) {
@@ -826,7 +841,8 @@ function hitUnit(target, dmg, splash) {
 
 function fireShot(gx, gy, z, target, dmg) {
   const d = Math.hypot(target.gx - gx, target.gy - gy);
-  S.shots.push({ sx: gx, sy: gy, sz: z, target, dmg, t: 0, dur: Math.max(0.25, d / 9) });
+  // ox/oy: a little landing scatter so a volley reads as a volley (cosmetic)
+  S.shots.push({ sx: gx, sy: gy, sz: z, target, dmg, t: 0, dur: Math.max(0.25, d / 9) * (0.9 + Math.random() * 0.2), ox: (Math.random() - 0.5) * 0.35, oy: (Math.random() - 0.5) * 0.35 });
 }
 
 function rectDist(u, b) {
@@ -842,8 +858,29 @@ function hitBuilding(u, b) {
   sfx("hit");
 }
 
+// Morale: once a whole raid party has landed, if fewer than morale × its
+// strength still stand, the faint-hearted run back to their edge.
+function checkMorale() {
+  for (const [id, p] of Object.entries(S.parties || {})) {
+    if (p.fled || p.spawned < p.total) continue;
+    const alive = S.units.filter(u => u.team === "e" && u.party === Number(id) && u.hp > 0 && !u.flee);
+    if (!alive.length) { p.fled = true; continue; }
+    const fleeing = alive.filter(u => alive.length / p.total < u.def.morale);
+    if (!fleeing.length) continue;
+    p.fled = true;
+    for (const u of fleeing) u.flee = true;
+    spawnFloat("Retreat!", fleeing[0].gx, fleeing[0].gy, "#ffd27a");
+    say(`The raiders' nerve breaks: ${fleeing.length} flee back the way they came.`);
+  }
+}
+
 function updateFoe(u, dt) {
   const d = u.def;
+  if (u.flee) {
+    moveToward(u, u.hx ?? u.gx, u.hy ?? u.gy, dt * 1.2);
+    if (Math.hypot((u.hx ?? u.gx) - u.gx, (u.hy ?? u.gy) - u.gy) < 0.3) u.gone = true;
+    return;
+  }
   const foe = nearestFoe(u, d.ranged ? d.range : 2.2);
   if (foe) {
     if (dist(u, foe) <= d.range) attack(u, foe, d.dmg);
@@ -874,7 +911,7 @@ function updateSoldier(u, dt) {
 
   const foe = nearestFoe(u, u.ordered || d.ranged ? range : 4);
   if (foe && dist(u, foe) <= range) {
-    attack(u, foe, d.dmg);
+    attack(u, d.ranged ? volleyTarget(u, range) || foe : foe, d.dmg);
     if (!u.ordered) return;
   } else if (foe && !u.ordered && Math.hypot(foe.gx - u.tx, foe.gy - u.ty) < 5) {
     moveToward(u, foe.gx, foe.gy, dt);
@@ -909,7 +946,7 @@ function updateCombat(dt) {
     const tw = b.def.tower;
     if (!tw || S.time < b.next) continue;
     const c = { gx: b.gx + b.w / 2, gy: b.gy + b.h / 2, team: "p" };
-    const foe = nearestFoe(c, tw.range);
+    const foe = volleyTarget(c, tw.range);
     if (foe) { fireShot(c.gx, c.gy, 48, foe, tw.dmg); b.next = S.time + tw.cd; }
   }
 
@@ -918,13 +955,15 @@ function updateCombat(dt) {
     s.t += dt;
     if (s.t >= s.dur) {
       if (s.fire) ignite(s.fire);
-      else if (s.target.hp > 0) s.target.hp -= s.dmg;
+      else if (s.target.hp > 0) { s.target.hp -= s.dmg; puff(s.target.gx + (s.ox || 0) * 0.5, s.target.gy + (s.oy || 0) * 0.5, 2, "#c8b48a"); }
       S.shots.splice(i, 1);
     }
   }
 
+  checkMorale();
   for (let i = S.units.length - 1; i >= 0; i--) {
     const u = S.units[i];
+    if (u.gone) { S.units.splice(i, 1); continue; } // fled off the map: no gold
     if (u.hp > 0) continue;
     if (u.team === "e") {
       S.gold += u.def.gold;
@@ -1044,7 +1083,10 @@ function launchWave() {
   }
   const list = [];
   for (const type of Object.keys(FOES)) for (let i = 0; i < (w[type] || 0); i++) list.push(type);
-  list.forEach((type, i) => S.spawnQueue.push({ at: S.time + i * 0.7, type, edge: w.from[i % w.from.length] }));
+  const party = S.nextWave;
+  S.parties = S.parties || {};
+  S.parties[party] = { total: list.length, spawned: 0, fled: false };
+  list.forEach((type, i) => S.spawnQueue.push({ at: S.time + i * 0.7, type, edge: w.from[i % w.from.length], party }));
   say(`Raid ${S.nextWave} of ${S.L.waves.length}: ${list.length} raiders from the ${w.from.join(" and ")}!`, true);
   sfx("conch");
 }
@@ -1191,7 +1233,7 @@ function step(dt) {
   while (S.tickAcc >= 1 && S.mode === "play") { S.tickAcc -= 1; tick(); }
   while (S.spawnQueue.length && S.time >= S.spawnQueue[0].at) {
     const q = S.spawnQueue.shift();
-    spawnFoe(q.type, q.edge);
+    spawnFoe(q.type, q.edge, q.party);
   }
   for (const t of S.trees) if (t.stage < 100) t.stage = Math.min(100, t.stage + 0.6 * dt);
   for (const w of S.workers) updateWorker(w, dt);
@@ -1717,8 +1759,33 @@ window.addEventListener("keydown", e => {
     buildTabs(); renderPalette();
   } else if (k === "c") {
     centerCamera();
+  } else if (/^Digit[1-9]$/.test(e.code)) {
+    controlGroup(Number(e.code.slice(5)), e.ctrlKey || e.metaKey || e.shiftKey);
+    e.preventDefault();
   }
 });
+
+// Control groups: Ctrl/Shift+1..9 stores the selected soldiers, 1..9 selects
+// them again, pressing the same number twice centres the camera on them.
+const lastGroupKey = { n: 0, at: 0 };
+function controlGroup(n, assign) {
+  S.groups = S.groups || {};
+  if (assign) {
+    const sel = S.units.filter(u => u.team === "p" && u.sel).map(u => u.uid);
+    S.groups[n] = sel;
+    spawnFloat(`Group ${n}: ${sel.length}`, S.citadel.gx + 1, S.citadel.gy, "#bff0a8");
+    return;
+  }
+  const ids = new Set(S.groups[n] || []);
+  const members = S.units.filter(u => u.team === "p" && ids.has(u.uid));
+  if (!members.length) return;
+  for (const u of S.units) u.sel = ids.has(u.uid) && u.team === "p";
+  const now = performance.now();
+  if (lastGroupKey.n === n && now - lastGroupKey.at < 400) {
+    centerCamera(members.reduce((a, u) => a + u.gx, 0) / members.length, members.reduce((a, u) => a + u.gy, 0) / members.length);
+  }
+  lastGroupKey.n = n; lastGroupKey.at = now;
+}
 
 function togglePause() {
   if (!S || S.mode !== "play") return;
