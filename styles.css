@@ -1,0 +1,455 @@
+:root {
+  --stone-dark: #1d1813;
+  --stone-mid: #322920;
+  --stone-light: #594836;
+  --parchment-bg: #f3e4c2;
+  --parchment-mid: #dec99a;
+  --parchment-border: #856338;
+  --gold: #f5c342;
+  --crimson: #8c2219;
+  --text-dark: #291c0e;
+  --text-light: #f5ebd6;
+}
+
+* {
+  box-sizing: border-box;
+  margin: 0;
+  padding: 0;
+}
+
+body {
+  font-family: "Georgia", "Palatino Linotype", serif;
+  background: #120e0a;
+  color: var(--text-light);
+  height: 100vh;
+  display: flex;
+  flex-direction: column;
+  overflow: hidden;
+  user-select: none;
+}
+
+/* ==================== TOP BAR ==================== */
+.sh-top-bar {
+  height: 44px;
+  background: linear-gradient(180deg, #2d241b 0%, #17120d 100%);
+  border-bottom: 2px solid var(--stone-light);
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 0 14px;
+  z-index: 20;
+}
+
+.mission-banner {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+}
+
+.crown-icon {
+  font-size: 22px;
+}
+
+.mission-title {
+  font-size: 13px;
+  font-weight: bold;
+  color: var(--gold);
+  letter-spacing: 0.5px;
+}
+
+.mission-obj {
+  font-size: 11px;
+  color: #d6c5a7;
+}
+
+.top-controls {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+}
+
+.sh-btn {
+  background: linear-gradient(180deg, #47392b 0%, #292017 100%);
+  color: var(--text-light);
+  border: 1px solid #755d43;
+  border-radius: 5px;
+  padding: 5px 10px;
+  font-family: inherit;
+  font-size: 11px;
+  font-weight: bold;
+  cursor: pointer;
+}
+
+.sh-btn:hover {
+  border-color: var(--gold);
+  filter: brightness(1.12);
+}
+
+.sh-btn.gold {
+  background: linear-gradient(180deg, #d19b26 0%, #8a600e 100%);
+  color: #1c1204;
+  border-color: #fae094;
+}
+
+.sh-btn.danger {
+  background: linear-gradient(180deg, #a6261e 0%, #63120d 100%);
+  border-color: #e6685f;
+}
+
+/* ==================== 2.5D ISOMETRIC VIEWPORT ==================== */
+.iso-viewport {
+  flex: 1;
+  position: relative;
+  overflow: hidden;
+  background: #1a2d14;
+}
+
+#isoCanvas {
+  width: 100%;
+  height: 100%;
+  display: block;
+  cursor: crosshair;
+}
+
+.scribe-alert {
+  position: absolute;
+  top: 12px;
+  left: 16px;
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  background: linear-gradient(180deg, #f3e4c2 0%, #d8c08e 100%);
+  color: var(--text-dark);
+  border: 3px solid #781e16;
+  border-radius: 8px;
+  padding: 8px 14px;
+  max-width: 480px;
+  box-shadow: 0 8px 24px rgba(0, 0, 0, 0.75);
+  z-index: 15;
+}
+
+.scribe-alert.hidden {
+  display: none;
+}
+
+.sa-portrait {
+  font-size: 30px;
+  width: 44px;
+  height: 44px;
+  background: #2b1d10;
+  border: 2px solid var(--gold);
+  border-radius: 6px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.sa-title {
+  font-weight: bold;
+  font-size: 12px;
+  color: #781e16;
+}
+
+.sa-text {
+  font-size: 12px;
+  font-style: italic;
+}
+
+.controls-pill {
+  position: absolute;
+  bottom: 8px;
+  left: 50%;
+  transform: translateX(-50%);
+  background: rgba(16, 12, 8, 0.82);
+  border: 1px solid #6e583f;
+  color: #ebdcc2;
+  padding: 4px 14px;
+  border-radius: 16px;
+  font-size: 11px;
+  pointer-events: none;
+}
+
+/* Inspector Modal */
+.sh-inspector {
+  position: absolute;
+  bottom: 36px;
+  left: 50%;
+  transform: translateX(-50%);
+  background: linear-gradient(180deg, var(--parchment-bg) 0%, var(--parchment-mid) 100%);
+  color: var(--text-dark);
+  border: 3px solid var(--parchment-border);
+  border-radius: 8px;
+  width: 440px;
+  box-shadow: 0 10px 28px rgba(0, 0, 0, 0.8);
+  z-index: 25;
+}
+
+.sh-inspector.hidden {
+  display: none;
+}
+
+.shi-header {
+  background: #6e1c15;
+  color: var(--gold);
+  padding: 6px 12px;
+  font-size: 13px;
+  font-weight: bold;
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+}
+
+.shi-close {
+  background: none;
+  border: none;
+  color: #fff;
+  cursor: pointer;
+  font-size: 14px;
+}
+
+.shi-body {
+  padding: 12px;
+  font-size: 12px;
+}
+
+/* ==================== BOTTOM STRONGHOLD HD HUD ==================== */
+.sh-hud {
+  height: 162px;
+  background: linear-gradient(180deg, #382e23 0%, #1c1610 100%);
+  border-top: 4px solid #8a6c45;
+  display: grid;
+  grid-template-columns: 196px 1fr 330px 164px;
+  gap: 8px;
+  padding: 7px 10px;
+  box-shadow: 0 -6px 22px rgba(0, 0, 0, 0.85);
+  z-index: 20;
+}
+
+/* Left Shield Rack */
+.sh-shield-rack {
+  display: grid;
+  grid-template-columns: repeat(4, 1fr);
+  grid-template-rows: repeat(2, 1fr);
+  gap: 4px;
+}
+
+.sh-shield {
+  background: linear-gradient(180deg, #4a3b2c 0%, #261e16 100%);
+  border: 2px solid #70583c;
+  border-radius: 5px 5px 14px 14px;
+  color: #decbb0;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  cursor: pointer;
+  padding: 2px;
+}
+
+.sh-shield:hover {
+  border-color: var(--gold);
+}
+
+.sh-shield.active {
+  background: linear-gradient(180deg, #96261d 0%, #57120d 100%);
+  border-color: var(--gold);
+  color: #fff;
+}
+
+.sh-s-icon {
+  font-size: 17px;
+}
+
+.sh-s-lbl {
+  font-size: 9px;
+  font-weight: bold;
+  margin-top: 2px;
+}
+
+/* Center Parchment Scroll + Stockpile Bar */
+.sh-parchment-panel {
+  background: linear-gradient(180deg, var(--parchment-bg) 0%, var(--parchment-mid) 100%);
+  border: 3px solid var(--parchment-border);
+  border-radius: 7px;
+  display: flex;
+  flex-direction: column;
+  justify-content: space-between;
+  padding: 6px 8px;
+  overflow: hidden;
+  box-shadow: inset 0 0 14px rgba(70, 45, 15, 0.35);
+}
+
+.sh-palette-strip {
+  display: flex;
+  gap: 7px;
+  overflow-x: auto;
+  padding-bottom: 3px;
+  flex: 1;
+  align-items: stretch;
+}
+
+.iso-card {
+  min-width: 118px;
+  max-width: 126px;
+  background: rgba(255, 255, 255, 0.62);
+  border: 2px solid #b59767;
+  border-radius: 6px;
+  padding: 4px 6px;
+  color: var(--text-dark);
+  display: flex;
+  flex-direction: column;
+  justify-content: space-between;
+  cursor: pointer;
+  transition: transform 0.1s, border-color 0.12s;
+}
+
+.iso-card:hover {
+  background: rgba(255, 255, 255, 0.9);
+  border-color: #7d2018;
+  transform: translateY(-1px);
+}
+
+.iso-card.selected {
+  background: #fae29c;
+  border: 2px solid #8c2219;
+  box-shadow: 0 0 8px rgba(140, 34, 25, 0.45);
+}
+
+.ic-head {
+  display: flex;
+  align-items: center;
+  gap: 5px;
+  font-size: 11px;
+  font-weight: bold;
+  line-height: 1.1;
+}
+
+.ic-sub {
+  font-size: 9.5px;
+  color: #544028;
+  line-height: 1.15;
+}
+
+.ic-cost {
+  font-size: 10px;
+  font-weight: bold;
+  color: #6e1c15;
+  background: rgba(0, 0, 0, 0.08);
+  border-radius: 3px;
+  text-align: center;
+  padding: 1px 4px;
+}
+
+.sh-stock-ribbon {
+  display: flex;
+  justify-content: space-between;
+  flex-wrap: wrap;
+  gap: 6px;
+  background: rgba(54, 36, 16, 0.14);
+  border-top: 1px solid #b89b6a;
+  padding: 3px 6px 1px;
+  font-size: 11px;
+  color: var(--text-dark);
+}
+
+/* Right: Iconic Open Scribe Book */
+.sh-scribe-book {
+  background: linear-gradient(90deg, #ebd9b2 0%, #d4be8d 48%, #96794b 50%, #ebd9b2 52%, #dac596 100%);
+  border: 3px solid #694c27;
+  border-radius: 7px;
+  color: var(--text-dark);
+  display: grid;
+  grid-template-columns: 122px 1fr;
+  padding: 6px 8px;
+  gap: 8px;
+}
+
+.sb-page-left {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  border-right: 1px dashed rgba(94, 67, 34, 0.4);
+  padding-right: 5px;
+}
+
+#scribeFaceCanvas {
+  width: 48px;
+  height: 48px;
+  margin-bottom: 2px;
+}
+
+.sb-metric {
+  width: 100%;
+  display: flex;
+  justify-content: space-between;
+  font-size: 10.5px;
+  line-height: 1.3;
+}
+
+.sb-val.pos {
+  color: #1b6b22;
+}
+.sb-val.neg {
+  color: #a61c14;
+}
+.sb-val.gold {
+  color: #8a5900;
+}
+
+.sb-page-right {
+  display: flex;
+  flex-direction: column;
+  justify-content: space-between;
+}
+
+.sb-top-row {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  font-size: 10.5px;
+  color: #5e1812;
+}
+
+.sb-gov-btn {
+  background: #781e16;
+  color: #fff;
+  border: 1px solid var(--gold);
+  border-radius: 3px;
+  padding: 1px 5px;
+  font-size: 9.5px;
+  cursor: pointer;
+}
+
+.sb-quote {
+  font-size: 10.5px;
+  font-style: italic;
+  color: #362411;
+  line-height: 1.25;
+}
+
+.sb-wave-box {
+  background: rgba(140, 34, 25, 0.14);
+  border: 1px solid #a86c4f;
+  padding: 2px 6px;
+  border-radius: 4px;
+  font-size: 10.5px;
+  display: flex;
+  justify-content: space-between;
+}
+
+/* Far Right: Diamond Radar Frame */
+.sh-radar-frame {
+  background: #231b14;
+  border: 3px solid #70583c;
+  border-radius: 7px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  overflow: hidden;
+}
+
+#radarCanvas {
+  display: block;
+  cursor: pointer;
+}

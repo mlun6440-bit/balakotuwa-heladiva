@@ -1,0 +1,163 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>BALAKOTUWA: Citadel of Heladiva — 2.5D Isometric Sri Lankan RTS</title>
+  <link rel="stylesheet" href="styles.css" />
+</head>
+<body>
+  <!-- TOP MISSION & CAMERA BAR -->
+  <header class="sh-top-bar">
+    <div class="mission-banner">
+      <span class="crown-icon">🦁</span>
+      <div>
+        <div class="mission-title" id="missionTitle">BALAKOTUWA: CITADEL OF HELADIVA — DEFEND RAJARATA</div>
+        <div class="mission-obj" id="missionObjectives">
+          Royal Decree: 🪵 Gather 60 Kumbuk Timber • 🍚 Gather 50 Vee Bissa Rice • 🧱 Fortify the Maligawa • 🏹 Train 6 Dunuvaya Archers
+        </div>
+      </div>
+    </div>
+
+    <div class="top-controls">
+      <button class="sh-btn gold" id="themeToggleBtn" title="Switch between Rajarata Era (Sigiriya/Polonnaruwa) and Kandyan Era (Senkadagala)">
+        🦁 Era: Rajarata (Polonnaruwa)
+      </button>
+      <button class="sh-btn danger" id="triggerRaidBtn" title="Trigger Invader Vanguard along the Border Road">
+        🐚 Sound Conch (Wave)
+      </button>
+      <button class="sh-btn" id="pauseGameBtn" title="Pause or Resume Simulation">
+        ⏸️ Pause
+      </button>
+      <button class="sh-btn" id="centerCameraBtn" title="Center Camera on the Raja Maligawa">
+        🎯 Center Maligawa
+      </button>
+      <button class="sh-btn" id="soundToggleBtn" title="Toggle Audio & Maha Adigar Announcements">
+        🔇 Audio: OFF
+      </button>
+    </div>
+  </header>
+
+  <!-- MAIN 2.5D ISOMETRIC VIEWPORT -->
+  <div class="iso-viewport" id="isoViewport">
+    <canvas id="isoCanvas"></canvas>
+
+    <!-- Floating Maha Adigar / Invader Banner -->
+    <div class="scribe-alert hidden" id="scribeAlert">
+      <div class="sa-portrait" id="saPortrait">🧙‍♂️</div>
+      <div class="sa-body">
+        <div class="sa-title" id="saTitle">Maha Adigar (Royal Advisor)</div>
+        <div class="sa-text" id="saText">"Ayubowan, Maha Raja! Place your Badagara and Vee Bissa first, then Dara Maduwa loggers near the jungle and Veddah hunters near the deer herd!"</div>
+      </div>
+    </div>
+
+    <!-- Floating Controls Hint -->
+    <div class="controls-pill" id="controlsPill">
+      🖱️ Use WASD/Arrow Keys or Shift+Drag to pan camera • Left-Click to build or select warriors • Right-Click to march or cancel build
+    </div>
+
+    <!-- Raja Maligawa Governance Inspector Modal -->
+    <div class="sh-inspector hidden" id="shInspector">
+      <div class="shi-header">
+        <span id="shiTitle">🦁 Raja Maligawa — Rajakariya & Vee Bissa Rations</span>
+        <button class="shi-close" id="shiCloseBtn">✕</button>
+      </div>
+      <div class="shi-body" id="shiBody"></div>
+    </div>
+  </div>
+
+  <!-- BOTTOM CARVED STONE & PUSKOLA POTHA (OLA LEAF) INTERFACE -->
+  <footer class="sh-hud">
+    <!-- Far Left: 6 Shield Category Tabs + Warrior Recruitment + Demolish -->
+    <div class="sh-shield-rack">
+      <button class="sh-shield active" data-cat="castle" title="Balakotuwa Fortifications (Walls, Simhadvara Gate, Mura Atuwa Tower, Angam Maduwa, Ayudhagaraya)">
+        <span class="sh-s-icon">🏯</span>
+        <span class="sh-s-lbl">Balakotuwa</span>
+      </button>
+      <button class="sh-shield" data-cat="industry" title="Kammala & Industry (Badagara Yard, Kumbuk Logger, Kalugal Quarry, Buffalo Cart, Wootz Furnace)">
+        <span class="sh-s-icon">🪓</span>
+        <span class="sh-s-lbl">Kammala</span>
+      </button>
+      <button class="sh-shield" data-cat="farm" title="Wewa & Govithena (Vee Bissa Granary, Veddah Hunter, Kos & Pol Orchard, Samba Paddy)">
+        <span class="sh-s-icon">🦌</span>
+        <span class="sh-s-lbl">Govithena</span>
+      </button>
+      <button class="sh-shield" data-cat="town" title="Gama & Viharaya (Govi Gedara Homestead, Dagoba Stupa Shrine)">
+        <span class="sh-s-icon">🛕</span>
+        <span class="sh-s-lbl">Viharaya</span>
+      </button>
+      <button class="sh-shield" data-cat="weapons" title="Ayudha Smithies (Dunu Bowyer, Hella Spear Smith, Kastane Wootz Smithy)">
+        <span class="sh-s-icon">🏹</span>
+        <span class="sh-s-lbl">Ayudha</span>
+      </button>
+      <button class="sh-shield" data-cat="foodproc" title="Ahara & Ra Processing (Vee Mola Rice Mill, Bath Maduwa Kitchen, Ra Salawa Toddy Tavern)">
+        <span class="sh-s-icon">🍚</span>
+        <span class="sh-s-lbl">Ahara & Ra</span>
+      </button>
+      <button class="sh-shield recruit-shield" data-cat="troops" title="Angam Maduwa Recruitment (Dunuvaya Archers, Hella Spearmen, Angampora Soorayas, Kandula War Elephants)">
+        <span class="sh-s-icon">🐘</span>
+        <span class="sh-s-lbl">Warriors</span>
+      </button>
+      <button class="sh-shield demolish-shield" id="demolishBtn" title="Demolish Structure">
+        <span class="sh-s-icon">⛏️</span>
+        <span class="sh-s-lbl">Clear</span>
+      </button>
+    </div>
+
+    <!-- Center: Illustrated Isometric Puskola Scroll -->
+    <div class="sh-parchment-panel">
+      <div class="sh-palette-strip" id="shPaletteStrip"></div>
+      <!-- Physical Badagara & Vee Bissa Quick Readout Bar -->
+      <div class="sh-stock-ribbon">
+        <span>🪵 Kumbuk: <strong id="stWood">80</strong></span>
+        <span>🪨 Kalugal: <strong id="stStone">40</strong></span>
+        <span>⛏️ Wootz: <strong id="stIron">10</strong></span>
+        <span>🌾 Paddy: <strong id="stWheat">10</strong></span>
+        <span>🍚 Vee Bissa: <strong id="stFood">90</strong></span>
+        <span>🥥 Kithul Ra: <strong id="stAle">10</strong></span>
+        <span>🏹 Dunu: <strong id="stBows">4</strong></span>
+        <span>🔱 Hella: <strong id="stSpears">4</strong></span>
+        <span>🗡️ Kastane: <strong id="stSwords">2</strong></span>
+      </div>
+    </div>
+
+    <!-- Right: Maha Adigar's Open Puskola Potha (Harmony, Kahavanu Gold, Govi Population) -->
+    <div class="sh-scribe-book" id="scribeBookBtn" title="Click to adjust Rajakariya Taxes & Vee Bissa Rice Rations">
+      <div class="sb-page-left">
+        <canvas id="scribeFaceCanvas" width="54" height="54"></canvas>
+        <div class="sb-metric">
+          <span>Janapriya</span>
+          <strong class="sb-val pos" id="sbPop">85</strong>
+        </div>
+        <div class="sb-metric">
+          <span>Kahavanu</span>
+          <strong class="sb-val gold" id="sbGold">250</strong>
+        </div>
+        <div class="sb-metric">
+          <span>Govi People</span>
+          <strong class="sb-val" id="sbPeasants">10/14</strong>
+        </div>
+      </div>
+      <div class="sb-page-right">
+        <div class="sb-top-row">
+          <strong id="scribeTitleLabel">Maha Adigar (Advisor)</strong>
+          <button class="sb-gov-btn" id="openTaxModalBtn">⚖️ Tax & Rice</button>
+        </div>
+        <div class="sb-quote" id="sbQuoteText">
+          "Ayubowan, Maha Raja! Place Dara Maduwa loggers by the jungle and Veddah hunters near the deer herd!"
+        </div>
+        <div class="sb-wave-box">
+          <span>🐚 Next Vanguard:</span> <strong id="sbWaveTimer">01:20</strong>
+        </div>
+      </div>
+    </div>
+
+    <!-- Far Right: Isometric Diamond Radar Minimap -->
+    <div class="sh-radar-frame">
+      <canvas id="radarCanvas" width="150" height="135"></canvas>
+    </div>
+  </footer>
+
+  <script src="game.js"></script>
+</body>
+</html>
