@@ -1190,10 +1190,12 @@ function tributeCost() {
   const w = S.L.waves[S.nextWave];
   if (!w) return null;
   const n = Object.keys(FOES).reduce((a, k) => a + (w[k] || 0), 0);
-  const k = 1 + 0.5 * (S.tributes || 0);
+  const k = Math.pow(2, S.tributes || 0); // doubles each time
   return { gold: Math.round(6 * n * k), rice: Math.round(4 * n * k) };
 }
-const tributeOpen = () => S.mode === "play" && (S.idx >= 1 || S.L.skirmish) && !S.L.sandbox && nextWaveIn() <= TRIBUTE_WINDOW && S.nextWave < S.L.waves.length;
+// The final assault of a campaign level can't be bought off.
+const tributeOpen = () => S.mode === "play" && (S.idx >= 1 || S.L.skirmish) && !S.L.sandbox && nextWaveIn() <= TRIBUTE_WINDOW &&
+  S.nextWave < S.L.waves.length - (S.L.endless ? 0 : 1);
 
 function payTribute() {
   if (!tributeOpen()) return;
@@ -1207,7 +1209,7 @@ function payTribute() {
   S.harmony = clamp(S.harmony - 5, 0, 100);
   S.stats.tributes++;
   spawnFloat(`-${costText(cost)}`, S.citadel.gx + 1, S.citadel.gy, "#e9b949");
-  say(`The raiders take the tribute and turn back from the ${w.from.join(" and ")}. They will ask for more next time.`);
+  say(`The raiders take the tribute and turn back from the ${w.from.join(" and ")}. They will ask twice as much next time, and the final assault cannot be bought off.`);
   sfx("coin");
   checkVictory();
   syncHud();
@@ -1365,6 +1367,8 @@ function endLevel(won) {
   let stars = won ? (pct >= 0.9 ? 3 : pct >= 0.5 ? 2 : 1) : 0;
   // "Let not one drop of rain reach the sea unused": three stars need 70% kept.
   if (S.L.objectives.some(o => o.type === "catch") && rainKept() < 70) stars = Math.min(stars, 2);
+  // a kingdom that buys peace is not sung about: tribute caps a level at two stars
+  if (!S.L.endless && (S.stats.tributes || 0) > 0) stars = Math.min(stars, 2);
   S.starsEarned = stars;
   if (!won) S.causes = defeatCauses();
   if (S.L.endless) {
@@ -1651,7 +1655,7 @@ function syncHud() {
     const c = tributeCost();
     tb.textContent = `🪙 Pay ${costText(c)}`;
     tb.disabled = !affordable(c);
-    tb.title = "Pay rice and gold to turn the coming raid back; it costs more each time and −5 harmony.";
+    tb.title = "Pay to turn this raid back: the price doubles each time, −5 harmony, and the level can earn at most two stars.";
   }
   document.getElementById("pauseBtn").textContent = S.paused ? "▶" : "⏸";
   document.getElementById("pauseBtn").disabled = S.mode !== "play";
@@ -1821,6 +1825,7 @@ function showEnd(won, starCount) {
         : "Raiders breached the Maligawa."}</p>
       ${!won && S.causes ? `<div class="causes"><b>Why it fell</b><ul>${S.causes.map(c => `<li>${c}</li>`).join("")}</ul></div>` : ""}
       ${S.rain.caught + S.rain.lost > 0 ? `<p>🌧️ Rain kept: <b>${rainKept()}%</b>${S.L.objectives.some(o => o.type === "catch") ? (rainKept() >= 70 ? " · Parakramabahu would be pleased." : " · Below 70%: too much rain reached the sea for three stars.") : ""}</p>` : ""}
+      ${won && !S.L.endless && S.stats.tributes ? `<p>🪙 Tribute paid ${S.stats.tributes} time${S.stats.tributes > 1 ? "s" : ""}: a kingdom that buys peace earns at most two stars.</p>` : ""}
       <div class="actions">
         ${hasNext ? `<button class="btn primary" id="nextBtn">Next level ▶</button>` : ""}
         <button class="btn" id="retryBtn">↻ Replay</button>
