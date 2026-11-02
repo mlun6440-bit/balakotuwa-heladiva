@@ -15,12 +15,13 @@ Read this before changing the game. It is written so that any future model
 
 ## Architecture
 
-Three classic scripts sharing globals, loaded in this order:
+Four classic scripts sharing globals, loaded in this order:
 
 1. `data.js`: pure data tables (`BUILDINGS`, `TROOPS`, `FOES`, `EDICTS`, `LEVELS`, `TUTORIAL`, `SEASONS`).
 2. `game.js`: state `S`, simulation, pathfinding, water, HUD, input, boot.
    Boot waits for `DOMContentLoaded` so `render.js` is present.
-3. `render.js`: every pixel. Only cosmetic state is written here: `S.fx`
+3. `audio.js`: synthesised sound (`SOUND.play(kind)`, `SOUND.update()`); reads `S`, never writes it.
+4. `render.js`: every pixel. Only cosmetic state is written here: `S.fx`
    particles plus render-local caches (terrain, shadow layer, footpaths,
    ruins, gait/facing, ambient animals). The simulation never reads them.
 
@@ -44,6 +45,12 @@ Key invariants:
   `S.rain.lost`.
 - `S.cover` (forest cover per tile) is refreshed in `tick()`; use `inCover(u)`
   rather than counting trees.
+- Save: `saveRun()` stores primary state only (`RUN_SKIP` lists what is
+  derived or transient). A new field on `S`, a building or a unit must be
+  plain data and, for buildings/units, added to the lists in `saveRun`.
+- Unit queries go through the spatial hash (`unitsNear`), rebuilt each
+  combat step; don't loop over every unit for neighbour checks.
+- Raid parties (`S.parties`) drive morale; spawn raiders with a party id.
 - `b.at` is the simulation time a building was placed; the renderer uses it
   for the cosmetic construction animation only.
 - Coordinates: grid `gx, gy` (floats for movers); `iso()` maps to world pixels
@@ -52,11 +59,13 @@ Key invariants:
 ## Extending
 
 - **New building:** add a row to `BUILDINGS` (flags: `solid`, `ground`, `wall`,
-  `water`, `worker`, `store`, `pop`, `harmony`, `tower`, `paint`, `needsRock`),
+  `water`, `worker`, `store`, `pop`, `harmony`, `tower`, `paint`, `needsRock`,
+  `flammable`, `thorn`, `upgrade: { to, cost }`),
   unlock it in a level's `unlocks.buildings`, and add a `case` in
   `drawBuilding` (or let the generic `hall()` draw it). A new `worker` job also
   needs a branch in `planJob`/`updateWorker`.
-- **New troop or raider:** add a row to `TROOPS`/`FOES`, and a look in `drawUnit`.
+- **New troop or raider:** add a row to `TROOPS`/`FOES` (`FOES` take `morale`,
+  `fire`), and a look in `drawUnit` / a `LOOKS` entry in `tools/art/units.js`.
   Waves reference raider ids by key (`{ raider: 4, bowman: 1 }`).
 - **New level:** append to `LEVELS`. Objective types: `res`, `build`, `water`,
   `catch` (rain caught; three stars then need 70% kept), `harmony`, `pop`,

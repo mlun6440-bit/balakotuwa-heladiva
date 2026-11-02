@@ -21,6 +21,7 @@ const RES = { timber: "🪵", stone: "🪨", rice: "🍚", gold: "🪙", arms: "
 // solid: blocks raiders (they must break it). ground: flat, walkable.
 // flammable: thatch or timber that raider fire arrows can set alight.
 // upgrade: { to, cost } lets the ⬆️ Upgrade tool rebuild it in place.
+// thorn: walkable, but slows and scratches raiders; raiders path around it.
 // worker: job type staffed by one villager. store: drop-off for those resources.
 const BUILDINGS = {
   citadel:    { name: "Maligawa (Citadel)", cat: null, icon: "🏯", w: 2, h: 2, hp: 2500, solid: true, z: 40, store: ["timber", "stone", "rice", "arms"],
@@ -60,6 +61,8 @@ const BUILDINGS = {
 
   palisade:   { name: "Palisade", cat: "defence", icon: "🪵", w: 1, h: 1, hp: 320, cost: { timber: 3 }, solid: true, flammable: true, wall: true, z: 20, paint: true, upgrade: { to: "rampart", cost: { stone: 4 } },
                 desc: "Cheap wall. Raiders must break through. Drag to paint." },
+  thorn:      { name: "Katu Wetiya (Thorn barrier)", cat: "defence", icon: "🌿", w: 1, h: 1, hp: 140, cost: { timber: 1 }, ground: true, thorn: true, flammable: true, paint: true,
+                desc: "Cheap thorny brush. Raiders avoid it, or push through at 45% speed and take 3 damage a second. Trampled over time; burns easily." },
   rampart:    { name: "Gal Bamma (Rampart)", cat: "defence", icon: "🧱", w: 1, h: 1, hp: 950, cost: { stone: 5 }, solid: true, wall: true, z: 26, paint: true,
                 desc: "Heavy stone wall. Drag to paint." },
   gate:       { name: "Vahalkada (Gate)", cat: "defence", icon: "⛩️", w: 1, h: 1, hp: 900, cost: { timber: 8, stone: 6 }, solid: true, wall: true, z: 30,
@@ -106,12 +109,14 @@ const TROOPS = {
 };
 
 const FOES = {
-  raider: { name: "Raider", hp: 90, dmg: 12, bdmg: 12, range: 0.9, speed: 1.5, gold: 6 },
-  bowman: { name: "Raider bowman", hp: 60, dmg: 9, bdmg: 4, range: 4.2, speed: 1.5, ranged: true, gold: 6, fire: true },
-  brute:  { name: "Ram bearer", hp: 280, dmg: 10, bdmg: 48, range: 0.9, speed: 1.0, heavy: true, gold: 15 }
+  raider: { name: "Raider", hp: 90, dmg: 12, bdmg: 12, range: 0.9, speed: 1.5, gold: 6, morale: 0.35 },
+  bowman: { name: "Raider bowman", hp: 60, dmg: 9, bdmg: 4, range: 4.2, speed: 1.5, ranged: true, gold: 6, fire: true, morale: 0.45 },
+  brute:  { name: "Ram bearer", hp: 280, dmg: 10, bdmg: 48, range: 0.9, speed: 1.0, heavy: true, gold: 15, morale: 0 }
 };
 
 // fire: shoots fire arrows at flammable buildings when no soldier is in range.
+// morale: when its raid party falls below this share of its strength, the
+// raider flees back to its edge (0 = never). Fleeing raiders give no gold.
 
 // ==================== CAMPAIGN ====================
 // Rects are [x1, y1, x2, y2] inclusive; forests add a density. Waves split
@@ -127,7 +132,7 @@ const LEVELS = [
     rivers: [{ edge: "west", at: 1, width: 2, wobble: 1.2 }],
     rocks: [[16, 3, 20, 6]],
     forests: [[3, 4, 9, 9, 0.55], [4, 18, 10, 24, 0.5], [19, 18, 24, 24, 0.45]],
-    unlocks: { buildings: ["woodcutter", "quarry", "storehouse", "house", "wewa", "canal", "paddy", "bissa", "palisade", "barracks", "kammala"], troops: ["spearman", "archer"] },
+    unlocks: { buildings: ["woodcutter", "quarry", "storehouse", "house", "wewa", "canal", "paddy", "bissa", "palisade", "barracks", "kammala", "thorn"], troops: ["spearman", "archer"] },
     waves: [{ t: 170, from: ["east"], raider: 3 }, { t: 290, from: ["east"], raider: 4, bowman: 1 }],
     hpScale: 1.0,
     objectives: [{ type: "res", key: "timber", n: 100 }, { type: "build", id: "wewa", n: 1 }, { type: "res", key: "rice", n: 80 }, { type: "waves" }],

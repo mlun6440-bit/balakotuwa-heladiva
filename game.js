@@ -78,7 +78,7 @@ function saveProgress() {
 // field, water networks, cover, staffing) is rebuilt by refreshWorld().
 const RUN_KEY = "balakotuwa.run.v1";
 const RUN_SKIP = new Set(["L", "tiles", "trees", "unlocked", "buildings", "occ", "workers", "units", "shots", "floats", "nets",
-  "netOf", "flooded", "flow", "citadel", "cover", "fx", "tool", "demolish", "upgrade", "mode", "paused"]);
+  "netOf", "flooded", "flow", "citadel", "cover", "fx", "tool", "demolish", "upgrade", "repair", "mode", "paused"]);
 const plain = v => v === null || typeof v !== "object" || Array.isArray(v) || Object.getPrototypeOf(v) === Object.prototype;
 
 function saveRun() {
@@ -93,7 +93,7 @@ function saveRun() {
     buildings: S.buildings.map(b => ({ uid: b.uid, id: b.id, gx: b.gx, gy: b.gy, hp: b.hp, maxHp: b.maxHp, water: b.water, growth: b.growth,
       open: b.open, next: b.next, at: b.at, fire: b.fire, irrigated: b.irrigated })),
     units: S.units.map(u => ({ uid: u.uid, team: u.team, type: u.type, gx: r3(u.gx), gy: r3(u.gy), tx: u.tx, ty: u.ty, hp: u.hp, maxHp: u.maxHp,
-      last: u.last, z: u.z, ordered: u.ordered, lastFire: u.lastFire }))
+      last: u.last, z: u.z, ordered: u.ordered, lastFire: u.lastFire, party: u.party, hx: u.hx, hy: u.hy, flee: u.flee }))
   };
   try { localStorage.setItem(RUN_KEY, JSON.stringify(data)); } catch (e) { /* storage full or blocked */ }
   S.lastSave = S.time;
@@ -203,7 +203,7 @@ function unlockedFor(idx) {
 // ==================== SKIRMISH ====================
 // A seeded random map with every building unlocked and endless raids that
 // grow each time. Survive as many raids as you can.
-function makeSkirmish(seed) {
+function makeSkirmish(seed, sandbox = false) {
   const r = mulberry32(seed), ri = (a, b) => a + Math.floor(r() * (b - a + 1));
   const edges = ["west", "north", "south", "east"];
   const riverEdge = edges[ri(0, 2)];
@@ -221,8 +221,13 @@ function makeSkirmish(seed) {
     rocks: Array.from({ length: ri(2, 3) }, () => rect(ri(2, 4), ri(2, 4))),
     forests: Array.from({ length: ri(3, 5) }, () => [...rect(ri(4, 7), ri(4, 7)), 0.35 + r() * 0.2]),
     unlocks: {}, all,
-    waves: [0, 1, 2].map(k => skirmishWave(k, seed, riverEdge)),
-    hpScale: 1, objectives: [{ type: "endless" }]
+    waves: sandbox ? [] : [0, 1, 2].map(k => skirmishWave(k, seed, riverEdge)),
+    hpScale: 1, objectives: [{ type: sandbox ? "sandbox" : "endless" }],
+    ...(sandbox ? {
+      id: `sandbox-${seed}`, name: "Sandbox", sandbox: true, endless: false, era: `Royal sandbox · seed ${seed}`,
+      intro: "A peaceful valley with full stores. Build anything; open 👑 Decrees to send raids of any size from any edge and test your defences.",
+      start: { timber: 999, stone: 999, rice: 600, gold: 999, villagers: 30, arms: 60 }
+    } : {})
   };
 }
 function skirmishWave(k, seed, riverEdge) {
@@ -232,9 +237,25 @@ function skirmishWave(k, seed, riverEdge) {
   const from = [...edges].sort(() => r() - 0.5).slice(0, n);
   return { t: 150 + k * 95, from, raider: 3 + 2 * k, bowman: 1 + Math.floor(k * 0.8), brute: Math.floor(k / 2) };
 }
-const startSkirmish = seed => startLevel(LEVELS.length, "brief", makeSkirmish(seed ?? (Date.now() % 900000) + 1));
-const restartLevel = () => (S.L.skirmish ? startSkirmish(S.L.seed) : startLevel(S.idx));
-const levelTitle = () => (S.L.skirmish ? "Skirmish" : `${S.idx + 1}. ${S.L.name}`);
+const newSeed = () => (Date.now() % 900000) + 1;
+const startSkirmish = seed => startLevel(LEVELS.length, "brief", makeSkirmish(seed ?? newSeed()));
+const startSandbox = seed => startLevel(LEVELS.length, "brief", makeSkirmish(seed ?? newSeed(), true));
+const restartLevel = () => (S.L.sandbox ? startSandbox(S.L.seed) : S.L.skirmish ? startSkirmish(S.L.seed) : startLevel(S.idx));
+const levelTitle = () => (S.L.sandbox ? "Sandbox" : S.L.skirmish ? "Skirmish" : `${S.idx + 1}. ${S.L.name}`);
+
+// Sandbox: send a raid of a chosen size from a chosen edge (also a balance harness).
+const RAID_SIZES = { small: 6, medium: 14, large: 30, extreme: 60 };
+function sendRaid(size, edge) {
+  const n = RAID_SIZES[size];
+  const list = [];
+  for (let i = 0; i < n; i++) list.push(i % 10 === 9 ? "brute" : i % 3 === 2 ? "bowman" : "raider");
+  const party = 1000 + (S.raidsSent = (S.raidsSent || 0) + 1);
+  S.parties = S.parties || {};
+  S.parties[party] = { total: list.length, spawned: 0, fled: false };
+  list.forEach((type, i) => S.spawnQueue.push({ at: S.time + i * 0.35, type, edge, party }));
+  say(`A ${size} raid of ${n} sets out from the ${edge}.`, true);
+  sfx("conch");
+}
 
 function startLevel(idx, mode = "brief", custom = null) {
   const L = custom || LEVELS[idx];
@@ -373,6 +394,30 @@ function upgradeAt(gx, gy, quiet = false) {
   return true;
 }
 
+// ==================== REPAIR ====================
+// Restoring a building costs 60% of its build cost × the share of health lost.
+const REPAIR_CITADEL = { timber: 40, stone: 40 };
+function repairCost(b) {
+  const base = b === S.citadel ? REPAIR_CITADEL : b.def.cost || {};
+  const lost = 1 - b.hp / b.maxHp, out = {};
+  for (const [k, v] of Object.entries(base)) { const c = Math.ceil(v * 0.6 * lost); if (c > 0) out[k] = c; }
+  return out;
+}
+function repairAt(gx, gy, quiet = false) {
+  const b = buildingAt(gx, gy);
+  if (!b || b.hp >= b.maxHp) { if (!quiet) say(b ? `The ${b.def.name} is not damaged.` : "Nothing to repair here.", !!b); return false; }
+  if (b.fire > 0) { if (!quiet) say("Put the fire out first.", true); return false; }
+  const cost = repairCost(b);
+  if (!affordable(cost)) { if (!quiet) say(`Repairing the ${b.def.name} needs ${costText(cost)}.`, true); return false; }
+  for (const [k, v] of Object.entries(cost)) S[k] -= v;
+  b.hp = b.maxHp;
+  puff(b.gx + b.w / 2, b.gy + b.h / 2, 5, "#cbbd9a");
+  spawnFloat("🔧", b.gx + b.w / 2, b.gy + b.h / 2, "#bff0a8");
+  sfx("build");
+  syncHud();
+  return true;
+}
+
 function demolishAt(gx, gy) {
   const b = buildingAt(gx, gy);
   if (!b) return;
@@ -402,7 +447,7 @@ function enterCost(x, y) {
   const t = S.tiles[y][x].t;
   let c = t === "river" ? 6 : t === "rock" ? 1.6 : 1;
   const b = S.occ[y][x];
-  if (b && b !== S.citadel) c += b.def.solid ? 3 + b.maxHp / 90 : 0.3;
+  if (b && b !== S.citadel) c += b.def.solid ? 3 + b.maxHp / 90 : b.def.thorn ? 4 : 0.3;
   return c;
 }
 
@@ -718,7 +763,13 @@ function updateWorker(w, dt) {
         w.timer -= dt * workMult();
         if (w.timer <= 0) {
           w.timer = 6;
-          if (S.rice > 30) { S.rice -= 5; S.gold += 8; spawnFloat("-5🍚 +8🪙", w.gx, w.gy, "#e9b949"); sfx("coin"); }
+          // Pola orders (👑 tab): sell rice above a level, buy timber/stone below one at a markup
+          const m = S.market || (S.market = { sell: 30, buy: 0 });
+          if (S.rice > m.sell + 5) { S.rice -= 5; S.gold += 8; spawnFloat("-5🍚 +8🪙", w.gx, w.gy, "#e9b949"); sfx("coin"); }
+          else if (S.gold >= 12 && (S.timber < m.buy || S.stone < m.buy)) {
+            const k = S.timber <= S.stone ? "timber" : "stone";
+            S.gold -= 12; S[k] += 5; spawnFloat(`-12🪙 +5${RES[k]}`, w.gx, w.gy, "#e9b949"); sfx("coin");
+          }
         }
       }
       break;
@@ -740,11 +791,12 @@ function spawnSoldier(type, gx, gy) {
   S.units.push({ uid: ++S.uid, team: "p", type, def: d, gx, gy, tx: gx, ty: gy, hp: d.hp, maxHp: d.hp, last: -9, z: 0, sel: false, ordered: false });
 }
 
-function spawnFoe(type, edge) {
+function spawnFoe(type, edge, party = null) {
   const d = FOES[type];
   const hp = Math.round(d.hp * S.L.hpScale);
   const [x, y] = edgeSpawn(edge);
-  S.units.push({ uid: ++S.uid, team: "e", type, def: d, gx: x, gy: y, hp, maxHp: hp, last: -9, z: 0 });
+  S.units.push({ uid: ++S.uid, team: "e", type, def: d, gx: x, gy: y, hp, maxHp: hp, last: -9, z: 0, party, hx: x, hy: y });
+  if (party !== null && S.parties && S.parties[party]) S.parties[party].spawned++;
 }
 
 function edgeSpawn(edge) {
@@ -781,6 +833,7 @@ function terrainMult(u) {
   const x = Math.floor(u.gx), y = Math.floor(u.gy);
   if (!inb(x, y)) return 1;
   if (u.team === "e" && S.flooded.has(y * MAP + x)) return 0.4;
+  if (u.team === "e" && S.occ[y][x] && S.occ[y][x].def.thorn) return 0.45; // pushing through thorns
   if (u.team === "e" && coverAt(u.gx, u.gy) >= 3) return 0.7; // thick jungle
   const t = S.tiles[y][x].t;
   return t === "river" ? 0.55 : t === "rock" ? 0.85 : 1;
@@ -793,15 +846,55 @@ function moveToward(u, tx, ty, dt) {
   u.gx += (dx / d) * step; u.gy += (dy / d) * step;
 }
 
+// ==================== SPATIAL HASH ====================
+// Units are bucketed into 2×2-tile cells once per combat step, so neighbour
+// queries (targeting, volleys, separation) stay fast with hundreds of units.
+const CELL = 2, CELLS = Math.ceil(MAP / CELL) + 2;
+function buildUnitGrid() {
+  const grid = new Map();
+  for (const u of S.units) {
+    const k = (Math.floor(u.gx / CELL) + 1) * CELLS + Math.floor(u.gy / CELL) + 1;
+    let a = grid.get(k);
+    if (!a) grid.set(k, (a = []));
+    a.push(u);
+  }
+  S.ugrid = grid;
+}
+// Every unit whose cell overlaps the square of radius r around (x, y).
+function unitsNear(x, y, r) {
+  if (!S.ugrid) buildUnitGrid();
+  const out = [];
+  const x0 = Math.floor((x - r) / CELL) + 1, x1 = Math.floor((x + r) / CELL) + 1, y0 = Math.floor((y - r) / CELL) + 1, y1 = Math.floor((y + r) / CELL) + 1;
+  for (let cx = x0; cx <= x1; cx++) for (let cy = y0; cy <= y1; cy++) {
+    const a = S.ugrid.get(cx * CELLS + cy);
+    if (a) for (const u of a) out.push(u);
+  }
+  return out;
+}
+
 function nearestFoe(u, radius, from = u) {
   let best = null, bd = radius;
-  for (const v of S.units) {
+  for (const v of unitsNear(from.gx, from.gy, radius)) {
     if (v.team === u.team || v.hp <= 0) continue;
     const d = Math.hypot(v.gx - from.gx, v.gy - from.gy);
     if (u.team === "e" && d > 1.5 && inCover(v)) continue; // hidden in the forest
     if (d <= bd) { bd = d; best = v; }
   }
   return best;
+}
+
+// Ranged volleys spread over the crowd: pick at random among the nearest few
+// enemies in range instead of everyone shooting the same one.
+function volleyTarget(u, range, from = u) {
+  const near = [];
+  for (const v of unitsNear(from.gx, from.gy, range)) {
+    if (v.team === u.team || v.hp <= 0 || v.flee) continue;
+    const d = Math.hypot(v.gx - from.gx, v.gy - from.gy);
+    if (d <= range && !(u.team === "e" && d > 1.5 && inCover(v))) near.push([d, v]);
+  }
+  if (!near.length) return null;
+  near.sort((a, b) => a[0] - b[0]);
+  return near[Math.floor(Math.random() * Math.min(4, near.length))][1];
 }
 
 function attack(u, target, dmg) {
@@ -826,7 +919,8 @@ function hitUnit(target, dmg, splash) {
 
 function fireShot(gx, gy, z, target, dmg) {
   const d = Math.hypot(target.gx - gx, target.gy - gy);
-  S.shots.push({ sx: gx, sy: gy, sz: z, target, dmg, t: 0, dur: Math.max(0.25, d / 9) });
+  // ox/oy: a little landing scatter so a volley reads as a volley (cosmetic)
+  S.shots.push({ sx: gx, sy: gy, sz: z, target, dmg, t: 0, dur: Math.max(0.25, d / 9) * (0.9 + Math.random() * 0.2), ox: (Math.random() - 0.5) * 0.35, oy: (Math.random() - 0.5) * 0.35 });
 }
 
 function rectDist(u, b) {
@@ -842,8 +936,29 @@ function hitBuilding(u, b) {
   sfx("hit");
 }
 
+// Morale: once a whole raid party has landed, if fewer than morale × its
+// strength still stand, the faint-hearted run back to their edge.
+function checkMorale() {
+  for (const [id, p] of Object.entries(S.parties || {})) {
+    if (p.fled || p.spawned < p.total) continue;
+    const alive = S.units.filter(u => u.team === "e" && u.party === Number(id) && u.hp > 0 && !u.flee);
+    if (!alive.length) { p.fled = true; continue; }
+    const fleeing = alive.filter(u => alive.length / p.total < u.def.morale);
+    if (!fleeing.length) continue;
+    p.fled = true;
+    for (const u of fleeing) u.flee = true;
+    spawnFloat("Retreat!", fleeing[0].gx, fleeing[0].gy, "#ffd27a");
+    say(`The raiders' nerve breaks: ${fleeing.length} flee back the way they came.`);
+  }
+}
+
 function updateFoe(u, dt) {
   const d = u.def;
+  if (u.flee) {
+    moveToward(u, u.hx ?? u.gx, u.hy ?? u.gy, dt * 1.2);
+    if (Math.hypot((u.hx ?? u.gx) - u.gx, (u.hy ?? u.gy) - u.gy) < 0.3) u.gone = true;
+    return;
+  }
   const foe = nearestFoe(u, d.ranged ? d.range : 2.2);
   if (foe) {
     if (dist(u, foe) <= d.range) attack(u, foe, d.dmg);
@@ -874,7 +989,7 @@ function updateSoldier(u, dt) {
 
   const foe = nearestFoe(u, u.ordered || d.ranged ? range : 4);
   if (foe && dist(u, foe) <= range) {
-    attack(u, foe, d.dmg);
+    attack(u, d.ranged ? volleyTarget(u, range) || foe : foe, d.dmg);
     if (!u.ordered) return;
   } else if (foe && !u.ordered && Math.hypot(foe.gx - u.tx, foe.gy - u.ty) < 5) {
     moveToward(u, foe.gx, foe.gy, dt);
@@ -884,10 +999,9 @@ function updateSoldier(u, dt) {
 }
 
 function separate() {
-  const us = S.units;
-  for (let i = 0; i < us.length; i++) {
-    for (let j = i + 1; j < us.length; j++) {
-      const a = us[i], b = us[j];
+  for (const a of S.units) {
+    for (const b of unitsNear(a.gx, a.gy, 0.32)) {
+      if (b.uid <= a.uid) continue; // each pair once
       const dx = b.gx - a.gx, dy = b.gy - a.gy, d = Math.hypot(dx, dy);
       if (d > 0.001 && d < 0.32) {
         const push = (0.32 - d) * 0.25;
@@ -899,17 +1013,19 @@ function separate() {
 }
 
 function updateCombat(dt) {
+  buildUnitGrid();
   for (const u of S.units) {
     if (u.hp <= 0) continue;
     if (u.team === "p") updateSoldier(u, dt); else updateFoe(u, dt);
   }
+  buildUnitGrid();
   separate();
 
   for (const b of S.buildings) {
     const tw = b.def.tower;
     if (!tw || S.time < b.next) continue;
     const c = { gx: b.gx + b.w / 2, gy: b.gy + b.h / 2, team: "p" };
-    const foe = nearestFoe(c, tw.range);
+    const foe = volleyTarget(c, tw.range);
     if (foe) { fireShot(c.gx, c.gy, 48, foe, tw.dmg); b.next = S.time + tw.cd; }
   }
 
@@ -918,13 +1034,15 @@ function updateCombat(dt) {
     s.t += dt;
     if (s.t >= s.dur) {
       if (s.fire) ignite(s.fire);
-      else if (s.target.hp > 0) s.target.hp -= s.dmg;
+      else if (s.target.hp > 0) { s.target.hp -= s.dmg; puff(s.target.gx + (s.ox || 0) * 0.5, s.target.gy + (s.oy || 0) * 0.5, 2, "#c8b48a"); }
       S.shots.splice(i, 1);
     }
   }
 
+  checkMorale();
   for (let i = S.units.length - 1; i >= 0; i--) {
     const u = S.units[i];
+    if (u.gone) { S.units.splice(i, 1); continue; } // fled off the map: no gold
     if (u.hp > 0) continue;
     if (u.team === "e") {
       S.gold += u.def.gold;
@@ -1044,7 +1162,10 @@ function launchWave() {
   }
   const list = [];
   for (const type of Object.keys(FOES)) for (let i = 0; i < (w[type] || 0); i++) list.push(type);
-  list.forEach((type, i) => S.spawnQueue.push({ at: S.time + i * 0.7, type, edge: w.from[i % w.from.length] }));
+  const party = S.nextWave;
+  S.parties = S.parties || {};
+  S.parties[party] = { total: list.length, spawned: 0, fled: false };
+  list.forEach((type, i) => S.spawnQueue.push({ at: S.time + i * 0.7, type, edge: w.from[i % w.from.length], party }));
   say(`Raid ${S.nextWave} of ${S.L.waves.length}: ${list.length} raiders from the ${w.from.join(" and ")}!`, true);
   sfx("conch");
 }
@@ -1081,7 +1202,10 @@ function tick() {
   updateCover();
 
   for (const u of S.units) {
-    if (u.team === "e" && S.flooded.has(Math.floor(u.gy) * MAP + Math.floor(u.gx))) u.hp -= 4;
+    if (u.team !== "e") continue;
+    if (S.flooded.has(Math.floor(u.gy) * MAP + Math.floor(u.gx))) u.hp -= 4;
+    const tb = buildingAt(Math.floor(u.gx), Math.floor(u.gy));
+    if (tb && tb.def.thorn) { u.hp -= 3; damageBuilding(tb, 4); } // scratched, and the hedge is trampled
   }
 
   // Economy & harmony
@@ -1139,6 +1263,7 @@ function objective(o) {
     case "harmony": return { label: `😊 Harmony ${o.n}+`, cur: Math.floor(S.harmony), n: o.n };
     case "pop": return { label: `👥 ${o.n} villagers`, cur: S.villagers, n: o.n };
     case "catch": return { label: `🌧️ Catch ${o.n} rain (${rainKept()}% kept)`, cur: Math.floor(S.rain.caught), n: o.n };
+    case "sandbox": return { label: `🏗️ Sandbox · raids sent: ${S.raidsSent || 0} (send more from 👑)`, cur: 0, n: Infinity };
     case "endless": {
       const busy = foesAlive() || S.spawnQueue.length > 0;
       return { label: `🛡️ Raids survived: ${Math.max(0, S.nextWave - (busy ? 1 : 0))} (best ${progress.skirmishBest || 0})`, cur: 0, n: Infinity };
@@ -1191,7 +1316,7 @@ function step(dt) {
   while (S.tickAcc >= 1 && S.mode === "play") { S.tickAcc -= 1; tick(); }
   while (S.spawnQueue.length && S.time >= S.spawnQueue[0].at) {
     const q = S.spawnQueue.shift();
-    spawnFoe(q.type, q.edge);
+    spawnFoe(q.type, q.edge, q.party);
   }
   for (const t of S.trees) if (t.stage < 100) t.stage = Math.min(100, t.stage + 0.6 * dt);
   for (const w of S.workers) updateWorker(w, dt);
@@ -1251,33 +1376,69 @@ function buildTabs() {
   nav.innerHTML = "";
   for (const c of CATS) {
     const btn = document.createElement("button");
-    btn.className = `tab ${S.cat === c.id && !S.demolish && !S.upgrade ? "active" : ""}`;
+    btn.className = `tab ${S.cat === c.id && !S.demolish && !S.upgrade && !S.repair ? "active" : ""}`;
     btn.innerHTML = `<span>${c.icon}</span><span>${c.label}</span>`;
-    btn.addEventListener("click", () => { S.cat = c.id; S.tool = null; S.demolish = false; S.upgrade = false; buildTabs(); renderPalette(); });
+    btn.addEventListener("click", () => { S.cat = c.id; S.tool = null; S.demolish = false; S.upgrade = false; S.repair = false; buildTabs(); renderPalette(); });
     nav.appendChild(btn);
   }
   const clear = document.createElement("button");
   clear.className = `tab clear ${S.demolish ? "active" : ""}`;
   clear.title = "Demolish (half refund)";
   clear.innerHTML = "<span>⛏️</span><span>Clear</span>";
-  clear.addEventListener("click", () => { S.demolish = !S.demolish; S.upgrade = false; S.tool = null; buildTabs(); renderPalette(); });
+  clear.addEventListener("click", () => { S.demolish = !S.demolish; S.upgrade = false; S.repair = false; S.tool = null; buildTabs(); renderPalette(); });
   nav.appendChild(clear);
   const upg = document.createElement("button");
   upg.className = `tab clear ${S.upgrade ? "active" : ""}`;
   upg.title = "Upgrade in place: palisade → rampart, house → walawwa (drag along walls)";
   upg.innerHTML = "<span>⬆️</span><span>Upgrade</span>";
-  upg.addEventListener("click", () => { S.upgrade = !S.upgrade; S.demolish = false; S.tool = null; buildTabs(); renderPalette(); });
+  upg.addEventListener("click", () => { S.upgrade = !S.upgrade; S.demolish = false; S.repair = false; S.tool = null; buildTabs(); renderPalette(); });
   nav.appendChild(upg);
+  const rep = document.createElement("button");
+  rep.className = `tab clear ${S.repair ? "active" : ""}`;
+  rep.title = "Repair damaged buildings for part of their cost (drag along walls)";
+  rep.innerHTML = "<span>🔧</span><span>Repair</span>";
+  rep.addEventListener("click", () => { S.repair = !S.repair; S.demolish = false; S.upgrade = false; S.tool = null; buildTabs(); renderPalette(); });
+  nav.appendChild(rep);
 }
 
 function affordable(cost) {
   return Object.entries(cost).every(([k, v]) => S[k] >= v);
 }
 
+// Pola orders: two thresholds the market's trader follows.
+function marketCard(pal) {
+  const m = S.market || (S.market = { sell: 30, buy: 0 });
+  const c = document.createElement("div");
+  c.className = "card wide";
+  c.title = "The market's trader sells 5 rice for 8 gold above the first level, and buys 5 timber or stone for 12 gold below the second.";
+  c.innerHTML = `<div class="card-head">⚖️ Pola orders</div><div class="card-desc">
+    <span>Sell 🍚 above</span><button class="btn" data-m="sell,-10">−</button><b>${m.sell}</b><button class="btn" data-m="sell,10">+</button>
+    <span>Buy 🪵🪨 below</span><button class="btn" data-m="buy,-10">−</button><b>${m.buy}</b><button class="btn" data-m="buy,10">+</button></div>`;
+  c.querySelectorAll("[data-m]").forEach(b => b.addEventListener("click", () => {
+    const [k, d] = b.dataset.m.split(",");
+    m[k] = clamp(m[k] + Number(d), 0, k === "sell" ? 500 : 300);
+    renderPalette();
+  }));
+  pal.appendChild(c);
+}
+
 function renderPalette() {
   const pal = document.getElementById("palette");
   pal.innerHTML = "";
-  if (S.cat === "realm") {
+  if (S.cat === "realm" && S.L.sandbox) {
+    if (count("market")) marketCard(pal);
+    S.raidEdge = S.raidEdge || "east";
+    const card = (html, onClick) => { const c = document.createElement("div"); c.className = "card wide"; c.innerHTML = html; pal.appendChild(c); onClick(c); };
+    card(`<div class="card-head">🚩 Raid edge</div><div class="card-desc">${["north", "east", "south", "west"].map(e => `<button class="btn ${S.raidEdge === e ? "primary" : ""}" data-edge="${e}">${e}</button>`).join(" ")}</div>`,
+      c => c.querySelectorAll("[data-edge]").forEach(b => b.addEventListener("click", () => { S.raidEdge = b.dataset.edge; renderPalette(); })));
+    card(`<div class="card-head">⚔️ Send a raid</div><div class="card-desc">${Object.entries(RAID_SIZES).map(([k, n]) => `<button class="btn" data-size="${k}">${k} (${n})</button>`).join(" ")}</div>`,
+      c => c.querySelectorAll("[data-size]").forEach(b => b.addEventListener("click", () => { sendRaid(b.dataset.size, S.raidEdge); syncHud(); })));
+    card(`<div class="card-head">🏺 Royal stores</div><div class="card-desc"><button class="btn" id="sbFill">+500 of everything</button> <button class="btn" id="sbSeason">Change season</button></div>`, c => {
+      c.querySelector("#sbFill").addEventListener("click", () => { for (const k of Object.keys(RES)) S[k] += 500; syncHud(); });
+      c.querySelector("#sbSeason").addEventListener("click", () => { S.seasonLeft = 1; tick(); });
+    });
+  } else if (S.cat === "realm") {
+    if (count("market")) marketCard(pal);
     for (const [id, e] of Object.entries(EDICTS)) {
       if (!S.unlocked.edicts.has(id)) continue;
       const why = edictBlocked(id);
@@ -1306,7 +1467,7 @@ function renderPalette() {
       card.dataset.build = id;
       card.title = b.desc;
       card.innerHTML = `<div class="card-head">${b.icon} ${b.name}</div><div class="card-desc">${b.desc}</div><div class="card-cost">${costText(buildCost(b))}</div>`;
-      card.addEventListener("click", () => { S.tool = S.tool === id ? null : id; S.demolish = false; S.upgrade = false; buildTabs(); renderPalette(); });
+      card.addEventListener("click", () => { S.tool = S.tool === id ? null : id; S.demolish = false; S.upgrade = false; S.repair = false; buildTabs(); renderPalette(); });
       pal.appendChild(card);
     }
   }
@@ -1316,6 +1477,7 @@ function renderPalette() {
 
 function updateAffordability() {
   for (const card of document.querySelectorAll("#palette .card")) {
+    if (!card.dataset.edict && !card.dataset.troop && !card.dataset.build) continue; // sandbox controls
     if (card.dataset.edict) { card.classList.toggle("poor", !!edictBlocked(card.dataset.edict) && !edictOn(card.dataset.edict)); continue; }
     const cost = card.dataset.troop ? troopCost(card.dataset.troop) : buildCost(BUILDINGS[card.dataset.build]);
     card.classList.toggle("poor", !affordable(cost));
@@ -1410,7 +1572,7 @@ function syncHud() {
   document.getElementById("pauseBtn").disabled = S.mode !== "play";
   document.getElementById("speedBtn").textContent = `⏩ ${S.speed}×`;
   // decree cards show live timers; building costs change while rajakariya runs
-  if (S.cat === "realm" || (S.cat !== "army" && S.lastDiscount !== edictOn("rajakariya"))) { S.lastDiscount = edictOn("rajakariya"); renderPalette(); }
+  if ((S.cat === "realm" && !S.L.sandbox) || (S.cat !== "army" && S.cat !== "realm" && S.lastDiscount !== edictOn("rajakariya"))) { S.lastDiscount = edictOn("rajakariya"); renderPalette(); }
   else updateAffordability();
 }
 
@@ -1430,6 +1592,7 @@ function spawnFloat(text, gx, gy, color) {
 
 function describe(b) {
   const lines = [`<b>${b.def.icon} ${b.def.name}</b>`, `HP ${Math.ceil(b.hp)}/${b.maxHp}`];
+  if (S.repair) lines.push(b.hp < b.maxHp ? `🔧 Repair: ${costText(repairCost(b)) || "free"}` : "Undamaged");
   if (S.upgrade) lines.push(b.def.upgrade ? `⬆️ ${BUILDINGS[b.def.upgrade.to].name}: ${costText(b.def.upgrade.cost)}` : "No upgrade");
   if (b.fire > 0) lines.push(`🔥 On fire (${b.fire >= 2 ? "raging" : "burning"}). Villagers are carrying water.`);
   if (b.def.worker) lines.push(b.worker ? (b.id === "pansala" ? (b.worker.alms ? "The monk is on his alms round" : "The monk is in meditation") : "Staffed") : "💤 No villager free. Build houses.");
@@ -1487,6 +1650,12 @@ function showMenu() {
           <div class="lc-era">Random map, everything unlocked</div>
           <div class="lc-stars">Best: ${progress.skirmishBest || 0} raids</div>
         </button>
+        <button class="level-card" id="sandboxCard">
+          <div class="lc-num">Sandbox</div>
+          <div class="lc-name">Royal sandbox</div>
+          <div class="lc-era">Full stores; send raids yourself</div>
+          <div class="lc-stars">🏗️</div>
+        </button>
       </div>
       <details class="how">
         <summary>How to play</summary>
@@ -1499,10 +1668,11 @@ function showMenu() {
           <li>Finish every objective and survive every raid to win. Stars depend on how much of the citadel is left standing.</li>
         </ul>
       </details>
-      ${S && S.mode === "menu" ? `<div class="actions"><button class="btn primary" id="resumeBtn">▶ Resume ${S.L.skirmish ? "skirmish" : `level ${S.idx + 1}`}</button></div>` : ""}
+      ${S && S.mode === "menu" ? `<div class="actions"><button class="btn primary" id="resumeBtn">▶ Resume ${S.L.sandbox ? "sandbox" : S.L.skirmish ? "skirmish" : `level ${S.idx + 1}`}</button></div>` : ""}
     </div>`;
   overlay.querySelectorAll(".level-card[data-level]").forEach(btn => btn.addEventListener("click", () => startLevel(Number(btn.dataset.level))));
   document.getElementById("skirmishCard").addEventListener("click", () => startSkirmish());
+  document.getElementById("sandboxCard").addEventListener("click", () => startSandbox());
   const cont = document.getElementById("continueBtn");
   if (cont) cont.addEventListener("click", continueRun);
   const resume = document.getElementById("resumeBtn");
@@ -1515,7 +1685,7 @@ function showBriefing() {
   const unlocks = [...(L.unlocks.buildings || []).map(id => BUILDINGS[id].name), ...(L.unlocks.troops || []).map(id => TROOPS[id].name)];
   overlay.innerHTML = `
     <div class="card-screen">
-      <div class="lc-num">${L.skirmish ? "Skirmish" : `Level ${S.idx + 1}`} · ${L.era}</div>
+      <div class="lc-num">${L.sandbox ? "Sandbox" : L.skirmish ? "Skirmish" : `Level ${S.idx + 1}`} · ${L.era}</div>
       <h2>${L.name}</h2>
       <p>${L.intro}</p>
       <b>Objectives</b>
@@ -1610,7 +1780,7 @@ canvas.addEventListener("mousemove", e => {
   }
   const g = screenToGrid(x, y);
   input.hover = { gx: g.gx, gy: g.gy, x: sx, y: sy };
-  if (input.painting && (S.tool || S.upgrade)) paintTo(g.gx, g.gy);
+  if (input.painting && (S.tool || S.upgrade || S.repair)) paintTo(g.gx, g.gy);
   if (input.drag) { input.drag.x2 = x; input.drag.y2 = y; }
   updateTooltip();
 });
@@ -1620,7 +1790,7 @@ function paintTo(gx, gy) {
   let [x, y] = input.lastPaint.split(",").map(Number);
   while (x !== gx || y !== gy) {
     if (Math.abs(gx - x) >= Math.abs(gy - y)) x += Math.sign(gx - x); else y += Math.sign(gy - y);
-    if (S.upgrade) upgradeAt(x, y, true); else tryBuild(x, y, true);
+    if (S.upgrade) upgradeAt(x, y, true); else if (S.repair) repairAt(x, y, true); else tryBuild(x, y, true);
   }
   input.lastPaint = `${gx},${gy}`;
 }
@@ -1646,8 +1816,8 @@ canvas.addEventListener("mousedown", e => {
       return;
     }
     if (S.demolish) { demolishAt(g.gx, g.gy); return; }
-    if (S.upgrade) {
-      upgradeAt(g.gx, g.gy);
+    if (S.upgrade || S.repair) {
+      if (S.upgrade) upgradeAt(g.gx, g.gy); else repairAt(g.gx, g.gy);
       input.painting = true; input.lastPaint = `${g.gx},${g.gy}`;
       return;
     }
@@ -1660,8 +1830,8 @@ canvas.addEventListener("mousedown", e => {
     }
     input.drag = { x1: x, y1: y, x2: x, y2: y };
   } else if (e.button === 2) {
-    if (S.tool || S.demolish || S.upgrade) {
-      S.tool = null; S.demolish = false; S.upgrade = false;
+    if (S.tool || S.demolish || S.upgrade || S.repair) {
+      S.tool = null; S.demolish = false; S.upgrade = false; S.repair = false;
       buildTabs(); renderPalette();
       return;
     }
@@ -1712,13 +1882,38 @@ window.addEventListener("keydown", e => {
     e.preventDefault();
     togglePause();
   } else if (k === "escape") {
-    S.tool = null; S.demolish = false; S.upgrade = false;
+    S.tool = null; S.demolish = false; S.upgrade = false; S.repair = false;
     for (const u of S.units) u.sel = false;
     buildTabs(); renderPalette();
   } else if (k === "c") {
     centerCamera();
+  } else if (/^Digit[1-9]$/.test(e.code)) {
+    controlGroup(Number(e.code.slice(5)), e.ctrlKey || e.metaKey || e.shiftKey);
+    e.preventDefault();
   }
 });
+
+// Control groups: Ctrl/Shift+1..9 stores the selected soldiers, 1..9 selects
+// them again, pressing the same number twice centres the camera on them.
+const lastGroupKey = { n: 0, at: 0 };
+function controlGroup(n, assign) {
+  S.groups = S.groups || {};
+  if (assign) {
+    const sel = S.units.filter(u => u.team === "p" && u.sel).map(u => u.uid);
+    S.groups[n] = sel;
+    spawnFloat(`Group ${n}: ${sel.length}`, S.citadel.gx + 1, S.citadel.gy, "#bff0a8");
+    return;
+  }
+  const ids = new Set(S.groups[n] || []);
+  const members = S.units.filter(u => u.team === "p" && ids.has(u.uid));
+  if (!members.length) return;
+  for (const u of S.units) u.sel = ids.has(u.uid) && u.team === "p";
+  const now = performance.now();
+  if (lastGroupKey.n === n && now - lastGroupKey.at < 400) {
+    centerCamera(members.reduce((a, u) => a + u.gx, 0) / members.length, members.reduce((a, u) => a + u.gy, 0) / members.length);
+  }
+  lastGroupKey.n = n; lastGroupKey.at = now;
+}
 
 function togglePause() {
   if (!S || S.mode !== "play") return;

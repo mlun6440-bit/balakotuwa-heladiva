@@ -697,9 +697,9 @@ function drawRock(x, y) {
 function drawHoverTile() {
   const h = input.hover;
   if (S.tool || !inb(h.gx, h.gy) || S.mode !== "play") return;
-  if (S.upgrade) {
+  if (S.upgrade || S.repair) {
     const b = buildingAt(h.gx, h.gy);
-    const ok = b && typeof upgradeBlocked === "function" && !upgradeBlocked(b);
+    const ok = b && (S.repair ? b.hp < b.maxHp && !(b.fire > 0) && affordable(repairCost(b)) : !upgradeBlocked(b));
     if (b) diamond(b.gx, b.gy, b.w, b.h, 0, ok ? "rgba(233,185,73,0.25)" : "rgba(255,90,70,0.2)", ok ? "rgba(255,215,110,0.95)" : "rgba(255,90,70,0.9)");
     else diamond(h.gx, h.gy, 1, 1, 0, null, "rgba(233,185,73,0.5)");
     return;
@@ -710,6 +710,13 @@ function drawHoverTile() {
 // ==================== GROUND-LEVEL STRUCTURES ====================
 function drawGround(b, now) {
   const { gx, gy, w, h } = b;
+  if (b.id === "thorn") {
+    if (!drawSprite(`thorn.${b.uid % 2}`, gx, gy)) {
+      ctx.strokeStyle = "#6b5a3a"; ctx.lineWidth = 0.8;
+      for (let i = 0; i < 18; i++) { const p = iso(gx + 0.15 + hash(b.uid, i) * 0.7, gy + 0.15 + hash(i, b.uid) * 0.7, 0); ctx.beginPath(); ctx.moveTo(p.x, p.y); ctx.lineTo(p.x + (hash(i, 3) - 0.5) * 8, p.y - 3 - hash(i, 4) * 6); ctx.stroke(); }
+    }
+    return;
+  }
   if (hasSprite("wewa.base")) {
     if (b.id === "wewa") return drawWewaSprite(b, now);
     if (b.id === "canal" || b.id === "sluice") return drawCanalSprite(b, now);
@@ -1528,11 +1535,12 @@ function drawUnit(u, now) {
 function drawShots() {
   for (const s of S.shots) {
     const k = s.t / s.dur;
-    const x = s.sx + (s.target.gx - s.sx) * k, y = s.sy + (s.target.gy - s.sy) * k;
+    const tgx = s.target.gx + (s.ox || 0), tgy = s.target.gy + (s.oy || 0);
+    const x = s.sx + (tgx - s.sx) * k, y = s.sy + (tgy - s.sy) * k;
     const z = s.sz * (1 - k) + 10 * k + Math.sin(k * Math.PI) * 26;
     const p = iso(x, y, z);
     const k2 = Math.min(1, k + 0.05);
-    const q = iso(s.sx + (s.target.gx - s.sx) * k2, s.sy + (s.target.gy - s.sy) * k2, s.sz * (1 - k2) + 10 * k2 + Math.sin(k2 * Math.PI) * 26);
+    const q = iso(s.sx + (tgx - s.sx) * k2, s.sy + (tgy - s.sy) * k2, s.sz * (1 - k2) + 10 * k2 + Math.sin(k2 * Math.PI) * 26);
     const a = Math.atan2(q.y - p.y, q.x - p.x);
     line({ x: p.x - Math.cos(a) * 6, y: p.y - Math.sin(a) * 6 }, p, "#e8dcb0", 1.4);
     if (s.fire) {
