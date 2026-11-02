@@ -33,21 +33,27 @@ off here when they ship.
 
 ## Ideas from Sri Lankan history (gameplay)
 
-Researched themes that fit the water loop; each should stay a data row or a
-small system, not a copy of any other game's mechanic.
+Researched themes that fit the water loop; each stays a data row or a small
+system, not a copy of any other game's mechanic.
 
-- [ ] **Rajakariya.** Villagers owe the king days of labour: a seasonal
-      "call-up" that speeds wewa and wall building at a harmony cost.
-- [ ] **"Not one drop to the sea."** Parakramabahu's maxim as a scored goal:
-      bonus stars for water stored versus rain that ran off.
-- [ ] **Cascading tanks (ellangawa).** Wewas linked uphill to downhill share
-      overflow, so building order along a valley matters.
-- [ ] **Perahera.** A festival you can hold once per Maha for a large harmony
-      boost, paid in rice and gold, with an elephant procession.
-- [ ] **Hill-country ambush.** Kandyan forest defence: soldiers hidden in
-      forest tiles strike first; raiders slow down in thick jungle.
-- [ ] **Dagoba relic and monks.** A monastery building whose monks raise
-      harmony and teach (faster soldier training).
+- [x] **Rajakariya.** 👑 Decrees tab (`EDICTS` in `data.js`): for 30s villagers
+      work 60% faster, fields grow 50% faster and buildings cost 30% less
+      timber and stone; harmony −8; once per season (level 2+).
+- [x] **"Not one drop to the sea."** Rain caught vs. lost to overflow is
+      tracked; objective type `catch` on Sea of Parakrama; three stars there
+      need 70% of the rain kept; shown on the end screen.
+- [x] **Cascading tanks (ellangawa).** A full wewa spills into the emptiest
+      wewas on its canal network instead of losing the rain.
+      Follow-up: true uphill/downhill order once terrain has real elevation.
+- [x] **Perahera.** Once per Maha (level 4+): rice and gold for 60s of
+      harmony climbing towards +25, with a procession of tuskers, dancers and
+      torch-bearers around the citadel.
+- [x] **Hill-country ambush.** Raiders slow to 70% in thick jungle; soldiers in
+      forest are hidden beyond 1.5 tiles and their first strike does double
+      damage.
+- [x] **Pansala and monks.** Monastery building with a monk worker (alms
+      rounds); +5 harmony each (two count) and 25% cheaper soldiers.
+      Follow-up: monks could also calm fear after a raid.
 
 ## Later
 

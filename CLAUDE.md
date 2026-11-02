@@ -17,7 +17,7 @@ Read this before changing the game. It is written so that any future model
 
 Three classic scripts sharing globals, loaded in this order:
 
-1. `data.js`: pure data tables (`BUILDINGS`, `TROOPS`, `FOES`, `LEVELS`, `TUTORIAL`, `SEASONS`).
+1. `data.js`: pure data tables (`BUILDINGS`, `TROOPS`, `FOES`, `EDICTS`, `LEVELS`, `TUTORIAL`, `SEASONS`).
 2. `game.js`: state `S`, simulation, pathfinding, water, HUD, input, boot.
    Boot waits for `DOMContentLoaded` so `render.js` is present.
 3. `render.js`: every pixel. Only cosmetic state is written here: `S.fx`
@@ -39,6 +39,11 @@ Key invariants:
   wall-clock time for gameplay, only for animation.
 - The one-second economy runs in `tick()`. Per-frame movement runs in `step(dt)`.
 - Workers exist only while there are villagers to staff them (`staff()`).
+- Water: Maha rain fills each wewa (`RAIN`/s); overflow cascades to other
+  wewas on the same canal network, and only what none can hold is counted in
+  `S.rain.lost`.
+- `S.cover` (forest cover per tile) is refreshed in `tick()`; use `inCover(u)`
+  rather than counting trees.
 - `b.at` is the simulation time a building was placed; the renderer uses it
   for the cosmetic construction animation only.
 - Coordinates: grid `gx, gy` (floats for movers); `iso()` maps to world pixels
@@ -54,7 +59,11 @@ Key invariants:
 - **New troop or raider:** add a row to `TROOPS`/`FOES`, and a look in `drawUnit`.
   Waves reference raider ids by key (`{ raider: 4, bowman: 1 }`).
 - **New level:** append to `LEVELS`. Objective types: `res`, `build`, `water`,
-  `harmony`, `pop`, `waves` (always include `waves`).
+  `catch` (rain caught; three stars then need 70% kept), `harmony`, `pop`,
+  `waves` (always include `waves`). Unlock decrees with `unlocks.edicts`.
+- **New decree:** add a row to `EDICTS` (`cost`, `once: "season" | "maha"`,
+  `dur`, `harmony`), unlock it in a level, and read its effect where it
+  applies with `edictOn(id)` (see `workMult`, `buildCost`, the harmony target).
 - **Painted art:** add an `ART.add(key, draw, opts)` model in `tools/art/`
   (origin = footprint top corner for buildings, ground point for units and
   props), run `node tools/bake.mjs`, and draw it with `drawSprite(key, gx, gy)`.

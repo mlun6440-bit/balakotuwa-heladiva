@@ -26,6 +26,10 @@ The sprite art is original, modelled in code under `tools/art/` and baked into
 - **Sluice gates.** Click a sluice to flood its canal network. Raiders wading through floodwater slow down and drown, but the water comes out of your wewas.
 - **Villagers.** They staff farms, woodcutters, quarries and markets. Every soldier you train costs one villager. Houses raise the population cap.
 - **Harmony.** It rises with a full granary and dagobas, and falls with hunger and destruction. New families settle only at 45 or above.
+- **Cascading tanks.** A full wewa spills its rain into the other wewas on its canal network. On Sea of Parakrama, keep 70% of the rain for three stars: "let not one drop reach the sea unused".
+- **Royal decrees (👑).** *Rajakariya*, the king's labour service, speeds up work and makes building cheaper for a harmony cost. A *Perahera* festival in Maha lifts harmony with a procession of tuskers and torch-bearers.
+- **Pansala.** A monk walks alms rounds; a staffed monastery raises harmony and makes soldiers cheaper.
+- **Forest ambush.** Raiders slow down in thick jungle. Soldiers hidden in the forest can't be seen from afar and strike first for double damage.
 - **Raiders.** They follow the cheapest path to the citadel. They walk around walls when there is a gap and break through when there isn't.
 
 ## Campaign
@@ -33,9 +37,9 @@ The sprite art is original, modelled in code under `tools/art/` and baked into
 | # | Level | Era | New |
 |---|-------|-----|-----|
 | 1 | Dawn at Anuradhapura | Early kingdom | Core economy, palisades, archers, spearmen |
-| 2 | The Dry Zone | Rajarata | Sluice gates, watchtowers |
+| 2 | The Dry Zone | Rajarata | Sluice gates, watchtowers, pansala, rajakariya |
 | 3 | Lion Rock | Sigiriya | Ramparts, gates, market, Angampora fighters |
-| 4 | Sea of Parakrama | Polonnaruwa | Dagoba, war elephants, ram bearers |
+| 4 | Sea of Parakrama | Polonnaruwa | Dagoba, war elephants, ram bearers, perahera, rain-catch goal |
 | 5 | Hill Kingdom | Senkadagala | Raids from three sides |
 
 Progress and star ratings are saved in the browser.
