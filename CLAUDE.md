@@ -17,10 +17,18 @@ Read this before changing the game. It is written so that any future model
 
 Three classic scripts sharing globals, loaded in this order:
 
-1. `data.js`: pure data tables (`BUILDINGS`, `TROOPS`, `FOES`, `LEVELS`, `TUTORIAL`, `SEASONS`).
+1. `data.js`: pure data tables (`BUILDINGS`, `TROOPS`, `FOES`, `EDICTS`, `LEVELS`, `TUTORIAL`, `SEASONS`).
 2. `game.js`: state `S`, simulation, pathfinding, water, HUD, input, boot.
    Boot waits for `DOMContentLoaded` so `render.js` is present.
-3. `render.js`: every pixel. Only cosmetic state (`S.fx`) is written here.
+3. `render.js`: every pixel. Only cosmetic state is written here: `S.fx`
+   particles plus render-local caches (terrain, shadow layer, footpaths,
+   ruins, gait/facing, ambient animals). The simulation never reads them.
+
+Art is baked offline: `tools/art/*.js` model every sprite in grid space and
+`node tools/bake.mjs` writes `assets/atlas*.png` + `assets/atlas.js` (loaded
+by `index.html` before `render.js`). Each `draw*` function tries the sprite
+first and falls back to procedural drawing, so the game runs without the
+atlas. Re-run the bake after changing anything under `tools/art/`.
 
 Key invariants:
 
@@ -31,6 +39,13 @@ Key invariants:
   wall-clock time for gameplay, only for animation.
 - The one-second economy runs in `tick()`. Per-frame movement runs in `step(dt)`.
 - Workers exist only while there are villagers to staff them (`staff()`).
+- Water: Maha rain fills each wewa (`RAIN`/s); overflow cascades to other
+  wewas on the same canal network, and only what none can hold is counted in
+  `S.rain.lost`.
+- `S.cover` (forest cover per tile) is refreshed in `tick()`; use `inCover(u)`
+  rather than counting trees.
+- `b.at` is the simulation time a building was placed; the renderer uses it
+  for the cosmetic construction animation only.
 - Coordinates: grid `gx, gy` (floats for movers); `iso()` maps to world pixels
   at zoom 1; `view.zoom`/`view.dpr` are applied by canvas transform only.
 
@@ -44,9 +59,21 @@ Key invariants:
 - **New troop or raider:** add a row to `TROOPS`/`FOES`, and a look in `drawUnit`.
   Waves reference raider ids by key (`{ raider: 4, bowman: 1 }`).
 - **New level:** append to `LEVELS`. Objective types: `res`, `build`, `water`,
-  `harmony`, `pop`, `waves` (always include `waves`).
-- **Painted art:** load an image into `SPRITES[key]` (see top of `render.js`).
-  Procedural drawing is the fallback, so art can be swapped in piece by piece.
+  `catch` (rain caught; three stars then need 70% kept), `harmony`, `pop`,
+  `waves` (always include `waves`). Unlock decrees with `unlocks.edicts`.
+- **New decree:** add a row to `EDICTS` (`cost`, `once: "season" | "maha"`,
+  `dur`, `harmony`), unlock it in a level, and read its effect where it
+  applies with `edictOn(id)` (see `workMult`, `buildCost`, the harmony target).
+- **Painted art:** add an `ART.add(key, draw, opts)` model in `tools/art/`
+  (origin = footprint top corner for buildings, ground point for units and
+  props), run `node tools/bake.mjs`, and draw it with `drawSprite(key, gx, gy)`.
+  Key conventions: building id (`house.0..2`, `gate.a|b`, `palisade.c|px|nx|py|ny`),
+  `canal.<mask>`, `paddy.<w|d><0..4>`, `tree.<kind>.<season>.<v>`,
+  `u.<type>.<f|b>.<w0..w5|i0|a0..a2>` (render mirrors for the other two
+  directions), `<key>#sh` for the baked shadow. Preview a model with
+  `node tools/bake.mjs --preview <keyPrefix> out.png 6 240 3`.
+  Follow `tools/art/ARTSTYLE.md` (palette, light, originality).
+- A hand-made image can still go straight into `SPRITES[key] = { img, ax, ay, scale }`.
 
 ## Checking a change
 
@@ -58,6 +85,9 @@ for (const lv of LEVELS.keys()) { startLevel(lv); document.getElementById('begin
   const errs = []; try { for (let i = 0; i < 18000 && S.mode === 'play'; i++) { step(0.05); if (i % 40 === 0) render(performance.now()); } }
   catch (e) { errs.push(e.stack); } console.log(lv + 1, S.mode, Math.round(S.time), errs); }
 ```
+
+`node tools/shoot.mjs docs/screens/check --smoke` runs the same smoke test in
+headless Chromium and saves screenshots of a sample town in both seasons.
 
 Then play level 1 by hand for a minute: build, paint canals, open a sluice,
 train a soldier, zoom and pan.

@@ -63,19 +63,76 @@ function costText(cost) {
 function loadProgress() {
   try {
     const p = JSON.parse(localStorage.getItem(SAVE_KEY));
-    if (p && typeof p.unlocked === "number") return { unlocked: p.unlocked, stars: p.stars || {} };
+    if (p && typeof p.unlocked === "number") return { unlocked: p.unlocked, stars: p.stars || {}, skirmishBest: p.skirmishBest || 0 };
   } catch (e) { /* storage blocked or corrupt: start fresh */ }
-  return { unlocked: 0, stars: {} };
+  return { unlocked: 0, stars: {}, skirmishBest: 0 };
 }
 function saveProgress() {
   try { localStorage.setItem(SAVE_KEY, JSON.stringify(progress)); } catch (e) { /* ignore */ }
+}
+
+// ==================== SAVE A RUN ====================
+// The level in progress is saved to localStorage (every 15s of play, when the
+// tab is hidden or closed, and when the menu opens) and can be continued from
+// the menu. Only primary state is stored; everything derived (occupancy, flow
+// field, water networks, cover, staffing) is rebuilt by refreshWorld().
+const RUN_KEY = "balakotuwa.run.v1";
+const RUN_SKIP = new Set(["L", "tiles", "trees", "unlocked", "buildings", "occ", "workers", "units", "shots", "floats", "nets",
+  "netOf", "flooded", "flow", "citadel", "cover", "fx", "tool", "demolish", "upgrade", "mode", "paused"]);
+const plain = v => v === null || typeof v !== "object" || Array.isArray(v) || Object.getPrototypeOf(v) === Object.prototype;
+
+function saveRun() {
+  if (!S || (S.mode !== "play" && S.mode !== "menu")) return;
+  const st = {};
+  for (const [k, v] of Object.entries(S)) if (!RUN_SKIP.has(k) && plain(v)) st[k] = v;
+  const r3 = v => Math.round(v * 1000) / 1000;
+  const data = {
+    v: 1, idx: S.idx, saved: Date.now(), name: levelTitle(),
+    L: S.L.skirmish ? { ...S.L, all: undefined } : null, st,
+    trees: S.trees.map(t => [r3(t.gx), r3(t.gy), r3(t.stage)]),
+    buildings: S.buildings.map(b => ({ uid: b.uid, id: b.id, gx: b.gx, gy: b.gy, hp: b.hp, maxHp: b.maxHp, water: b.water, growth: b.growth,
+      open: b.open, next: b.next, at: b.at, fire: b.fire, irrigated: b.irrigated })),
+    units: S.units.map(u => ({ uid: u.uid, team: u.team, type: u.type, gx: r3(u.gx), gy: r3(u.gy), tx: u.tx, ty: u.ty, hp: u.hp, maxHp: u.maxHp,
+      last: u.last, z: u.z, ordered: u.ordered, lastFire: u.lastFire }))
+  };
+  try { localStorage.setItem(RUN_KEY, JSON.stringify(data)); } catch (e) { /* storage full or blocked */ }
+  S.lastSave = S.time;
+}
+
+function savedRun() {
+  try { const d = JSON.parse(localStorage.getItem(RUN_KEY)); return d && d.v === 1 ? d : null; } catch (e) { return null; }
+}
+function clearRun() { try { localStorage.removeItem(RUN_KEY); } catch (e) { /* ignore */ } }
+
+function continueRun() {
+  const d = savedRun();
+  if (!d) return false;
+  const custom = d.L ? { ...d.L, all: unlockedFor(LEVELS.length - 1) } : null;
+  startLevel(d.idx, "idle", custom);
+  Object.assign(S, d.st);
+  S.trees = d.trees.map(([gx, gy, stage]) => ({ gx, gy, stage, reserved: false }));
+  S.buildings = d.buildings.map(o => {
+    const def = BUILDINGS[o.id];
+    return { ...o, def, w: def.w, h: def.h, maxHp: o.maxHp || def.hp, worker: null, fire: o.fire || 0 };
+  });
+  S.citadel = S.buildings.find(b => b.id === "citadel");
+  S.units = d.units.map(o => ({ ...o, def: o.team === "p" ? TROOPS[o.type] : FOES[o.type], sel: false, lastFire: o.lastFire ?? -9 }));
+  S.workers = []; S.shots = []; S.floats = []; S.fx = [];
+  refreshWorld();
+  updateCover();
+  staff();
+  S.mode = "play"; S.paused = true;
+  overlay.classList.add("hidden");
+  buildTabs(); renderPalette(); syncHud(); centerCamera();
+  say("Welcome back. The kingdom waits, paused: press Space or ▶ Resume.");
+  return true;
 }
 
 // ==================== GLOBAL STATE ====================
 let S = null; // current level state
 let progress = loadProgress();
 // camX/camY are in world pixels at zoom 1; w/h are the viewport in CSS pixels.
-const view = { camX: 0, camY: 0, zoom: 1, w: 0, h: 0, dpr: 1 };
+const view = { camX: 0, camY: 0, zoom: 0.9, w: 0, h: 0, dpr: 1 };
 const input = { hover: { gx: -1, gy: -1, x: 0, y: 0 }, panning: false, panFrom: null, drag: null, painting: false, lastPaint: "" };
 const audio = { on: false, ctx: null };
 
@@ -134,28 +191,66 @@ function genMap(L) {
 
 // ==================== LEVEL SETUP ====================
 function unlockedFor(idx) {
-  const b = new Set(), t = new Set();
+  const b = new Set(), t = new Set(), e = new Set();
   for (let i = 0; i <= idx; i++) {
     (LEVELS[i].unlocks.buildings || []).forEach(x => b.add(x));
     (LEVELS[i].unlocks.troops || []).forEach(x => t.add(x));
+    (LEVELS[i].unlocks.edicts || []).forEach(x => e.add(x));
   }
-  return { buildings: b, troops: t };
+  return { buildings: b, troops: t, edicts: e };
 }
 
-function startLevel(idx, mode = "brief") {
-  const L = LEVELS[idx];
+// ==================== SKIRMISH ====================
+// A seeded random map with every building unlocked and endless raids that
+// grow each time. Survive as many raids as you can.
+function makeSkirmish(seed) {
+  const r = mulberry32(seed), ri = (a, b) => a + Math.floor(r() * (b - a + 1));
+  const edges = ["west", "north", "south", "east"];
+  const riverEdge = edges[ri(0, 2)];
+  const cx = ri(11, 14), cy = ri(11, 14);
+  const away = (x, y) => Math.hypot(x - cx, y - cy) > 6;
+  const rect = (w, h) => { for (;;) { const x = ri(2, MAP - 3 - w), y = ri(2, MAP - 3 - h); if (away(x + w / 2, y + h / 2)) return [x, y, x + w, y + h]; } };
+  const all = unlockedFor(LEVELS.length - 1);
+  return {
+    id: `skirmish-${seed}`, name: "Skirmish", era: `Random map · seed ${seed}`, seed, skirmish: true, endless: true,
+    intro: "A fresh valley and no end to the raiders. Each raid is larger than the last. How long can the Maligawa stand?",
+    citadel: [cx, cy], season: r() < 0.5 ? "maha" : "yala",
+    start: { timber: 150, stone: 80, rice: 100, gold: 150, villagers: 12, arms: 8 },
+    army: { spearman: 3, archer: 2 },
+    rivers: [{ edge: riverEdge, at: ri(0, 2), width: ri(1, 2), wobble: 0.8 + r() * 1.4 }],
+    rocks: Array.from({ length: ri(2, 3) }, () => rect(ri(2, 4), ri(2, 4))),
+    forests: Array.from({ length: ri(3, 5) }, () => [...rect(ri(4, 7), ri(4, 7)), 0.35 + r() * 0.2]),
+    unlocks: {}, all,
+    waves: [0, 1, 2].map(k => skirmishWave(k, seed, riverEdge)),
+    hpScale: 1, objectives: [{ type: "endless" }]
+  };
+}
+function skirmishWave(k, seed, riverEdge) {
+  const r = mulberry32(seed * 31 + k * 977);
+  const edges = ["east", "south", "north", "west"].filter(e => e !== riverEdge);
+  const n = Math.min(edges.length, 1 + Math.floor(k / 3));
+  const from = [...edges].sort(() => r() - 0.5).slice(0, n);
+  return { t: 150 + k * 95, from, raider: 3 + 2 * k, bowman: 1 + Math.floor(k * 0.8), brute: Math.floor(k / 2) };
+}
+const startSkirmish = seed => startLevel(LEVELS.length, "brief", makeSkirmish(seed ?? (Date.now() % 900000) + 1));
+const restartLevel = () => (S.L.skirmish ? startSkirmish(S.L.seed) : startLevel(S.idx));
+const levelTitle = () => (S.L.skirmish ? "Skirmish" : `${S.idx + 1}. ${S.L.name}`);
+
+function startLevel(idx, mode = "brief", custom = null) {
+  const L = custom || LEVELS[idx];
   const { tiles, trees } = genMap(L);
   S = {
     idx, L, tiles, trees,
-    unlocked: unlockedFor(idx),
+    unlocked: custom ? custom.all : unlockedFor(idx),
     buildings: [], occ: [], workers: [], units: [], shots: [], floats: [], spawnQueue: [],
-    timber: L.start.timber, stone: L.start.stone, rice: L.start.rice, gold: L.start.gold,
+    timber: L.start.timber, stone: L.start.stone, rice: L.start.rice, gold: L.start.gold, arms: L.start.arms || 0,
     villagers: L.start.villagers, cap: 0, harmony: 60, fear: 0,
     season: L.season, seasonLeft: SEASONS[L.season].len,
     time: 0, tickAcc: 0, waveClock: 0, nextWave: 0,
     nets: [], netOf: null, flooded: new Set(), flow: null,
     tool: null, demolish: false, cat: "water",
-    paused: true, speed: 1, mode, growAcc: 0, starveAcc: 0, tutorialStep: 0, warnedWave: -1, uid: 0
+    paused: true, speed: 1, mode, growAcc: 0, starveAcc: 0, tutorialStep: 0, warnedWave: -1, uid: 0,
+    seasonNo: 0, edictEnd: {}, edictUsed: {}, rain: { caught: 0, lost: 0, spilled: 0 }
   };
   const [cx, cy] = L.citadel;
   S.citadel = addBuilding("citadel", cx, cy);
@@ -167,6 +262,7 @@ function startLevel(idx, mode = "brief") {
     }
   }
   refreshWorld();
+  updateCover();
   centerCamera();
   buildTabs();
   renderPalette();
@@ -177,7 +273,7 @@ function startLevel(idx, mode = "brief") {
 // ==================== BUILDINGS ====================
 function addBuilding(id, gx, gy) {
   const def = BUILDINGS[id];
-  const b = { uid: ++S.uid, id, def, gx, gy, w: def.w, h: def.h, hp: def.hp, maxHp: def.hp, worker: null, water: 0, growth: 0, open: false, next: 0 };
+  const b = { uid: ++S.uid, id, def, gx, gy, w: def.w, h: def.h, hp: def.hp, maxHp: def.hp, worker: null, water: 0, growth: 0, open: false, next: 0, at: S.time, fire: 0 };
   S.buildings.push(b);
   S.trees = S.trees.filter(t => !(t.gx >= gx && t.gx < gx + def.w && t.gy >= gy && t.gy < gy + def.h));
   return b;
@@ -217,6 +313,15 @@ function canPlace(def, gx, gy) {
   return null;
 }
 
+// Rajakariya makes timber and stone work cheaper while it lasts.
+function buildCost(def) {
+  const d = edictOn("rajakariya") ? EDICTS.rajakariya.buildDiscount : 0;
+  if (!d) return def.cost;
+  const out = {};
+  for (const [k, v] of Object.entries(def.cost)) out[k] = k === "timber" || k === "stone" ? Math.ceil(v * (1 - d)) : v;
+  return out;
+}
+
 function rockNear(gx, gy, w, h, r) {
   for (let y = gy - r; y < gy + h + r; y++) for (let x = gx - r; x < gx + w + r; x++) {
     if (inb(x, y) && S.tiles[y][x].t === "rock") return true;
@@ -228,12 +333,40 @@ function tryBuild(gx, gy, quiet = false) {
   const def = BUILDINGS[S.tool];
   const why = canPlace(def, gx, gy);
   if (why) { if (!quiet) say(why, true); return false; }
-  for (const [k, v] of Object.entries(def.cost)) {
+  const cost = buildCost(def);
+  for (const [k, v] of Object.entries(cost)) {
     if (S[k] < v) { if (!quiet) say(`We need ${v} ${k} for the ${def.name}, and have ${Math.floor(S[k])}.`, true); return false; }
   }
-  for (const [k, v] of Object.entries(def.cost)) S[k] -= v;
+  for (const [k, v] of Object.entries(cost)) S[k] -= v;
   addBuilding(S.tool, gx, gy);
   puff(gx + def.w / 2, gy + def.h / 2, 6, "#b8a07a");
+  refreshWorld();
+  sfx("build");
+  syncHud();
+  return true;
+}
+
+// ==================== UPGRADES ====================
+// Why building b can't be upgraded now, or null.
+function upgradeBlocked(b) {
+  const up = b && b.def.upgrade;
+  if (!up) return b ? `The ${b.def.name} has no upgrade.` : "Nothing to upgrade here.";
+  if (!S.unlocked.buildings.has(up.to)) return `${BUILDINGS[up.to].name} is not known in this region yet.`;
+  if (b.fire > 0) return "Put the fire out first.";
+  if (!affordable(up.cost)) return `Upgrading to ${BUILDINGS[up.to].name} needs ${costText(up.cost)}.`;
+  return null;
+}
+
+// Rebuild in place: same tile, same uid, health kept in proportion.
+function upgradeAt(gx, gy, quiet = false) {
+  const b = buildingAt(gx, gy);
+  const why = upgradeBlocked(b);
+  if (why) { if (!quiet) say(why, true); return false; }
+  const up = b.def.upgrade, def = BUILDINGS[up.to];
+  for (const [k, v] of Object.entries(up.cost)) S[k] -= v;
+  const k = b.hp / b.maxHp;
+  b.id = up.to; b.def = def; b.maxHp = def.hp; b.hp = Math.max(1, Math.round(def.hp * k)); b.at = S.time;
+  puff(b.gx + 0.5, b.gy + 0.5, 6, "#b8a07a");
   refreshWorld();
   sfx("build");
   syncHud();
@@ -379,11 +512,36 @@ function waterSource(b) {
   return null;
 }
 
+const RAIN = 2.4; // water each wewa catches per second of Maha
+
 function tickWater() {
   const maha = S.season === "maha";
+  const spill = new Map(); // network id -> rain a full wewa could not hold
   for (const w of S.buildings) {
     if (w.id !== "wewa") continue;
-    w.water = clamp(w.water + (maha ? 2.4 : -0.3) + (riverBeside(w) ? 1.2 : 0), 0, WEWA_CAP);
+    if (maha) {
+      const add = Math.min(RAIN, WEWA_CAP - w.water);
+      w.water += add; S.rain.caught += add;
+      if (add < RAIN) { const id = S.netOf[w.gy][w.gx]; spill.set(id, (spill.get(id) || 0) + RAIN - add); }
+    } else w.water = Math.max(0, w.water - 0.3);
+    if (riverBeside(w)) w.water = Math.min(WEWA_CAP, w.water + 1.2);
+  }
+  // Ellangawa (cascading tanks): a full wewa spills into the emptiest wewas
+  // on its canal network. Whatever no tank can hold runs off to the sea.
+  for (const [id, amt0] of spill) {
+    let amt = amt0;
+    const ws = id === -1 ? [] : [...S.nets[id].wewas].filter(w => w.water < WEWA_CAP).sort((a, b) => a.water - b.water);
+    for (const w of ws) {
+      const add = Math.min(amt, WEWA_CAP - w.water);
+      w.water += add; amt -= add; S.rain.caught += add; S.rain.spilled += add;
+      if (amt <= 0) break;
+    }
+    S.rain.lost += amt;
+  }
+  if (S.rain.spilled > 0 && !S.warnedCascade) { S.warnedCascade = true; say("A full wewa spills down the canal into the next tank. That is ellangawa: no rain wasted."); }
+  if (S.rain.lost > 20 && !S.warnedSpill && S.L.objectives.some(o => o.type === "catch")) {
+    S.warnedSpill = true;
+    say("Rain is spilling from full wewas to the sea! Link another wewa to them with a canal.", true);
   }
   updateNetWater();
   for (const p of S.buildings) {
@@ -391,7 +549,7 @@ function tickWater() {
     const src = waterSource(p);
     p.irrigated = !!src;
     if (!p.worker || p.growth >= 100) continue;
-    const rate = src ? 4 : maha ? 2 : 0;
+    const rate = (src ? 4 : maha ? 2 : 0) * (edictOn("rajakariya") ? 1.5 : 1);
     p.growth = Math.min(100, p.growth + rate);
     if (src && src !== "river") drainNet(src, 0.4);
   }
@@ -446,6 +604,19 @@ function planJob(w) {
     }
     if (!best) { goTo(w, hx, hy + 0.6, "wait"); w.timer = 3; return; }
     goTo(w, best[0] + 0.5, best[1] + 0.9, "toSite");
+  } else if (w.job === "smith") {
+    // Fetch timber from a store, then forge it into a weapon at the kammala.
+    if (S.timber < 3) { goTo(w, hx, hy + 0.7, "wait"); w.timer = 4; return; }
+    const st = nearestStore(w, "timber");
+    goTo(w, st.gx + st.w / 2, st.gy + st.h + 0.2, "fetch");
+  } else if (w.job === "monk") {
+    // Alternate between the alms round (a house) and meditation at the pansala.
+    const houses = S.buildings.filter(h => h.id === "house");
+    w.alms = !w.alms && houses.length > 0;
+    if (w.alms) {
+      const h = houses[Math.floor(Math.random() * houses.length)];
+      goTo(w, h.gx + 0.5, h.gy + 1.25, "wait"); w.timer = 9;
+    } else goTo(w, hx + 0.3, hy + 1.1, "toSite");
   } else {
     goTo(w, hx + 0.2, hy + 0.3, "toSite");
   }
@@ -470,7 +641,7 @@ function carryHome(w, key, n) {
 function walk(w, dt) {
   const dx = w.tx - w.gx, dy = w.ty - w.gy, d = Math.hypot(dx, dy);
   if (d < 0.08) return true;
-  const step = Math.min(d, 2.0 * terrainMult(w) * dt);
+  const step = Math.min(d, 2.0 * terrainMult(w) * workMult() * dt);
   w.gx += (dx / d) * step; w.gy += (dy / d) * step;
   return false;
 }
@@ -480,17 +651,50 @@ function updateWorker(w, dt) {
     case "plan": planJob(w); break;
     case "wait":
       walk(w, dt);
-      w.timer -= dt;
+      w.timer -= dt * workMult();
       if (w.timer <= 0) planJob(w);
+      break;
+    case "toWater":
+      if (walk(w, dt)) {
+        const src = w.waterSrc || {};
+        if (src.wewa) src.wewa.water = Math.max(0, src.wewa.water - 2);
+        else if (src.net) drainNet(src.net, 2);
+        w.carry = { key: "water", n: 1 };
+        const b = w.fireTarget;
+        if (!b) { if (w.temp) S.workers = S.workers.filter(x => x !== w); else planJob(w); break; }
+        goTo(w, b.gx + b.w / 2, b.gy + b.h + 0.3, "toFire");
+      }
+      break;
+    case "toFire":
+      if (walk(w, dt)) {
+        const b = w.fireTarget;
+        w.carry = null;
+        if (b && S.buildings.includes(b) && b.fire > 0) {
+          b.fire = Math.max(0, b.fire - 1);
+          spawnFloat("💧", w.gx, w.gy, "#9fd8ff");
+          sfx("splash");
+        }
+        if (b && b.fire > 0 && S.buildings.includes(b)) seekWater(w);
+        else { w.fireTarget = null; if (w.temp) S.workers = S.workers.filter(x => x !== w); else planJob(w); }
+      }
+      break;
+    case "fetch":
+      if (walk(w, dt)) {
+        if (S.timber < 3) { planJob(w); break; }
+        S.timber -= 3;
+        w.carry = { key: "timber", n: 3 };
+        goTo(w, w.b.gx + 0.5, w.b.gy + 1.2, "toSite");
+      }
       break;
     case "toSite":
       if (walk(w, dt)) {
-        if (w.job === "woodcutter" || w.job === "mason") { w.phase = "work"; w.timer = w.job === "mason" ? 4.5 : 3.5; }
+        if (w.job === "smith") { w.carry = null; w.phase = "work"; w.timer = 7; }
+        else if (w.job === "woodcutter" || w.job === "mason") { w.phase = "work"; w.timer = w.job === "mason" ? 4.5 : 3.5; }
         else { w.phase = "tend"; w.timer = 6; }
       }
       break;
     case "work":
-      w.timer -= dt;
+      w.timer -= dt * workMult();
       if (w.timer > 0) break;
       if (w.job === "woodcutter") {
         const t = w.target;
@@ -498,6 +702,8 @@ function updateWorker(w, dt) {
         if (!t || !S.trees.includes(t)) { planJob(w); break; }
         t.stage = 0; t.reserved = false;
         carryHome(w, "timber", 5);
+      } else if (w.job === "smith") {
+        carryHome(w, "arms", 1);
       } else {
         carryHome(w, "stone", 4);
       }
@@ -505,11 +711,14 @@ function updateWorker(w, dt) {
     case "tend":
       if (w.job === "farmer") {
         if (w.b.growth >= 100) { w.b.growth = 0; carryHome(w, "rice", 12); }
-      } else if (w.job === "trader") {
+      } else if (w.job === "monk") {
         w.timer -= dt;
+        if (w.timer <= 0) planJob(w);
+      } else if (w.job === "trader") {
+        w.timer -= dt * workMult();
         if (w.timer <= 0) {
           w.timer = 6;
-          if (S.rice > 30) { S.rice -= 5; S.gold += 8; spawnFloat("-5🍚 +8🪙", w.gx, w.gy, "#e9b949"); }
+          if (S.rice > 30) { S.rice -= 5; S.gold += 8; spawnFloat("-5🍚 +8🪙", w.gx, w.gy, "#e9b949"); sfx("coin"); }
         }
       }
       break;
@@ -550,10 +759,29 @@ function edgeSpawn(edge) {
   }
 }
 
+// ==================== FOREST COVER ====================
+// Kandyan hill warfare: raiders struggle through thick jungle, and soldiers
+// hidden among trees are invisible from range and strike first.
+// S.cover[y*MAP+x] = mature trees in the 3×3 block around the tile.
+function updateCover() {
+  const own = new Uint8Array(MAP * MAP), cover = new Uint8Array(MAP * MAP);
+  for (const t of S.trees) if (t.stage >= 60) { const x = Math.floor(t.gx), y = Math.floor(t.gy); if (inb(x, y)) own[y * MAP + x]++; }
+  for (let y = 0; y < MAP; y++) for (let x = 0; x < MAP; x++) {
+    let n = 0;
+    for (let dy = -1; dy <= 1; dy++) for (let dx = -1; dx <= 1; dx++) if (inb(x + dx, y + dy)) n += own[(y + dy) * MAP + x + dx];
+    cover[y * MAP + x] = Math.min(255, n);
+  }
+  S.cover = cover;
+}
+const coverAt = (gx, gy) => { const x = Math.floor(gx), y = Math.floor(gy); return S.cover && inb(x, y) && !S.occ[y][x] ? S.cover[y * MAP + x] : 0; };
+const inCover = u => !u.z && coverAt(u.gx, u.gy) >= 2;
+const AMBUSH_RESET = 4; // seconds without attacking before the next first strike
+
 function terrainMult(u) {
   const x = Math.floor(u.gx), y = Math.floor(u.gy);
   if (!inb(x, y)) return 1;
   if (u.team === "e" && S.flooded.has(y * MAP + x)) return 0.4;
+  if (u.team === "e" && coverAt(u.gx, u.gy) >= 3) return 0.7; // thick jungle
   const t = S.tiles[y][x].t;
   return t === "river" ? 0.55 : t === "rock" ? 0.85 : 1;
 }
@@ -570,6 +798,7 @@ function nearestFoe(u, radius, from = u) {
   for (const v of S.units) {
     if (v.team === u.team || v.hp <= 0) continue;
     const d = Math.hypot(v.gx - from.gx, v.gy - from.gy);
+    if (u.team === "e" && d > 1.5 && inCover(v)) continue; // hidden in the forest
     if (d <= bd) { bd = d; best = v; }
   }
   return best;
@@ -577,6 +806,11 @@ function nearestFoe(u, radius, from = u) {
 
 function attack(u, target, dmg) {
   if (S.time - u.last < 1.0) return;
+  if (u.team === "p" && inCover(u) && S.time - u.last > AMBUSH_RESET) {
+    dmg *= 2;
+    spawnFloat("Ambush!", u.gx, u.gy, "#bff0a8");
+    if (!S.warnedAmbush) { S.warnedAmbush = true; say("Ambush! Soldiers hidden in the forest strike first for double damage, and raiders can't see them from afar."); }
+  }
   u.last = S.time;
   if (u.def.ranged) fireShot(u.gx, u.gy, u.z + 12, target, dmg);
   else hitUnit(target, dmg, u.def.splash);
@@ -618,6 +852,10 @@ function updateFoe(u, dt) {
   }
   const cx = clamp(Math.floor(u.gx), 0, MAP - 1), cy = clamp(Math.floor(u.gy), 0, MAP - 1);
   if (S.occ[cy][cx] === S.citadel || rectDist(u, S.citadel) < 0.45) { hitBuilding(u, S.citadel); return; }
+  if (d.fire && S.time - (u.lastFire ?? -9) > 3.5) {
+    const tb = nearestFlammable(u, d.range);
+    if (tb) { u.lastFire = S.time; u.last = S.time; fireArrow(u, tb); return; }
+  }
   const nxt = nextFlowTile(cx, cy);
   if (!nxt) { moveToward(u, S.citadel.gx + 1, S.citadel.gy + 1, dt); return; }
   const b = S.occ[nxt.y][nxt.x];
@@ -679,7 +917,8 @@ function updateCombat(dt) {
     const s = S.shots[i];
     s.t += dt;
     if (s.t >= s.dur) {
-      if (s.target.hp > 0) s.target.hp -= s.dmg;
+      if (s.fire) ignite(s.fire);
+      else if (s.target.hp > 0) s.target.hp -= s.dmg;
       S.shots.splice(i, 1);
     }
   }
@@ -695,12 +934,114 @@ function updateCombat(dt) {
   }
 }
 
+// ==================== FIRE ====================
+// Raider bowmen loose fire arrows at thatch and timber. Fire grows in the dry
+// season, is beaten down by monsoon rain, spreads to flammable neighbours,
+// and villagers run with water pots from the nearest wewa, canal or river.
+function nearestFlammable(u, range) {
+  let best = null, bd = range;
+  for (const b of S.buildings) {
+    if (!b.def.flammable || b.fire >= 1) continue;
+    const d = rectDist(u, b);
+    if (d <= bd) { bd = d; best = b; }
+  }
+  return best;
+}
+
+function fireArrow(u, b) {
+  const tx = b.gx + b.w / 2, ty = b.gy + b.h / 2;
+  S.shots.push({ sx: u.gx, sy: u.gy, sz: 12, target: { gx: tx, gy: ty, hp: 0 }, dmg: 0, t: 0, dur: Math.max(0.3, Math.hypot(tx - u.gx, ty - u.gy) / 8), fire: b });
+}
+
+function ignite(b) {
+  if (!S.buildings.includes(b) || !b.def.flammable) return;
+  if (!(b.fire > 0)) spawnFloat("🔥 Fire!", b.gx + b.w / 2, b.gy + b.h / 2, "#ffb04a");
+  b.fire = Math.max(b.fire, 1);
+  sfx("fire");
+  if (!S.warnedFire) {
+    S.warnedFire = true;
+    say(S.season === "maha"
+      ? "Fire arrows! The monsoon rain will help, but villagers are running with water pots."
+      : "Fire arrows on the thatch! In Yala it spreads fast. Villagers fetch water from the wewas: keep them full.", true);
+  }
+}
+
+function tickFire() {
+  const maha = S.season === "maha";
+  for (const b of [...S.buildings]) {
+    if (!(b.fire > 0)) continue;
+    b.fire = Math.min(3, b.fire + (maha ? -0.35 : 0.12));
+    if (b.fire <= 0) { b.fire = 0; continue; }
+    if (b.fire >= 1.5) {
+      for (const [x, y] of edgeTiles(b)) {
+        const nb = S.occ[y][x];
+        if (nb && nb !== b && nb.def.flammable && !(nb.fire > 0) && Math.random() < 0.05 * b.fire) ignite(nb);
+      }
+    }
+    damageBuilding(b, 6 * b.fire);
+  }
+  assignFirefighters();
+}
+
+// Three water carriers per fire: idle villagers come out of the citadel
+// first (temporary "bucket" workers), then nearby workers drop their jobs.
+function assignFirefighters() {
+  for (const w of S.workers) {
+    if (w.fireTarget && !(w.fireTarget.fire > 0 && S.buildings.includes(w.fireTarget))) { w.fireTarget = null; w.carry = null; if (!w.temp) planJob(w); }
+  }
+  S.workers = S.workers.filter(w => !w.temp || w.fireTarget);
+  for (const b of S.buildings) {
+    if (!(b.fire > 0)) continue;
+    let have = S.workers.filter(w => w.fireTarget === b).length;
+    const cx = b.gx + b.w / 2, cy = b.gy + b.h / 2;
+    while (have < 3 && idleVillagers() > 0) {
+      const w = { b: S.citadel, job: "bucket", temp: true, gx: S.citadel.gx + 1, gy: S.citadel.gy + 2.2, tx: 0, ty: 0, phase: "plan", timer: 0, carry: null, target: null, fireTarget: b };
+      S.workers.push(w); have++;
+      seekWater(w);
+    }
+    const free = S.workers.filter(w => !w.fireTarget && w.b !== b && Math.hypot(w.gx - cx, w.gy - cy) < 11)
+      .sort((p, q) => Math.hypot(p.gx - cx, p.gy - cy) - Math.hypot(q.gx - cx, q.gy - cy));
+    for (const w of free) {
+      if (have >= 3) break;
+      if (w.target && w.target.reserved) w.target.reserved = false;
+      w.target = null; w.carry = null; w.fireTarget = b; have++;
+      seekWater(w);
+    }
+  }
+}
+
+function nearestWater(w) {
+  let best = null, bd = Infinity;
+  const consider = (x, y, src) => { const d = Math.hypot(x - w.gx, y - w.gy); if (d < bd) { bd = d; best = { x, y, ...src }; } };
+  for (const b of S.buildings) {
+    if (b.id === "wewa" && b.water >= 2) consider(b.gx + 1, b.gy + 2.25, { wewa: b });
+    else if (b.def.water && b.id !== "wewa") { const id = S.netOf[b.gy][b.gx]; if (id !== -1 && S.nets[id].water >= 2) consider(b.gx + 0.5, b.gy + 0.5, { net: S.nets[id] }); }
+  }
+  for (let y = 0; y < MAP; y++) for (let x = 0; x < MAP; x++) {
+    if (S.tiles[y][x].t !== "river") continue;
+    for (const [dx, dy] of DIRS4) if (inb(x + dx, y + dy) && S.tiles[y + dy][x + dx].t !== "river") { consider(x + 0.5 + dx * 0.45, y + 0.5 + dy * 0.45, {}); break; }
+  }
+  return best;
+}
+
+function seekWater(w) {
+  const src = nearestWater(w);
+  if (!src) { w.fireTarget = null; if (w.temp) S.workers = S.workers.filter(x => x !== w); else planJob(w); return; }
+  w.waterSrc = src;
+  goTo(w, src.x, src.y, "toWater");
+}
+
 // ==================== RAIDS ====================
 const nextWaveIn = () => (S.nextWave < S.L.waves.length ? S.L.waves[S.nextWave].t - S.waveClock : Infinity);
 const foesAlive = () => S.units.some(u => u.team === "e");
 
 function launchWave() {
   const w = S.L.waves[S.nextWave++];
+  if (S.L.endless) {
+    // keep one raid queued ahead, and harden each raid a little
+    while (S.L.waves.length <= S.nextWave + 1) S.L.waves.push(skirmishWave(S.L.waves.length, S.L.seed, S.L.rivers[0].edge));
+    S.L.hpScale = 1 + 0.07 * S.nextWave;
+  }
   const list = [];
   for (const type of Object.keys(FOES)) for (let i = 0; i < (w[type] || 0); i++) list.push(type);
   list.forEach((type, i) => S.spawnQueue.push({ at: S.time + i * 0.7, type, edge: w.from[i % w.from.length] }));
@@ -722,6 +1063,7 @@ function tick() {
   if (S.seasonLeft <= 0) {
     S.season = SEASONS[S.season].next;
     S.seasonLeft = SEASONS[S.season].len;
+    S.seasonNo++;
     say(S.season === "maha"
       ? "The Maha monsoon breaks! The wewas fill and every paddy drinks."
       : "Yala, the dry season. Only paddies beside water will grow now.");
@@ -735,6 +1077,8 @@ function tick() {
   }
 
   tickWater();
+  tickFire();
+  updateCover();
 
   for (const u of S.units) {
     if (u.team === "e" && S.flooded.has(Math.floor(u.gy) * MAP + Math.floor(u.gx))) u.hp -= 4;
@@ -747,6 +1091,9 @@ function tick() {
   S.fear = Math.max(0, S.fear - 0.5);
 
   let target = 55 + Math.min(2, count("dagoba")) * BUILDINGS.dagoba.harmony - S.fear + (S.season === "maha" ? 3 : 0);
+  if (edictOn("perahera")) target += EDICTS.perahera.harmonyTarget;
+  target += Math.min(2, staffedPansalas()) * 5;
+  target += Math.min(6, count("walawwa")) * BUILDINGS.walawwa.harmony;
   if (S.rice <= 0) target -= 35;
   else if (S.rice >= S.villagers * 3) target += 8;
   target = clamp(target, 5, 100);
@@ -778,6 +1125,7 @@ function tick() {
   }
 
   checkVictory();
+  if (S.mode === "play" && S.time - (S.lastSave || 0) >= 15) saveRun();
   syncHud();
 }
 
@@ -790,6 +1138,11 @@ function objective(o) {
     case "water": return { label: `💧 Hold ${o.n} water in wewas`, cur: Math.floor(totalWater()), n: o.n };
     case "harmony": return { label: `😊 Harmony ${o.n}+`, cur: Math.floor(S.harmony), n: o.n };
     case "pop": return { label: `👥 ${o.n} villagers`, cur: S.villagers, n: o.n };
+    case "catch": return { label: `🌧️ Catch ${o.n} rain (${rainKept()}% kept)`, cur: Math.floor(S.rain.caught), n: o.n };
+    case "endless": {
+      const busy = foesAlive() || S.spawnQueue.length > 0;
+      return { label: `🛡️ Raids survived: ${Math.max(0, S.nextWave - (busy ? 1 : 0))} (best ${progress.skirmishBest || 0})`, cur: 0, n: Infinity };
+    }
     case "waves": {
       const busy = foesAlive() || S.spawnQueue.length > 0;
       return { label: `🛡️ Survive ${L.waves.length} raids`, cur: Math.max(0, S.nextWave - (busy ? 1 : 0)), n: L.waves.length };
@@ -798,6 +1151,8 @@ function objective(o) {
   return { label: "?", cur: 0, n: 1 };
 }
 
+// Share of the rain that fell on your wewas that was kept (Parakramabahu's maxim).
+const rainKept = () => { const t = S.rain.caught + S.rain.lost; return t > 0 ? Math.round((100 * S.rain.caught) / t) : 100; };
 const totalWater = () => S.buildings.reduce((n, b) => n + (b.id === "wewa" ? b.water : 0), 0);
 
 function checkVictory() {
@@ -807,11 +1162,19 @@ function checkVictory() {
 
 function endLevel(won) {
   if (S.mode !== "play") return;
+  clearRun();
   S.mode = "end";
   S.paused = true;
   const pct = Math.max(0, S.citadel.hp) / S.citadel.maxHp;
-  const stars = won ? (pct >= 0.9 ? 3 : pct >= 0.5 ? 2 : 1) : 0;
-  if (won) {
+  let stars = won ? (pct >= 0.9 ? 3 : pct >= 0.5 ? 2 : 1) : 0;
+  // "Let not one drop of rain reach the sea unused": three stars need 70% kept.
+  if (S.L.objectives.some(o => o.type === "catch") && rainKept() < 70) stars = Math.min(stars, 2);
+  if (S.L.endless) {
+    S.survived = Math.max(0, S.nextWave - 1);
+    S.newBest = S.survived > (progress.skirmishBest || 0);
+    progress.skirmishBest = Math.max(progress.skirmishBest || 0, S.survived);
+    saveProgress();
+  } else if (won) {
     progress.stars[S.L.id] = Math.max(progress.stars[S.L.id] || 0, stars);
     progress.unlocked = Math.max(progress.unlocked, Math.min(LEVELS.length - 1, S.idx + 1));
     saveProgress();
@@ -851,6 +1214,7 @@ function frame(now) {
     for (let sim = realDt * S.speed; sim > 0 && S.mode === "play"; sim -= 0.1) step(Math.min(0.1, sim));
   }
   if (S) { render(now); renderMinimap(); }
+  if (typeof SOUND !== "undefined") SOUND.update();
 }
 
 // Rendering lives in render.js.
@@ -875,7 +1239,7 @@ function centerCamera(gx, gy) {
 
 // Zoom about a screen point (CSS pixels) so the world under the cursor stays put.
 function zoomAt(factor, sx = view.w / 2, sy = view.h / 2) {
-  const z0 = view.zoom, z1 = clamp(z0 * factor, 0.55, 2.2);
+  const z0 = view.zoom, z1 = clamp(z0 * factor, 0.45, 2.6);
   view.camX += sx / z1 - sx / z0;
   view.camY += sy / z1 - sy / z0;
   view.zoom = z1;
@@ -887,17 +1251,23 @@ function buildTabs() {
   nav.innerHTML = "";
   for (const c of CATS) {
     const btn = document.createElement("button");
-    btn.className = `tab ${S.cat === c.id && !S.demolish ? "active" : ""}`;
+    btn.className = `tab ${S.cat === c.id && !S.demolish && !S.upgrade ? "active" : ""}`;
     btn.innerHTML = `<span>${c.icon}</span><span>${c.label}</span>`;
-    btn.addEventListener("click", () => { S.cat = c.id; S.tool = null; S.demolish = false; buildTabs(); renderPalette(); });
+    btn.addEventListener("click", () => { S.cat = c.id; S.tool = null; S.demolish = false; S.upgrade = false; buildTabs(); renderPalette(); });
     nav.appendChild(btn);
   }
   const clear = document.createElement("button");
   clear.className = `tab clear ${S.demolish ? "active" : ""}`;
   clear.title = "Demolish (half refund)";
   clear.innerHTML = "<span>⛏️</span><span>Clear</span>";
-  clear.addEventListener("click", () => { S.demolish = !S.demolish; S.tool = null; buildTabs(); renderPalette(); });
+  clear.addEventListener("click", () => { S.demolish = !S.demolish; S.upgrade = false; S.tool = null; buildTabs(); renderPalette(); });
   nav.appendChild(clear);
+  const upg = document.createElement("button");
+  upg.className = `tab clear ${S.upgrade ? "active" : ""}`;
+  upg.title = "Upgrade in place: palisade → rampart, house → walawwa (drag along walls)";
+  upg.innerHTML = "<span>⬆️</span><span>Upgrade</span>";
+  upg.addEventListener("click", () => { S.upgrade = !S.upgrade; S.demolish = false; S.tool = null; buildTabs(); renderPalette(); });
+  nav.appendChild(upg);
 }
 
 function affordable(cost) {
@@ -907,13 +1277,24 @@ function affordable(cost) {
 function renderPalette() {
   const pal = document.getElementById("palette");
   pal.innerHTML = "";
-  if (S.cat === "army") {
+  if (S.cat === "realm") {
+    for (const [id, e] of Object.entries(EDICTS)) {
+      if (!S.unlocked.edicts.has(id)) continue;
+      const why = edictBlocked(id);
+      const card = document.createElement("button");
+      card.className = `card ${edictOn(id) ? "selected" : ""}`;
+      card.dataset.edict = id;
+      card.innerHTML = `<div class="card-head">${e.icon} ${e.name}</div><div class="card-desc">${e.desc}</div><div class="card-cost">${costText(e.cost)}${why ? ` · <em>${why}</em>` : ""}</div>`;
+      card.addEventListener("click", () => proclaim(id));
+      pal.appendChild(card);
+    }
+  } else if (S.cat === "army") {
     for (const [id, t] of Object.entries(TROOPS)) {
       if (!S.unlocked.troops.has(id)) continue;
       const card = document.createElement("button");
       card.className = "card";
       card.dataset.troop = id;
-      card.innerHTML = `<div class="card-head">${t.icon} ${t.name}</div><div class="card-desc">${t.desc}</div><div class="card-cost">${costText(t.cost)} + 1 👥</div>`;
+      card.innerHTML = `<div class="card-head">${t.icon} ${t.name}</div><div class="card-desc">${t.desc}</div><div class="card-cost">${costText(troopCost(id))} + 1 👥</div>`;
       card.addEventListener("click", () => recruit(id));
       pal.appendChild(card);
     }
@@ -924,8 +1305,8 @@ function renderPalette() {
       card.className = `card ${S.tool === id ? "selected" : ""}`;
       card.dataset.build = id;
       card.title = b.desc;
-      card.innerHTML = `<div class="card-head">${b.icon} ${b.name}</div><div class="card-desc">${b.desc}</div><div class="card-cost">${costText(b.cost)}</div>`;
-      card.addEventListener("click", () => { S.tool = S.tool === id ? null : id; S.demolish = false; buildTabs(); renderPalette(); });
+      card.innerHTML = `<div class="card-head">${b.icon} ${b.name}</div><div class="card-desc">${b.desc}</div><div class="card-cost">${costText(buildCost(b))}</div>`;
+      card.addEventListener("click", () => { S.tool = S.tool === id ? null : id; S.demolish = false; S.upgrade = false; buildTabs(); renderPalette(); });
       pal.appendChild(card);
     }
   }
@@ -935,22 +1316,65 @@ function renderPalette() {
 
 function updateAffordability() {
   for (const card of document.querySelectorAll("#palette .card")) {
-    const cost = card.dataset.troop ? TROOPS[card.dataset.troop].cost : BUILDINGS[card.dataset.build].cost;
+    if (card.dataset.edict) { card.classList.toggle("poor", !!edictBlocked(card.dataset.edict) && !edictOn(card.dataset.edict)); continue; }
+    const cost = card.dataset.troop ? troopCost(card.dataset.troop) : buildCost(BUILDINGS[card.dataset.build]);
     card.classList.toggle("poor", !affordable(cost));
   }
 }
 
+// ==================== ROYAL DECREES ====================
+const edictOn = id => (S.edictEnd[id] || 0) > S.time;
+const workMult = () => (edictOn("rajakariya") ? EDICTS.rajakariya.work : 1);
+
+// Why a decree can't be proclaimed right now, or null.
+function edictBlocked(id) {
+  const e = EDICTS[id];
+  if (edictOn(id)) return `In force for ${Math.ceil(S.edictEnd[id] - S.time)}s`;
+  if (e.once === "maha" && S.season !== "maha") return "Only in the Maha monsoon";
+  if (S.edictUsed[id] === S.seasonNo) return "Already proclaimed this season";
+  if (!affordable(e.cost)) return `Needs ${costText(e.cost)}`;
+  return null;
+}
+
+function proclaim(id) {
+  const e = EDICTS[id];
+  const why = edictBlocked(id);
+  if (why) { say(`${e.name}: ${why.toLowerCase()}.`, true); return; }
+  for (const [k, v] of Object.entries(e.cost)) S[k] -= v;
+  S.edictEnd[id] = S.time + e.dur;
+  S.edictUsed[id] = S.seasonNo;
+  S.harmony = clamp(S.harmony + e.harmony, 0, 100);
+  say(id === "rajakariya"
+    ? "Rajakariya is proclaimed. Every family sends a worker for the king's service: build now, it costs less!"
+    : "The Perahera begins! Drums, torches and the tusker's procession lift every heart.");
+  spawnFloat(`${e.icon} ${e.name.split(" (")[0]}`, S.citadel.gx + 1, S.citadel.gy, "#e9b949");
+  sfx("conch");
+  renderPalette();
+  syncHud();
+}
+
+// Soldiers' price: monks at a staffed pansala teach discipline, 25% off.
+const staffedPansalas = () => S.buildings.filter(b => b.id === "pansala" && b.worker).length;
+function troopCost(id) {
+  const c = TROOPS[id].cost;
+  if (!staffedPansalas()) return c;
+  const out = {};
+  for (const [k, v] of Object.entries(c)) out[k] = Math.ceil(v * 0.75);
+  return out;
+}
+
 function recruit(id) {
   const t = TROOPS[id];
+  const cost = troopCost(id);
   const barracks = S.buildings.filter(b => b.id === "barracks");
   if (!barracks.length) { say("Build an Angam Maduwa (Defence tab) first.", true); return; }
-  if (!affordable(t.cost)) { say(`A ${t.name} needs ${costText(t.cost)}.`, true); return; }
+  if (!affordable(cost)) { say(`A ${t.name} needs ${costText(cost)}.`, true); return; }
   if (idleVillagers() < 1 && S.villagers < 1) { say("No villagers left to take up arms.", true); return; }
   if (idleVillagers() < 1) {
     // Pull the most recently staffed worker off their job.
     releaseWorker(S.workers.pop());
   }
-  for (const [k, v] of Object.entries(t.cost)) S[k] -= v;
+  for (const [k, v] of Object.entries(cost)) S[k] -= v;
   S.villagers--;
   const b = barracks[0];
   spawnSoldier(id, b.gx + 1 + Math.random() * 0.5, b.gy + b.h + 0.3 + Math.random() * 0.4);
@@ -960,11 +1384,11 @@ function recruit(id) {
 }
 
 function syncHud() {
-  document.getElementById("levelName").textContent = `${S.idx + 1}. ${S.L.name}`;
+  document.getElementById("levelName").textContent = levelTitle();
   document.getElementById("seasonBadge").textContent = `${SEASONS[S.season].label} · ${S.seasonLeft}s`;
   document.getElementById("objectives").innerHTML = S.L.objectives.map(o => {
     const r = objective(o);
-    return `<li class="${r.cur >= r.n ? "done" : ""}">${r.label} (${Math.min(r.cur, r.n)}/${r.n})</li>`;
+    return `<li class="${r.cur >= r.n ? "done" : ""}">${r.label}${r.n === Infinity ? "" : ` (${Math.min(r.cur, r.n)}/${r.n})`}</li>`;
   }).join("");
   document.getElementById("resources").innerHTML = Object.entries(RES)
     .map(([k, ic]) => `<span>${ic} ${k}: <strong>${Math.floor(S[k])}</strong></span>`).join("") +
@@ -985,7 +1409,9 @@ function syncHud() {
   document.getElementById("pauseBtn").textContent = S.paused ? "▶ Resume" : "⏸ Pause";
   document.getElementById("pauseBtn").disabled = S.mode !== "play";
   document.getElementById("speedBtn").textContent = `⏩ ${S.speed}×`;
-  updateAffordability();
+  // decree cards show live timers; building costs change while rajakariya runs
+  if (S.cat === "realm" || (S.cat !== "army" && S.lastDiscount !== edictOn("rajakariya"))) { S.lastDiscount = edictOn("rajakariya"); renderPalette(); }
+  else updateAffordability();
 }
 
 let advisorTimer = null;
@@ -1004,8 +1430,14 @@ function spawnFloat(text, gx, gy, color) {
 
 function describe(b) {
   const lines = [`<b>${b.def.icon} ${b.def.name}</b>`, `HP ${Math.ceil(b.hp)}/${b.maxHp}`];
-  if (b.def.worker) lines.push(b.worker ? "Staffed" : "💤 No villager free. Build houses.");
-  if (b.id === "wewa") lines.push(`Water ${Math.round(b.water)}/${WEWA_CAP}${riverBeside(b) ? " · river-fed" : ""}`);
+  if (S.upgrade) lines.push(b.def.upgrade ? `⬆️ ${BUILDINGS[b.def.upgrade.to].name}: ${costText(b.def.upgrade.cost)}` : "No upgrade");
+  if (b.fire > 0) lines.push(`🔥 On fire (${b.fire >= 2 ? "raging" : "burning"}). Villagers are carrying water.`);
+  if (b.def.worker) lines.push(b.worker ? (b.id === "pansala" ? (b.worker.alms ? "The monk is on his alms round" : "The monk is in meditation") : "Staffed") : "💤 No villager free. Build houses.");
+  if (b.id === "wewa") {
+    lines.push(`Water ${Math.round(b.water)}/${WEWA_CAP}${riverBeside(b) ? " · river-fed" : ""}`);
+    const id = S.netOf[b.gy][b.gx], linked = id !== -1 ? S.nets[id].wewas.size - 1 : 0;
+    lines.push(linked ? `Spills into ${linked} linked wewa${linked > 1 ? "s" : ""} when full` : "When full, rain runs off. Link another wewa by canal.");
+  }
   if (b.id === "paddy") lines.push(`Growth ${Math.round(b.growth)}% · ${b.irrigated ? "irrigated" : "dry"}`);
   if (b.id === "sluice") lines.push(b.open ? "Open: flooding canals. Click to close." : "Closed. Click to flood the canals.");
   if (b.def.water && b.id !== "wewa") {
@@ -1032,12 +1464,15 @@ const overlay = document.getElementById("overlay");
 function stars(n) { return "★".repeat(n) + "☆".repeat(3 - n); }
 
 function showMenu() {
-  if (S) { S.paused = true; if (S.mode === "play") S.mode = "menu"; }
+  if (S) { S.paused = true; if (S.mode === "play") S.mode = "menu"; saveRun(); }
+  const run = savedRun();
+  const canContinue = run && !(S && S.mode === "menu");
   overlay.classList.remove("hidden");
   overlay.innerHTML = `
     <div class="card-screen">
       <h1>Balakotuwa — Keepers of the Wewa</h1>
       <div class="tagline">Catch the monsoon, feed the kingdom, hold the citadel.</div>
+      ${canContinue ? `<div class="actions"><button class="btn primary" id="continueBtn">▶ Continue ${run.name} · ${Math.floor(run.st.time / 60)} min in</button></div>` : ""}
       <div class="level-list">
         ${LEVELS.map((L, i) => `
           <button class="level-card" data-level="${i}" ${i > progress.unlocked ? "disabled" : ""}>
@@ -1046,6 +1481,12 @@ function showMenu() {
             <div class="lc-era">${L.era}</div>
             <div class="lc-stars">${stars(progress.stars[L.id] || 0)}</div>
           </button>`).join("")}
+        <button class="level-card" id="skirmishCard">
+          <div class="lc-num">Skirmish</div>
+          <div class="lc-name">Endless raids</div>
+          <div class="lc-era">Random map, everything unlocked</div>
+          <div class="lc-stars">Best: ${progress.skirmishBest || 0} raids</div>
+        </button>
       </div>
       <details class="how">
         <summary>How to play</summary>
@@ -1058,9 +1499,12 @@ function showMenu() {
           <li>Finish every objective and survive every raid to win. Stars depend on how much of the citadel is left standing.</li>
         </ul>
       </details>
-      ${S && S.mode === "menu" ? `<div class="actions"><button class="btn primary" id="resumeBtn">▶ Resume level ${S.idx + 1}</button></div>` : ""}
+      ${S && S.mode === "menu" ? `<div class="actions"><button class="btn primary" id="resumeBtn">▶ Resume ${S.L.skirmish ? "skirmish" : `level ${S.idx + 1}`}</button></div>` : ""}
     </div>`;
-  overlay.querySelectorAll(".level-card").forEach(btn => btn.addEventListener("click", () => startLevel(Number(btn.dataset.level))));
+  overlay.querySelectorAll(".level-card[data-level]").forEach(btn => btn.addEventListener("click", () => startLevel(Number(btn.dataset.level))));
+  document.getElementById("skirmishCard").addEventListener("click", () => startSkirmish());
+  const cont = document.getElementById("continueBtn");
+  if (cont) cont.addEventListener("click", continueRun);
   const resume = document.getElementById("resumeBtn");
   if (resume) resume.addEventListener("click", () => { S.mode = "play"; S.paused = false; overlay.classList.add("hidden"); syncHud(); });
 }
@@ -1071,7 +1515,7 @@ function showBriefing() {
   const unlocks = [...(L.unlocks.buildings || []).map(id => BUILDINGS[id].name), ...(L.unlocks.troops || []).map(id => TROOPS[id].name)];
   overlay.innerHTML = `
     <div class="card-screen">
-      <div class="lc-num">Level ${S.idx + 1} · ${L.era}</div>
+      <div class="lc-num">${L.skirmish ? "Skirmish" : `Level ${S.idx + 1}`} · ${L.era}</div>
       <h2>${L.name}</h2>
       <p>${L.intro}</p>
       <b>Objectives</b>
@@ -1094,6 +1538,22 @@ function showBriefing() {
 
 function showEnd(won, starCount) {
   overlay.classList.remove("hidden");
+  if (S.L.endless) {
+    overlay.innerHTML = `
+      <div class="card-screen">
+        <h2>The Maligawa has fallen</h2>
+        <p>You held the valley through <b>${S.survived}</b> raid${S.survived === 1 ? "" : "s"}.${S.newBest ? " A new best!" : ` Best: ${progress.skirmishBest}.`}</p>
+        <div class="actions">
+          <button class="btn primary" id="newMapBtn">New map ▶</button>
+          <button class="btn" id="retryBtn">↻ Same map</button>
+          <button class="btn" id="toMenuBtn">Campaign</button>
+        </div>
+      </div>`;
+    document.getElementById("newMapBtn").addEventListener("click", () => startSkirmish());
+    document.getElementById("retryBtn").addEventListener("click", restartLevel);
+    document.getElementById("toMenuBtn").addEventListener("click", showMenu);
+    return;
+  }
   const hasNext = won && S.idx + 1 < LEVELS.length;
   overlay.innerHTML = `
     <div class="card-screen">
@@ -1102,6 +1562,7 @@ function showEnd(won, starCount) {
       <p>${won
         ? (S.idx + 1 === LEVELS.length ? "The hill kingdom endures. You have completed the campaign." : "The kingdom is fed and the walls still stand. A new region awaits.")
         : "Raiders breached the Maligawa. Build more wewas, wall the approaches and keep soldiers at home."}</p>
+      ${S.rain.caught + S.rain.lost > 0 ? `<p>🌧️ Rain kept: <b>${rainKept()}%</b>${S.L.objectives.some(o => o.type === "catch") ? (rainKept() >= 70 ? " · Parakramabahu would be pleased." : " · Below 70%: too much rain reached the sea for three stars.") : ""}</p>` : ""}
       <div class="actions">
         ${hasNext ? `<button class="btn primary" id="nextBtn">Next level ▶</button>` : ""}
         <button class="btn" id="retryBtn">↻ Replay</button>
@@ -1109,29 +1570,19 @@ function showEnd(won, starCount) {
       </div>
     </div>`;
   if (hasNext) document.getElementById("nextBtn").addEventListener("click", () => startLevel(S.idx + 1));
-  document.getElementById("retryBtn").addEventListener("click", () => startLevel(S.idx));
+  document.getElementById("retryBtn").addEventListener("click", restartLevel);
   document.getElementById("toMenuBtn").addEventListener("click", showMenu);
 }
 
 // ==================== AUDIO ====================
 function unlockAudio() {
   if (!audio.on) return;
-  try { audio.ctx = audio.ctx || new AudioContext(); audio.ctx.resume(); } catch (e) { audio.on = false; }
+  try { audio.ctx = audio.ctx || new AudioContext(); audio.ctx.resume(); } catch (e) { audio.on = false; return; }
+  if (typeof SOUND !== "undefined") SOUND.init();
 }
-
+// Effects are synthesised in audio.js.
 function sfx(kind) {
-  if (!audio.on || !audio.ctx) return;
-  const spec = { build: [330, 0.08, "triangle"], conch: [146, 0.9, "sawtooth"], harvest: [660, 0.1, "sine"], hit: [110, 0.05, "square"], win: [523, 0.6, "triangle"], lose: [98, 0.8, "sawtooth"] }[kind];
-  try {
-    const o = audio.ctx.createOscillator(), g = audio.ctx.createGain();
-    o.type = spec[2];
-    o.frequency.value = spec[0];
-    g.gain.setValueAtTime(0.08, audio.ctx.currentTime);
-    g.gain.exponentialRampToValueAtTime(0.0001, audio.ctx.currentTime + spec[1]);
-    o.connect(g).connect(audio.ctx.destination);
-    o.start();
-    o.stop(audio.ctx.currentTime + spec[1]);
-  } catch (e) { /* audio unavailable */ }
+  if (audio.on && typeof SOUND !== "undefined") SOUND.play(kind);
 }
 
 // ==================== INPUT ====================
@@ -1159,7 +1610,7 @@ canvas.addEventListener("mousemove", e => {
   }
   const g = screenToGrid(x, y);
   input.hover = { gx: g.gx, gy: g.gy, x: sx, y: sy };
-  if (input.painting && S.tool) paintTo(g.gx, g.gy);
+  if (input.painting && (S.tool || S.upgrade)) paintTo(g.gx, g.gy);
   if (input.drag) { input.drag.x2 = x; input.drag.y2 = y; }
   updateTooltip();
 });
@@ -1169,7 +1620,7 @@ function paintTo(gx, gy) {
   let [x, y] = input.lastPaint.split(",").map(Number);
   while (x !== gx || y !== gy) {
     if (Math.abs(gx - x) >= Math.abs(gy - y)) x += Math.sign(gx - x); else y += Math.sign(gy - y);
-    tryBuild(x, y, true);
+    if (S.upgrade) upgradeAt(x, y, true); else tryBuild(x, y, true);
   }
   input.lastPaint = `${gx},${gy}`;
 }
@@ -1195,6 +1646,11 @@ canvas.addEventListener("mousedown", e => {
       return;
     }
     if (S.demolish) { demolishAt(g.gx, g.gy); return; }
+    if (S.upgrade) {
+      upgradeAt(g.gx, g.gy);
+      input.painting = true; input.lastPaint = `${g.gx},${g.gy}`;
+      return;
+    }
     const b = buildingAt(g.gx, g.gy);
     if (b && b.id === "sluice") {
       b.open = !b.open;
@@ -1204,8 +1660,8 @@ canvas.addEventListener("mousedown", e => {
     }
     input.drag = { x1: x, y1: y, x2: x, y2: y };
   } else if (e.button === 2) {
-    if (S.tool || S.demolish) {
-      S.tool = null; S.demolish = false;
+    if (S.tool || S.demolish || S.upgrade) {
+      S.tool = null; S.demolish = false; S.upgrade = false;
       buildTabs(); renderPalette();
       return;
     }
@@ -1256,7 +1712,7 @@ window.addEventListener("keydown", e => {
     e.preventDefault();
     togglePause();
   } else if (k === "escape") {
-    S.tool = null; S.demolish = false;
+    S.tool = null; S.demolish = false; S.upgrade = false;
     for (const u of S.units) u.sel = false;
     buildTabs(); renderPalette();
   } else if (k === "c") {
@@ -1296,6 +1752,8 @@ document.getElementById("audioBtn").addEventListener("click", e => {
 document.getElementById("menuBtn").addEventListener("click", showMenu);
 
 new ResizeObserver(resizeCanvas).observe(document.getElementById("viewport"));
+document.addEventListener("visibilitychange", () => { if (document.hidden) saveRun(); });
+window.addEventListener("pagehide", saveRun);
 
 // ==================== BOOT ====================
 // Wait until render.js (loaded after this file) is in place.
