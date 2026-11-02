@@ -42,6 +42,10 @@ if (smoke) {
       const errs = []; try { for (let i = 0; i < 18000 && S.mode === "play"; i++) { step(0.05); if (i % 40 === 0) render(performance.now()); } }
       catch (e) { errs.push(e.stack); } lines.push(`${lv + 1} ${S.mode} ${Math.round(S.time)} ${JSON.stringify(errs)}`);
     }
+    // skirmish: endless raids must keep coming and the map must render
+    startSkirmish(4242); document.getElementById("beginBtn").click(); S.paused = true;
+    const errs = []; try { for (let i = 0; i < 18000 && S.mode === "play"; i++) { step(0.05); if (i % 40 === 0) render(performance.now()); } }
+    catch (e) { errs.push(e.stack); } lines.push(`skirmish ${S.mode} ${Math.round(S.time)} raids=${S.nextWave} ${JSON.stringify(errs)}`);
     return lines;
   });
   console.log(out.join("\n"));

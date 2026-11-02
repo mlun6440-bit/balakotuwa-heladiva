@@ -63,9 +63,9 @@ function costText(cost) {
 function loadProgress() {
   try {
     const p = JSON.parse(localStorage.getItem(SAVE_KEY));
-    if (p && typeof p.unlocked === "number") return { unlocked: p.unlocked, stars: p.stars || {} };
+    if (p && typeof p.unlocked === "number") return { unlocked: p.unlocked, stars: p.stars || {}, skirmishBest: p.skirmishBest || 0 };
   } catch (e) { /* storage blocked or corrupt: start fresh */ }
-  return { unlocked: 0, stars: {} };
+  return { unlocked: 0, stars: {}, skirmishBest: 0 };
 }
 function saveProgress() {
   try { localStorage.setItem(SAVE_KEY, JSON.stringify(progress)); } catch (e) { /* ignore */ }
@@ -143,12 +143,48 @@ function unlockedFor(idx) {
   return { buildings: b, troops: t, edicts: e };
 }
 
-function startLevel(idx, mode = "brief") {
-  const L = LEVELS[idx];
+// ==================== SKIRMISH ====================
+// A seeded random map with every building unlocked and endless raids that
+// grow each time. Survive as many raids as you can.
+function makeSkirmish(seed) {
+  const r = mulberry32(seed), ri = (a, b) => a + Math.floor(r() * (b - a + 1));
+  const edges = ["west", "north", "south", "east"];
+  const riverEdge = edges[ri(0, 2)];
+  const cx = ri(11, 14), cy = ri(11, 14);
+  const away = (x, y) => Math.hypot(x - cx, y - cy) > 6;
+  const rect = (w, h) => { for (;;) { const x = ri(2, MAP - 3 - w), y = ri(2, MAP - 3 - h); if (away(x + w / 2, y + h / 2)) return [x, y, x + w, y + h]; } };
+  const all = unlockedFor(LEVELS.length - 1);
+  return {
+    id: `skirmish-${seed}`, name: "Skirmish", era: `Random map · seed ${seed}`, seed, skirmish: true, endless: true,
+    intro: "A fresh valley and no end to the raiders. Each raid is larger than the last. How long can the Maligawa stand?",
+    citadel: [cx, cy], season: r() < 0.5 ? "maha" : "yala",
+    start: { timber: 150, stone: 80, rice: 100, gold: 150, villagers: 12, arms: 8 },
+    army: { spearman: 3, archer: 2 },
+    rivers: [{ edge: riverEdge, at: ri(0, 2), width: ri(1, 2), wobble: 0.8 + r() * 1.4 }],
+    rocks: Array.from({ length: ri(2, 3) }, () => rect(ri(2, 4), ri(2, 4))),
+    forests: Array.from({ length: ri(3, 5) }, () => [...rect(ri(4, 7), ri(4, 7)), 0.35 + r() * 0.2]),
+    unlocks: {}, all,
+    waves: [0, 1, 2].map(k => skirmishWave(k, seed, riverEdge)),
+    hpScale: 1, objectives: [{ type: "endless" }]
+  };
+}
+function skirmishWave(k, seed, riverEdge) {
+  const r = mulberry32(seed * 31 + k * 977);
+  const edges = ["east", "south", "north", "west"].filter(e => e !== riverEdge);
+  const n = Math.min(edges.length, 1 + Math.floor(k / 3));
+  const from = [...edges].sort(() => r() - 0.5).slice(0, n);
+  return { t: 150 + k * 95, from, raider: 3 + 2 * k, bowman: 1 + Math.floor(k * 0.8), brute: Math.floor(k / 2) };
+}
+const startSkirmish = seed => startLevel(LEVELS.length, "brief", makeSkirmish(seed ?? (Date.now() % 900000) + 1));
+const restartLevel = () => (S.L.skirmish ? startSkirmish(S.L.seed) : startLevel(S.idx));
+const levelTitle = () => (S.L.skirmish ? "Skirmish" : `${S.idx + 1}. ${S.L.name}`);
+
+function startLevel(idx, mode = "brief", custom = null) {
+  const L = custom || LEVELS[idx];
   const { tiles, trees } = genMap(L);
   S = {
     idx, L, tiles, trees,
-    unlocked: unlockedFor(idx),
+    unlocked: custom ? custom.all : unlockedFor(idx),
     buildings: [], occ: [], workers: [], units: [], shots: [], floats: [], spawnQueue: [],
     timber: L.start.timber, stone: L.start.stone, rice: L.start.rice, gold: L.start.gold, arms: L.start.arms || 0,
     villagers: L.start.villagers, cap: 0, harmony: 60, fear: 0,
@@ -916,6 +952,11 @@ const foesAlive = () => S.units.some(u => u.team === "e");
 
 function launchWave() {
   const w = S.L.waves[S.nextWave++];
+  if (S.L.endless) {
+    // keep one raid queued ahead, and harden each raid a little
+    while (S.L.waves.length <= S.nextWave + 1) S.L.waves.push(skirmishWave(S.L.waves.length, S.L.seed, S.L.rivers[0].edge));
+    S.L.hpScale = 1 + 0.07 * S.nextWave;
+  }
   const list = [];
   for (const type of Object.keys(FOES)) for (let i = 0; i < (w[type] || 0); i++) list.push(type);
   list.forEach((type, i) => S.spawnQueue.push({ at: S.time + i * 0.7, type, edge: w.from[i % w.from.length] }));
@@ -1011,6 +1052,10 @@ function objective(o) {
     case "harmony": return { label: `😊 Harmony ${o.n}+`, cur: Math.floor(S.harmony), n: o.n };
     case "pop": return { label: `👥 ${o.n} villagers`, cur: S.villagers, n: o.n };
     case "catch": return { label: `🌧️ Catch ${o.n} rain (${rainKept()}% kept)`, cur: Math.floor(S.rain.caught), n: o.n };
+    case "endless": {
+      const busy = foesAlive() || S.spawnQueue.length > 0;
+      return { label: `🛡️ Raids survived: ${Math.max(0, S.nextWave - (busy ? 1 : 0))} (best ${progress.skirmishBest || 0})`, cur: 0, n: Infinity };
+    }
     case "waves": {
       const busy = foesAlive() || S.spawnQueue.length > 0;
       return { label: `🛡️ Survive ${L.waves.length} raids`, cur: Math.max(0, S.nextWave - (busy ? 1 : 0)), n: L.waves.length };
@@ -1036,7 +1081,12 @@ function endLevel(won) {
   let stars = won ? (pct >= 0.9 ? 3 : pct >= 0.5 ? 2 : 1) : 0;
   // "Let not one drop of rain reach the sea unused": three stars need 70% kept.
   if (S.L.objectives.some(o => o.type === "catch") && rainKept() < 70) stars = Math.min(stars, 2);
-  if (won) {
+  if (S.L.endless) {
+    S.survived = Math.max(0, S.nextWave - 1);
+    S.newBest = S.survived > (progress.skirmishBest || 0);
+    progress.skirmishBest = Math.max(progress.skirmishBest || 0, S.survived);
+    saveProgress();
+  } else if (won) {
     progress.stars[S.L.id] = Math.max(progress.stars[S.L.id] || 0, stars);
     progress.unlocked = Math.max(progress.unlocked, Math.min(LEVELS.length - 1, S.idx + 1));
     saveProgress();
@@ -1239,11 +1289,11 @@ function recruit(id) {
 }
 
 function syncHud() {
-  document.getElementById("levelName").textContent = `${S.idx + 1}. ${S.L.name}`;
+  document.getElementById("levelName").textContent = levelTitle();
   document.getElementById("seasonBadge").textContent = `${SEASONS[S.season].label} · ${S.seasonLeft}s`;
   document.getElementById("objectives").innerHTML = S.L.objectives.map(o => {
     const r = objective(o);
-    return `<li class="${r.cur >= r.n ? "done" : ""}">${r.label} (${Math.min(r.cur, r.n)}/${r.n})</li>`;
+    return `<li class="${r.cur >= r.n ? "done" : ""}">${r.label}${r.n === Infinity ? "" : ` (${Math.min(r.cur, r.n)}/${r.n})`}</li>`;
   }).join("");
   document.getElementById("resources").innerHTML = Object.entries(RES)
     .map(([k, ic]) => `<span>${ic} ${k}: <strong>${Math.floor(S[k])}</strong></span>`).join("") +
@@ -1332,6 +1382,12 @@ function showMenu() {
             <div class="lc-era">${L.era}</div>
             <div class="lc-stars">${stars(progress.stars[L.id] || 0)}</div>
           </button>`).join("")}
+        <button class="level-card" id="skirmishCard">
+          <div class="lc-num">Skirmish</div>
+          <div class="lc-name">Endless raids</div>
+          <div class="lc-era">Random map, everything unlocked</div>
+          <div class="lc-stars">Best: ${progress.skirmishBest || 0} raids</div>
+        </button>
       </div>
       <details class="how">
         <summary>How to play</summary>
@@ -1344,9 +1400,10 @@ function showMenu() {
           <li>Finish every objective and survive every raid to win. Stars depend on how much of the citadel is left standing.</li>
         </ul>
       </details>
-      ${S && S.mode === "menu" ? `<div class="actions"><button class="btn primary" id="resumeBtn">▶ Resume level ${S.idx + 1}</button></div>` : ""}
+      ${S && S.mode === "menu" ? `<div class="actions"><button class="btn primary" id="resumeBtn">▶ Resume ${S.L.skirmish ? "skirmish" : `level ${S.idx + 1}`}</button></div>` : ""}
     </div>`;
-  overlay.querySelectorAll(".level-card").forEach(btn => btn.addEventListener("click", () => startLevel(Number(btn.dataset.level))));
+  overlay.querySelectorAll(".level-card[data-level]").forEach(btn => btn.addEventListener("click", () => startLevel(Number(btn.dataset.level))));
+  document.getElementById("skirmishCard").addEventListener("click", () => startSkirmish());
   const resume = document.getElementById("resumeBtn");
   if (resume) resume.addEventListener("click", () => { S.mode = "play"; S.paused = false; overlay.classList.add("hidden"); syncHud(); });
 }
@@ -1357,7 +1414,7 @@ function showBriefing() {
   const unlocks = [...(L.unlocks.buildings || []).map(id => BUILDINGS[id].name), ...(L.unlocks.troops || []).map(id => TROOPS[id].name)];
   overlay.innerHTML = `
     <div class="card-screen">
-      <div class="lc-num">Level ${S.idx + 1} · ${L.era}</div>
+      <div class="lc-num">${L.skirmish ? "Skirmish" : `Level ${S.idx + 1}`} · ${L.era}</div>
       <h2>${L.name}</h2>
       <p>${L.intro}</p>
       <b>Objectives</b>
@@ -1380,6 +1437,22 @@ function showBriefing() {
 
 function showEnd(won, starCount) {
   overlay.classList.remove("hidden");
+  if (S.L.endless) {
+    overlay.innerHTML = `
+      <div class="card-screen">
+        <h2>The Maligawa has fallen</h2>
+        <p>You held the valley through <b>${S.survived}</b> raid${S.survived === 1 ? "" : "s"}.${S.newBest ? " A new best!" : ` Best: ${progress.skirmishBest}.`}</p>
+        <div class="actions">
+          <button class="btn primary" id="newMapBtn">New map ▶</button>
+          <button class="btn" id="retryBtn">↻ Same map</button>
+          <button class="btn" id="toMenuBtn">Campaign</button>
+        </div>
+      </div>`;
+    document.getElementById("newMapBtn").addEventListener("click", () => startSkirmish());
+    document.getElementById("retryBtn").addEventListener("click", restartLevel);
+    document.getElementById("toMenuBtn").addEventListener("click", showMenu);
+    return;
+  }
   const hasNext = won && S.idx + 1 < LEVELS.length;
   overlay.innerHTML = `
     <div class="card-screen">
@@ -1396,7 +1469,7 @@ function showEnd(won, starCount) {
       </div>
     </div>`;
   if (hasNext) document.getElementById("nextBtn").addEventListener("click", () => startLevel(S.idx + 1));
-  document.getElementById("retryBtn").addEventListener("click", () => startLevel(S.idx));
+  document.getElementById("retryBtn").addEventListener("click", restartLevel);
   document.getElementById("toMenuBtn").addEventListener("click", showMenu);
 }
 

@@ -540,8 +540,8 @@ function bakeShadows() {
 }
 
 function bakeTerrain() {
-  const key = `${S.idx}|${atlas.version}`;
-  if (terrain.key !== key || terrain.S !== S && terrain.key.split("|")[0] !== String(S.idx)) {
+  const key = `${S.idx}|${S.L.seed}|${atlas.version}`;
+  if (terrain.key !== key) {
     terrain.key = key; terrain.S = S;
     const D = terrainDist();
     terrain.D = D;
