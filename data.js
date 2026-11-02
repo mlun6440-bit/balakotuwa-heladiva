@@ -60,11 +60,11 @@ const BUILDINGS = {
                 desc: "+12 harmony (counts up to two)." },
 
   palisade:   { name: "Palisade", cat: "defence", icon: "🪵", w: 1, h: 1, hp: 320, cost: { timber: 3 }, solid: true, flammable: true, wall: true, z: 20, paint: true, upgrade: { to: "rampart", cost: { stone: 4 } },
-                desc: "Cheap wall raiders must break through; drag to paint." },
+                desc: "Cheap wall raiders must break through; archers on it are out of their swords' reach." },
   thorn:      { name: "Katu Wetiya (Thorn barrier)", cat: "defence", icon: "🌿", w: 1, h: 1, hp: 140, cost: { timber: 1 }, ground: true, thorn: true, flammable: true, paint: true,
                 desc: "Cheap brush that slows and scratches raiders pushing through, but burns easily." },
   rampart:    { name: "Gal Bamma (Rampart)", cat: "defence", icon: "🧱", w: 1, h: 1, hp: 950, cost: { stone: 5 }, solid: true, wall: true, z: 26, paint: true,
-                desc: "Heavy stone wall; drag to paint." },
+                desc: "Heavy stone wall; archers on it are out of melee reach and shoot 40% farther." },
   gate:       { name: "Vahalkada (Gate)", cat: "defence", icon: "⛩️", w: 1, h: 1, hp: 900, cost: { timber: 8, stone: 6 }, solid: true, wall: true, z: 30,
                 desc: "Your soldiers pass through; raiders must break it." },
   tower:      { name: "Atuwa (Watchtower)", cat: "defence", icon: "🗼", w: 1, h: 1, hp: 750, cost: { timber: 12, stone: 10 }, solid: true, z: 48,
@@ -99,7 +99,7 @@ const CATS = [
 // Training a soldier costs one idle villager as well as the listed resources.
 const TROOPS = {
   archer:    { name: "Dunuvaya (Archer)", icon: "🏹", cost: { gold: 15, rice: 5 }, hp: 70, dmg: 11, range: 5, speed: 1.8, ranged: true, color: "#2f8f4e",
-               desc: "Ranged; extra range on walls and towers." },
+               desc: "Ranged; on walls and towers they shoot farther and melee raiders can't reach them." },
   spearman:  { name: "Hella (Spearman)", icon: "🔱", cost: { gold: 10, rice: 5 }, hp: 130, dmg: 14, range: 0.9, speed: 2.0, color: "#2d6fa8",
                desc: "Sturdy melee guard." },
   angampora: { name: "Angampora Fighter", icon: "🥋", cost: { gold: 22, rice: 8 }, hp: 170, dmg: 24, range: 0.9, speed: 2.6, color: "#d2902a",

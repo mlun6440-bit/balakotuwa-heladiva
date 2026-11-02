@@ -177,11 +177,15 @@ const BOT = (() => {
       if (S.units.length > n0) note(`trained ${id}`); else return;
     }
   }
+  // archers go up on towers and on walls facing the raid; the rest form up in front of the citadel
   function rally(edge) {
     const [ex, ey] = EDGE[edge], c = C();
-    const towers = S.buildings.filter(b => b.id === "tower");
+    const facing = b => (b.gx + 0.5 - c.x) * ex + (b.gy + 0.5 - c.y) * ey > 1.5;
+    const perches = S.buildings.filter(b => b.id === "tower" || (b.def.wall && b.id !== "gate" && facing(b) && d2c(b.gx, b.gy) < 8))
+      .sort((a, b) => (a.id === "tower" ? 0 : 1) - (b.id === "tower" ? 0 : 1));
+    let k = 0;
     S.units.filter(u => u.team === "p").forEach((u, i) => {
-      const tw = u.def.ranged && towers[i % Math.max(1, towers.length)];
+      const tw = u.def.ranged && perches.length ? perches[k++ % perches.length] : null;
       const [x, y] = tw ? [tw.gx + 0.5, tw.gy + 0.5] : [c.x + ex * 2.6 + (ey ? (i % 5) * 0.5 - 1 : 0), c.y + ey * 2.6 + (ex ? (i % 5) * 0.5 - 1 : 0)];
       u.tx = clamp(x, 0.3, MAP - 0.3); u.ty = clamp(y, 0.3, MAP - 0.3); u.ordered = true;
     });

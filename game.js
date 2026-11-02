@@ -886,6 +886,7 @@ function nearestFoe(u, radius, from = u) {
     if (v.team === u.team || v.hp <= 0) continue;
     const d = Math.hypot(v.gx - from.gx, v.gy - from.gy);
     if (u.team === "e" && d > 1.5 && inCover(v)) continue; // hidden in the forest
+    if (u.team === "e" && !u.def.ranged && v.z > 0) continue; // out of reach up on a wall or tower
     if (d <= bd) { bd = d; best = v; }
   }
   return best;
