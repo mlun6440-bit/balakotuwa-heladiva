@@ -134,12 +134,13 @@ function genMap(L) {
 
 // ==================== LEVEL SETUP ====================
 function unlockedFor(idx) {
-  const b = new Set(), t = new Set();
+  const b = new Set(), t = new Set(), e = new Set();
   for (let i = 0; i <= idx; i++) {
     (LEVELS[i].unlocks.buildings || []).forEach(x => b.add(x));
     (LEVELS[i].unlocks.troops || []).forEach(x => t.add(x));
+    (LEVELS[i].unlocks.edicts || []).forEach(x => e.add(x));
   }
-  return { buildings: b, troops: t };
+  return { buildings: b, troops: t, edicts: e };
 }
 
 function startLevel(idx, mode = "brief") {
@@ -155,7 +156,8 @@ function startLevel(idx, mode = "brief") {
     time: 0, tickAcc: 0, waveClock: 0, nextWave: 0,
     nets: [], netOf: null, flooded: new Set(), flow: null,
     tool: null, demolish: false, cat: "water",
-    paused: true, speed: 1, mode, growAcc: 0, starveAcc: 0, tutorialStep: 0, warnedWave: -1, uid: 0
+    paused: true, speed: 1, mode, growAcc: 0, starveAcc: 0, tutorialStep: 0, warnedWave: -1, uid: 0,
+    seasonNo: 0, edictEnd: {}, edictUsed: {}
   };
   const [cx, cy] = L.citadel;
   S.citadel = addBuilding("citadel", cx, cy);
@@ -217,6 +219,15 @@ function canPlace(def, gx, gy) {
   return null;
 }
 
+// Rajakariya makes timber and stone work cheaper while it lasts.
+function buildCost(def) {
+  const d = edictOn("rajakariya") ? EDICTS.rajakariya.buildDiscount : 0;
+  if (!d) return def.cost;
+  const out = {};
+  for (const [k, v] of Object.entries(def.cost)) out[k] = k === "timber" || k === "stone" ? Math.ceil(v * (1 - d)) : v;
+  return out;
+}
+
 function rockNear(gx, gy, w, h, r) {
   for (let y = gy - r; y < gy + h + r; y++) for (let x = gx - r; x < gx + w + r; x++) {
     if (inb(x, y) && S.tiles[y][x].t === "rock") return true;
@@ -228,10 +239,11 @@ function tryBuild(gx, gy, quiet = false) {
   const def = BUILDINGS[S.tool];
   const why = canPlace(def, gx, gy);
   if (why) { if (!quiet) say(why, true); return false; }
-  for (const [k, v] of Object.entries(def.cost)) {
+  const cost = buildCost(def);
+  for (const [k, v] of Object.entries(cost)) {
     if (S[k] < v) { if (!quiet) say(`We need ${v} ${k} for the ${def.name}, and have ${Math.floor(S[k])}.`, true); return false; }
   }
-  for (const [k, v] of Object.entries(def.cost)) S[k] -= v;
+  for (const [k, v] of Object.entries(cost)) S[k] -= v;
   addBuilding(S.tool, gx, gy);
   puff(gx + def.w / 2, gy + def.h / 2, 6, "#b8a07a");
   refreshWorld();
@@ -391,7 +403,7 @@ function tickWater() {
     const src = waterSource(p);
     p.irrigated = !!src;
     if (!p.worker || p.growth >= 100) continue;
-    const rate = src ? 4 : maha ? 2 : 0;
+    const rate = (src ? 4 : maha ? 2 : 0) * (edictOn("rajakariya") ? 1.5 : 1);
     p.growth = Math.min(100, p.growth + rate);
     if (src && src !== "river") drainNet(src, 0.4);
   }
@@ -470,7 +482,7 @@ function carryHome(w, key, n) {
 function walk(w, dt) {
   const dx = w.tx - w.gx, dy = w.ty - w.gy, d = Math.hypot(dx, dy);
   if (d < 0.08) return true;
-  const step = Math.min(d, 2.0 * terrainMult(w) * dt);
+  const step = Math.min(d, 2.0 * terrainMult(w) * workMult() * dt);
   w.gx += (dx / d) * step; w.gy += (dy / d) * step;
   return false;
 }
@@ -480,7 +492,7 @@ function updateWorker(w, dt) {
     case "plan": planJob(w); break;
     case "wait":
       walk(w, dt);
-      w.timer -= dt;
+      w.timer -= dt * workMult();
       if (w.timer <= 0) planJob(w);
       break;
     case "toSite":
@@ -490,7 +502,7 @@ function updateWorker(w, dt) {
       }
       break;
     case "work":
-      w.timer -= dt;
+      w.timer -= dt * workMult();
       if (w.timer > 0) break;
       if (w.job === "woodcutter") {
         const t = w.target;
@@ -506,7 +518,7 @@ function updateWorker(w, dt) {
       if (w.job === "farmer") {
         if (w.b.growth >= 100) { w.b.growth = 0; carryHome(w, "rice", 12); }
       } else if (w.job === "trader") {
-        w.timer -= dt;
+        w.timer -= dt * workMult();
         if (w.timer <= 0) {
           w.timer = 6;
           if (S.rice > 30) { S.rice -= 5; S.gold += 8; spawnFloat("-5🍚 +8🪙", w.gx, w.gy, "#e9b949"); }
@@ -722,6 +734,7 @@ function tick() {
   if (S.seasonLeft <= 0) {
     S.season = SEASONS[S.season].next;
     S.seasonLeft = SEASONS[S.season].len;
+    S.seasonNo++;
     say(S.season === "maha"
       ? "The Maha monsoon breaks! The wewas fill and every paddy drinks."
       : "Yala, the dry season. Only paddies beside water will grow now.");
@@ -747,6 +760,7 @@ function tick() {
   S.fear = Math.max(0, S.fear - 0.5);
 
   let target = 55 + Math.min(2, count("dagoba")) * BUILDINGS.dagoba.harmony - S.fear + (S.season === "maha" ? 3 : 0);
+  if (edictOn("perahera")) target += EDICTS.perahera.harmonyTarget;
   if (S.rice <= 0) target -= 35;
   else if (S.rice >= S.villagers * 3) target += 8;
   target = clamp(target, 5, 100);
@@ -907,13 +921,24 @@ function affordable(cost) {
 function renderPalette() {
   const pal = document.getElementById("palette");
   pal.innerHTML = "";
-  if (S.cat === "army") {
+  if (S.cat === "realm") {
+    for (const [id, e] of Object.entries(EDICTS)) {
+      if (!S.unlocked.edicts.has(id)) continue;
+      const why = edictBlocked(id);
+      const card = document.createElement("button");
+      card.className = `card ${edictOn(id) ? "selected" : ""}`;
+      card.dataset.edict = id;
+      card.innerHTML = `<div class="card-head">${e.icon} ${e.name}</div><div class="card-desc">${e.desc}</div><div class="card-cost">${costText(e.cost)}${why ? ` · <em>${why}</em>` : ""}</div>`;
+      card.addEventListener("click", () => proclaim(id));
+      pal.appendChild(card);
+    }
+  } else if (S.cat === "army") {
     for (const [id, t] of Object.entries(TROOPS)) {
       if (!S.unlocked.troops.has(id)) continue;
       const card = document.createElement("button");
       card.className = "card";
       card.dataset.troop = id;
-      card.innerHTML = `<div class="card-head">${t.icon} ${t.name}</div><div class="card-desc">${t.desc}</div><div class="card-cost">${costText(t.cost)} + 1 👥</div>`;
+      card.innerHTML = `<div class="card-head">${t.icon} ${t.name}</div><div class="card-desc">${t.desc}</div><div class="card-cost">${costText(troopCost(id))} + 1 👥</div>`;
       card.addEventListener("click", () => recruit(id));
       pal.appendChild(card);
     }
@@ -924,7 +949,7 @@ function renderPalette() {
       card.className = `card ${S.tool === id ? "selected" : ""}`;
       card.dataset.build = id;
       card.title = b.desc;
-      card.innerHTML = `<div class="card-head">${b.icon} ${b.name}</div><div class="card-desc">${b.desc}</div><div class="card-cost">${costText(b.cost)}</div>`;
+      card.innerHTML = `<div class="card-head">${b.icon} ${b.name}</div><div class="card-desc">${b.desc}</div><div class="card-cost">${costText(buildCost(b))}</div>`;
       card.addEventListener("click", () => { S.tool = S.tool === id ? null : id; S.demolish = false; buildTabs(); renderPalette(); });
       pal.appendChild(card);
     }
@@ -935,22 +960,58 @@ function renderPalette() {
 
 function updateAffordability() {
   for (const card of document.querySelectorAll("#palette .card")) {
-    const cost = card.dataset.troop ? TROOPS[card.dataset.troop].cost : BUILDINGS[card.dataset.build].cost;
+    if (card.dataset.edict) { card.classList.toggle("poor", !!edictBlocked(card.dataset.edict) && !edictOn(card.dataset.edict)); continue; }
+    const cost = card.dataset.troop ? troopCost(card.dataset.troop) : buildCost(BUILDINGS[card.dataset.build]);
     card.classList.toggle("poor", !affordable(cost));
   }
 }
 
+// ==================== ROYAL DECREES ====================
+const edictOn = id => (S.edictEnd[id] || 0) > S.time;
+const workMult = () => (edictOn("rajakariya") ? EDICTS.rajakariya.work : 1);
+
+// Why a decree can't be proclaimed right now, or null.
+function edictBlocked(id) {
+  const e = EDICTS[id];
+  if (edictOn(id)) return `In force for ${Math.ceil(S.edictEnd[id] - S.time)}s`;
+  if (e.once === "maha" && S.season !== "maha") return "Only in the Maha monsoon";
+  if (S.edictUsed[id] === S.seasonNo) return "Already proclaimed this season";
+  if (!affordable(e.cost)) return `Needs ${costText(e.cost)}`;
+  return null;
+}
+
+function proclaim(id) {
+  const e = EDICTS[id];
+  const why = edictBlocked(id);
+  if (why) { say(`${e.name}: ${why.toLowerCase()}.`, true); return; }
+  for (const [k, v] of Object.entries(e.cost)) S[k] -= v;
+  S.edictEnd[id] = S.time + e.dur;
+  S.edictUsed[id] = S.seasonNo;
+  S.harmony = clamp(S.harmony + e.harmony, 0, 100);
+  say(id === "rajakariya"
+    ? "Rajakariya is proclaimed. Every family sends a worker for the king's service: build now, it costs less!"
+    : "The Perahera begins! Drums, torches and the tusker's procession lift every heart.");
+  spawnFloat(`${e.icon} ${e.name.split(" (")[0]}`, S.citadel.gx + 1, S.citadel.gy, "#e9b949");
+  sfx("conch");
+  renderPalette();
+  syncHud();
+}
+
+// Soldiers' price (monks at a staffed pansala lower it; see troopDiscount).
+function troopCost(id) { return TROOPS[id].cost; }
+
 function recruit(id) {
   const t = TROOPS[id];
+  const cost = troopCost(id);
   const barracks = S.buildings.filter(b => b.id === "barracks");
   if (!barracks.length) { say("Build an Angam Maduwa (Defence tab) first.", true); return; }
-  if (!affordable(t.cost)) { say(`A ${t.name} needs ${costText(t.cost)}.`, true); return; }
+  if (!affordable(cost)) { say(`A ${t.name} needs ${costText(cost)}.`, true); return; }
   if (idleVillagers() < 1 && S.villagers < 1) { say("No villagers left to take up arms.", true); return; }
   if (idleVillagers() < 1) {
     // Pull the most recently staffed worker off their job.
     releaseWorker(S.workers.pop());
   }
-  for (const [k, v] of Object.entries(t.cost)) S[k] -= v;
+  for (const [k, v] of Object.entries(cost)) S[k] -= v;
   S.villagers--;
   const b = barracks[0];
   spawnSoldier(id, b.gx + 1 + Math.random() * 0.5, b.gy + b.h + 0.3 + Math.random() * 0.4);
@@ -985,7 +1046,9 @@ function syncHud() {
   document.getElementById("pauseBtn").textContent = S.paused ? "▶ Resume" : "⏸ Pause";
   document.getElementById("pauseBtn").disabled = S.mode !== "play";
   document.getElementById("speedBtn").textContent = `⏩ ${S.speed}×`;
-  updateAffordability();
+  // decree cards show live timers; building costs change while rajakariya runs
+  if (S.cat === "realm" || (S.cat !== "army" && S.lastDiscount !== edictOn("rajakariya"))) { S.lastDiscount = edictOn("rajakariya"); renderPalette(); }
+  else updateAffordability();
 }
 
 let advisorTimer = null;

@@ -607,6 +607,7 @@ function render(now) {
   for (const bu of amb.bushes) if (!buildingAt(Math.floor(bu.gx), Math.floor(bu.gy)) && onScreen(bu.gx, bu.gy)) list.push([bu.gx + bu.gy, 5, bu]);
   for (const [, pl] of amb.props) for (const pr of pl) if (propFree(pr)) list.push([pr.gx + pr.gy, 6, pr]);
   for (const a of amb.animals) if (onScreen(a.gx, a.gy)) list.push([a.gx + a.gy, 7, a]);
+  for (const m of peraheraMembers()) list.push([m.gx + m.gy, 8, m]);
   list.sort((a, b) => a[0] - b[0]);
   for (const [, kind, o] of list) {
     if (kind === 0) drawTree(o, now);
@@ -616,7 +617,8 @@ function render(now) {
     else if (kind === 4) { if (!drawSprite(`rock.${o.v}`, o.x, o.y)) drawRock(o.x, o.y); }
     else if (kind === 5) drawSprite(`bush.${S.season}.${o.v}`, o.gx, o.gy);
     else if (kind === 6) drawSprite(o.key, o.gx, o.gy);
-    else drawAnimal(o, now);
+    else if (kind === 7) drawAnimal(o, now);
+    else drawPeraheraMember(o, now);
   }
 
   drawGhost();
@@ -1790,6 +1792,46 @@ function drawBirds(now) {
     const row = Math.ceil(i / 2), side = i % 2 ? 1 : -1;
     const gx = f.x - Math.sign(f.vx) * row * 0.35, gy = f.y + side * row * 0.3;
     drawSprite(`animal.egret.f${Math.floor(now / 180 + i) % 2}`, gx, gy, 70 + Math.sin(now * 0.002 + i) * 2, { flip: f.vx < 0 });
+  }
+}
+
+// ==================== PERAHERA ====================
+// While the festival decree is in force, a procession circles the citadel:
+// tuskers, Kandyan dancers and torch-bearers. Positions follow S.time so the
+// parade halts when the game is paused.
+const PERAHERA = ["u.v.farmer", "u.angampora", "u.angampora", "u.elephant", "u.v.trader", "u.v.farmer", "u.angampora", "u.elephant", "u.v.farmer"];
+function peraheraMembers() {
+  if (typeof edictOn !== "function" || !edictOn("perahera") || !hasSprite("u.elephant.f.i0")) return [];
+  const c = S.citadel, x0 = c.gx - 1.4, y0 = c.gy - 1.4, x1 = c.gx + c.w + 1.4, y1 = c.gy + c.h + 1.4;
+  const W = x1 - x0, H = y1 - y0, per = 2 * (W + H);
+  const at = d => {
+    d = ((d % per) + per) % per;
+    if (d < W) return [x0 + d, y1, 1, 0];
+    d -= W; if (d < H) return [x1, y1 - d, 0, -1];
+    d -= H; if (d < W) return [x1 - d, y0, -1, 0];
+    d -= W; return [x0, y0 + d, 0, 1];
+  };
+  const head = S.time * 0.55;
+  return PERAHERA.map((key, i) => {
+    const d = head - i * (key === "u.elephant" || PERAHERA[i - 1] === "u.elephant" ? 0.75 : 0.5);
+    const [gx, gy, dx, dy] = at(d);
+    return { key, gx, gy, sx: dx - dy, sy: dx + dy, d, torch: key === "u.v.farmer" };
+  });
+}
+function drawPeraheraMember(m, now) {
+  const back = m.sy < 0, flip = m.sx < 0;
+  const elephant = m.key === "u.elephant";
+  const fr = `w${Math.floor(m.d * (elephant ? 4 : 7)) % 6}`;
+  drawSprite(`${m.key}.${elephant || !back ? "f" : "b"}.${fr}`, m.gx, m.gy, 0, { flip });
+  if (m.torch) {
+    const p = iso(m.gx, m.gy, 26);
+    const r = 5 + Math.sin(now * 0.02 + m.d * 9) * 1.2;
+    ctx.globalCompositeOperation = "lighter";
+    const g = ctx.createRadialGradient(p.x, p.y, 0, p.x, p.y, r * 2.4);
+    g.addColorStop(0, "rgba(255,230,150,0.95)"); g.addColorStop(0.35, "rgba(255,140,40,0.55)"); g.addColorStop(1, "rgba(255,80,0,0)");
+    ctx.fillStyle = g; ctx.beginPath(); ctx.arc(p.x, p.y, r * 2.4, 0, Math.PI * 2); ctx.fill();
+    ctx.globalCompositeOperation = "source-over";
+    line(iso(m.gx, m.gy, 14), p, "#5a3a1c", 1.2);
   }
 }
 

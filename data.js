@@ -62,13 +62,26 @@ const BUILDINGS = {
                 desc: "Needed to train soldiers in the Army tab." }
 };
 
+// ==================== ROYAL DECREES ====================
+// Proclaimed from the 👑 tab. once: "season" = once per season, "maha" = once
+// per Maha. dur in simulation seconds. Effects are read by name in game.js.
+const EDICTS = {
+  rajakariya: { name: "Rajakariya (Royal service)", icon: "🛠️", cost: { rice: 15 }, once: "season", dur: 30, harmony: -8,
+                work: 1.6, buildDiscount: 0.3,
+                desc: "Every family owes the king days of labour. For 30s villagers work 60% faster and buildings cost 30% less timber and stone. Harmony −8." },
+  perahera:   { name: "Perahera (Festival)", icon: "🐘", cost: { rice: 40, gold: 30 }, once: "maha", dur: 60, harmony: 6,
+                harmonyTarget: 25,
+                desc: "An elephant procession with drummers and torches. For 60s harmony climbs towards +25. Once per Maha." }
+};
+
 const CATS = [
   { id: "water", icon: "💧", label: "Water" },
   { id: "food", icon: "🌾", label: "Food" },
   { id: "industry", icon: "🪓", label: "Industry" },
   { id: "town", icon: "🛕", label: "Town" },
   { id: "defence", icon: "🏯", label: "Defence" },
-  { id: "army", icon: "🐘", label: "Army" }
+  { id: "army", icon: "🐘", label: "Army" },
+  { id: "realm", icon: "👑", label: "Decrees" }
 ];
 
 // ==================== SOLDIERS & RAIDERS ====================
@@ -119,7 +132,7 @@ const LEVELS = [
     rivers: [{ edge: "north", at: 0, width: 1, wobble: 1 }],
     rocks: [[3, 18, 7, 23], [20, 4, 23, 7]],
     forests: [[3, 4, 8, 10, 0.4], [17, 18, 23, 24, 0.35]],
-    unlocks: { buildings: ["sluice", "tower"] },
+    unlocks: { buildings: ["sluice", "tower", "pansala"], edicts: ["rajakariya"] },
     waves: [{ t: 160, from: ["east"], raider: 4, bowman: 1 }, { t: 280, from: ["south"], raider: 5, bowman: 2 }, { t: 400, from: ["east"], raider: 6, bowman: 2 }],
     hpScale: 1.1,
     objectives: [{ type: "water", n: 150 }, { type: "res", key: "rice", n: 120 }, { type: "waves" }]
@@ -153,7 +166,7 @@ const LEVELS = [
     rivers: [{ edge: "south", at: 0, width: 2, wobble: 1 }],
     rocks: [[19, 3, 23, 6]],
     forests: [[2, 14, 8, 20, 0.45], [18, 15, 24, 21, 0.4]],
-    unlocks: { buildings: ["dagoba"], troops: ["elephant"] },
+    unlocks: { buildings: ["dagoba"], troops: ["elephant"], edicts: ["perahera"] },
     waves: [
       { t: 150, from: ["east"], raider: 5, bowman: 2 },
       { t: 250, from: ["north"], raider: 6, bowman: 3 },
