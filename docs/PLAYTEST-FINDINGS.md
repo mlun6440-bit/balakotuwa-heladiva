@@ -16,9 +16,28 @@ and tension that builds. Never their content (see `CLAUDE.md`).
 | Tribute bought whole levels | Learner paid off 4/4 raids on Lion Rock, 3 stars, citadel untouched | Final assault can't be bought; price doubles; any tribute caps at 2 stars | Learner pays 0 on L1–2, 2–3 raids on L3–5 and accepts 2 stars |
 | Walls were worthless | Learner built 0 wall tiles on every level | Melee raiders can't reach soldiers on walls/towers | Learner builds 2–5 wall tiles on L1–4 |
 
+## Loop batch 1 (R1–R5)
+
+| Round | Change | Bot evidence |
+|---|---|---|
+| R1 | Siltation + shramadana work parties | Parties form and dig on every level; idle share only modestly lower |
+| R2 | Raiders trample paddies, rob granaries | Novice loses 3 paddies on L1, 10–13 on L2; the planner learns to protect fields |
+| R3 | Soldier upkeep, new-edge warning, cards fit, Hill Kingdom granary | No card clips; finale still hard for the novice |
+| R4 | Stone thrower vs bolt tower (+ the bot learned to sally out) | Thrower flattens a lone watchtower from 7.3 tiles; a bolt tower kills it in ~26s; the planner wins the finale with 3 stars once it sallies |
+| R5 | One 🔨 Improve tool; one helper path for temporary workers | No regressions |
+
+Current curve (latest evaluation plus reruns): the planner wins every level
+(L1–L3 three stars, L4 two, L5 three). The novice wins L1–L2 comfortably,
+**scrapes L3–L4** (won 3 of 4 each, citadel 2–50%, L3 losing 12–15 families
+to hunger), and loses the finale.
+
 ## Open findings, ranked by evidence
 
-1. **Most villagers are idle (50–70% on every level).** Population grows
+0. **Mid-campaign is on a knife-edge for weak play** (L3–L4 above): trampled
+   fields plus soldier upkeep starve a careless kingdom. *Direction:* an
+   advisor warning when raiders head for the fields, and/or upkeep only in
+   Yala.
+1. **Most villagers are idle (still ~50% after R1).** Population grows
    faster than jobs; idle people only fight fires. *Direction:* give idle
    villagers a water-loop role, e.g. a "shramadana" pool that desilts wewas
    and repairs bunds (ties to the roadmap's siltation idea), or cap growth
