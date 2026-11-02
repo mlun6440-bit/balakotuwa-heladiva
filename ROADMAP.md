@@ -95,6 +95,16 @@ Recorded so these are not re-added without a strong reason:
   hint ("keep about one watered paddy for each house") fixes it; following it,
   the scripted player wins at ~350s.
 
+## From the learning playtest (docs/PLAYTEST-FINDINGS.md)
+
+- [x] Tribute could buy whole levels → final raid can't be bought, price doubles, max 2 stars.
+- [x] Walls were worthless → archers on walls/towers are out of melee reach.
+- [ ] Idle villagers (50–70%): a water-loop job for them (desilting, bund repair).
+- [ ] Early raids lack tension: raiders that threaten fields, bunds and granaries.
+- [ ] Hill Kingdom difficulty cliff for novices.
+- [ ] Army balloons without upkeep.
+- [ ] UI: card text clips at three lines; "Rain kept" shown on levels without a rain goal.
+
 ## Later
 
 - [x] **Fire.** Bowmen loose fire arrows at `flammable` buildings; fire spreads
