@@ -177,7 +177,7 @@ function startLevel(idx, mode = "brief") {
 // ==================== BUILDINGS ====================
 function addBuilding(id, gx, gy) {
   const def = BUILDINGS[id];
-  const b = { uid: ++S.uid, id, def, gx, gy, w: def.w, h: def.h, hp: def.hp, maxHp: def.hp, worker: null, water: 0, growth: 0, open: false, next: 0 };
+  const b = { uid: ++S.uid, id, def, gx, gy, w: def.w, h: def.h, hp: def.hp, maxHp: def.hp, worker: null, water: 0, growth: 0, open: false, next: 0, at: S.time };
   S.buildings.push(b);
   S.trees = S.trees.filter(t => !(t.gx >= gx && t.gx < gx + def.w && t.gy >= gy && t.gy < gy + def.h));
   return b;

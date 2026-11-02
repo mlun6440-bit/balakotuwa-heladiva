@@ -485,6 +485,11 @@ function drawHoverTile() {
 // ==================== GROUND-LEVEL STRUCTURES ====================
 function drawGround(b, now) {
   const { gx, gy, w, h } = b;
+  if (hasSprite("wewa.base")) {
+    if (b.id === "wewa") return drawWewaSprite(b, now);
+    if (b.id === "canal" || b.id === "sluice") return drawCanalSprite(b, now);
+    if (b.id === "paddy") return drawPaddySprite(b, now);
+  }
   if (b.id === "wewa") drawWewa(b, now);
   else if (b.id === "canal" || b.id === "sluice") drawCanal(b, now);
   else if (b.id === "paddy") drawPaddy(b, now);
@@ -580,6 +585,87 @@ function drawPaddy(b, now) {
       if (k >= 1) { ctx.fillStyle = "#f3d77a"; ctx.fillRect(p.x - 1 + sway, p.y - tall - 2, 2, 2); }
     }
   }
+}
+
+// ---- sprite versions of the water works ----
+function drawWewaSprite(b, now) {
+  const { gx, gy } = b;
+  drawSprite("wewa.base", gx, gy);
+  const k = b.water / WEWA_CAP;
+  if (k > 0.01) {
+    const z = 0.6 + 5.6 * k, inset = 0.56 - 0.2 * (z / 7);
+    const p0 = iso(gx + inset, gy + inset, z), p2 = iso(gx + 2 - inset, gy + 2 - inset, z);
+    const g = ctx.createLinearGradient(p0.x, p0.y, p2.x, p2.y);
+    g.addColorStop(0, `rgba(120,185,215,${0.75 + 0.2 * k})`);
+    g.addColorStop(0.5, `rgba(52,120,160,${0.8 + 0.2 * k})`);
+    g.addColorStop(1, `rgba(24,80,118,${0.85 + 0.15 * k})`);
+    diamond(gx + inset, gy + inset, 2 - inset * 2, 2 - inset * 2, z, g);
+    // sky glint and ripples
+    ctx.strokeStyle = "rgba(255,255,255,0.22)"; ctx.lineWidth = 0.8;
+    for (let i = 0; i < 4; i++) {
+      const t = (now * 0.00012 + i * 0.25 + b.uid * 0.13) % 1;
+      const a = iso(gx + inset + 0.15, gy + inset + t * (2 - inset * 2 - 0.2), z), c = iso(gx + 2 - inset - 0.3, gy + inset + t * (2 - inset * 2 - 0.2), z);
+      ctx.globalAlpha = Math.sin(t * Math.PI);
+      ctx.beginPath(); ctx.moveTo(a.x, a.y); ctx.lineTo(c.x, c.y); ctx.stroke();
+    }
+    ctx.globalAlpha = 1;
+    // waterline darkening along the back banks
+    ctx.strokeStyle = "rgba(30,40,30,0.35)"; ctx.lineWidth = 1.2;
+    const q0 = iso(gx + 2 - inset, gy + inset, z), q1 = iso(gx + inset, gy + 2 - inset, z);
+    ctx.beginPath(); ctx.moveTo(q0.x, q0.y); ctx.lineTo(p0.x, p0.y); ctx.lineTo(q1.x, q1.y); ctx.stroke();
+    if (k > 0.3) for (let i = 0; i < 6; i++) {
+      const lx = gx + inset + 0.15 + hash(b.uid, i) * (1.7 - inset * 2), ly = gy + inset + 0.15 + hash(i, b.uid) * (1.7 - inset * 2);
+      drawSprite(S.season === "maha" && i % 2 === 0 ? "lotus.0" : "lotus.1", lx, ly, z);
+    }
+  }
+  drawSprite("wewa.front", gx, gy);
+}
+
+function canalMask(b) {
+  let m = 0;
+  for (const [bit, dx, dy] of [[1, 1, 0], [2, -1, 0], [4, 0, 1], [8, 0, -1]]) {
+    const nb = buildingAt(b.gx + dx, b.gy + dy);
+    if (nb && nb.def.water) m |= bit;
+  }
+  return m;
+}
+function drawCanalSprite(b, now) {
+  const { gx, gy } = b;
+  const m = canalMask(b);
+  drawSprite(`canal.${m}`, gx, gy);
+  const id = S.netOf[gy][gx];
+  const wet = id !== -1 && S.nets[id].water >= 1;
+  const flooded = S.flooded.has(gy * MAP + gx);
+  if (!wet && !flooded) return;
+  const z = flooded ? -0.4 : -1.4;
+  const col = flooded ? `rgba(${120 + Math.sin(now * 0.008 + gx + gy) * 25 | 0},200,240,0.92)` : "rgba(46,124,170,0.9)";
+  const r = [[0.33, 0.33, 0.34, 0.34]];
+  if (m & 1) r.push([0.67, 0.33, 0.33, 0.34]);
+  if (m & 2) r.push([0, 0.33, 0.33, 0.34]);
+  if (m & 4) r.push([0.33, 0.67, 0.34, 0.33]);
+  if (m & 8) r.push([0.33, 0, 0.34, 0.33]);
+  for (const [x, y, w, h] of r) diamond(gx + x, gy + y, w, h, z, col);
+  // flowing glints
+  const t = (now * 0.0006 + gx * 0.3 + gy * 0.2) % 1;
+  ctx.fillStyle = flooded ? "rgba(255,255,255,0.7)" : "rgba(220,240,255,0.45)";
+  const p = iso(gx + 0.38 + t * 0.24, gy + 0.5, z);
+  ctx.fillRect(p.x - 1.5, p.y - 0.4, 3, 0.8);
+  if (flooded) { const q = iso(gx + 0.5, gy + 0.38 + ((t + 0.5) % 1) * 0.24, z); ctx.fillRect(q.x - 1.5, q.y - 0.4, 3, 0.8); }
+}
+function drawSluice(b) {
+  if (!drawSprite(`sluice.${b.open ? "open" : "closed"}`, b.gx, b.gy)) {
+    box(b.gx + 0.12, b.gy + 0.12, 0.2, 0.2, 0, 16, PAL.stone);
+    box(b.gx + 0.68, b.gy + 0.68, 0.2, 0.2, 0, 16, PAL.stone);
+    box(b.gx + 0.12, b.gy + 0.12, 0.76, 0.76, 16, 3, "#8d8676");
+    box(b.gx + 0.3, b.gy + 0.3, 0.4, 0.4, b.open ? 10 : 0, b.open ? 6 : 10, PAL.timber);
+  }
+}
+function paddyKey(b) {
+  const wet = b.irrigated || S.season === "maha";
+  return `paddy.${wet ? "w" : "d"}${Math.min(4, Math.floor(b.growth / 100 * 4.999))}`;
+}
+function drawPaddySprite(b, now) {
+  drawSprite(paddyKey(b), b.gx, b.gy);
 }
 
 // ==================== BUILDINGS ====================
@@ -804,8 +890,100 @@ function drawBarracks(b, now) {
   flag(iso(gx + 0.15, gy + 1.85, 0), 30, PAL.maroon, now);
 }
 
+// Sprite key for a (non-wall) building.
+function buildingKey(b) {
+  if (b.id === "house") return `house.${b.uid % 3}`;
+  if (b.id === "gate") {
+    const links = wallLinks(b);
+    return links.some(([dx]) => dx === 0) && !links.some(([, dy]) => dy === 0) ? "gate.a" : "gate.b";
+  }
+  return b.id;
+}
+// Wall pieces in draw order: back arms, centre, front arms.
+function wallKeys(b) {
+  let links = wallLinks(b);
+  if (!links.length) links = b.id === "palisade" ? [[1, 0], [-1, 0]] : [];
+  const has = (dx, dy) => links.some(([a, c]) => a === dx && c === dy);
+  const out = [];
+  if (has(-1, 0)) out.push(`${b.id}.nx`);
+  if (has(0, -1)) out.push(`${b.id}.ny`);
+  out.push(`${b.id}.c`);
+  if (has(1, 0)) out.push(`${b.id}.px`);
+  if (has(0, 1)) out.push(`${b.id}.py`);
+  return out;
+}
+
+// Construction: a building first appears as a marked-out site, then rises
+// out of its scaffolding. Timed in simulation seconds; purely cosmetic.
+const BUILD_TIME = 2.6;
+// b.at is the simulation time the building was placed (set in addBuilding).
+function buildProgress(b) {
+  if (!(b.at > 0)) return 1; // placed at level start
+  return clamp((S.time - b.at) / BUILD_TIME, 0, 1);
+}
+
+const FLAGS = { citadel: [1.42, 0.5, 52, 20], tower: [0.5, 0.5, 60, 12], gate: [0.5, 0.5, 51, 12], barracks: [1.85, 1.85, 0, 30] };
+
+function drawBuildingSprite(b, now) {
+  const key = b.def.wall && b.id !== "gate" ? null : buildingKey(b);
+  if (key && !hasSprite(key)) return false;
+  if (!key && !hasSprite(`${b.id}.c`)) return false;
+  const prog = buildProgress(b);
+  const n = Math.max(b.w, b.h) > 1 ? 2 : 1;
+  if (prog < 0.3) { drawSprite(`site.${n}`, b.gx, b.gy); return true; }
+  const clip = prog < 1 ? (prog - 0.3) / 0.7 : undefined;
+  const o = clip !== undefined ? { clip } : undefined;
+  if (key) drawSprite(key, b.gx, b.gy, 0, o);
+  else for (const k of wallKeys(b)) drawSprite(k, b.gx, b.gy, 0, o);
+  if (prog < 1) { drawSprite(`scaffold.${n}`, b.gx, b.gy); return true; }
+  const fl = FLAGS[b.id];
+  if (fl) flag(iso(b.gx + fl[0], b.gy + fl[1], fl[2]), fl[3], PAL.maroon, now);
+  drawDamage(b);
+  return true;
+}
+
+// Soot and cracks on damaged buildings (fire and smoke come from updateFx).
+function drawDamage(b) {
+  const k = b.hp / b.maxHp;
+  if (k > 0.65) return;
+  const sev = (0.65 - k) / 0.65;
+  const top = b.def.z || 18;
+  for (let i = 0; i < 3 + b.w * 2; i++) {
+    const p = iso(b.gx + 0.15 + hash(b.uid, i) * (b.w - 0.3), b.gy + 0.15 + hash(i, b.uid) * (b.h - 0.3), 3 + hash(b.uid, i, 3) * top * 0.7);
+    const r = 4 + hash(b.uid, i, 4) * 7;
+    const g = ctx.createRadialGradient(p.x, p.y, 0, p.x, p.y, r);
+    g.addColorStop(0, `rgba(20,14,10,${0.55 * sev})`); g.addColorStop(1, "rgba(20,14,10,0)");
+    ctx.fillStyle = g; ctx.beginPath(); ctx.arc(p.x, p.y, r, 0, Math.PI * 2); ctx.fill();
+  }
+  ctx.strokeStyle = `rgba(25,15,8,${0.7 * sev})`; ctx.lineWidth = 0.7;
+  for (let i = 0; i < 3; i++) {
+    let p = iso(b.gx + b.w * (0.3 + hash(i, b.uid, 7) * 0.5), b.gy + b.h, 4 + hash(b.uid, i, 8) * top * 0.4);
+    ctx.beginPath(); ctx.moveTo(p.x, p.y);
+    for (let j = 0; j < 4; j++) { p = { x: p.x + (hash(i, j, b.uid) - 0.5) * 5, y: p.y - 2 - hash(j, i) * 3 }; ctx.lineTo(p.x, p.y); }
+    ctx.stroke();
+  }
+}
+
+// Rubble left where a building was destroyed (render-local, fades after a while).
+const ruins = { S: null, list: [], seen: new Map() };
+function drawRuins() {
+  if (ruins.S !== S) { ruins.S = S; ruins.list = []; ruins.seen = new Map(); }
+  const now = new Map();
+  for (const b of S.buildings) now.set(b.uid, b);
+  for (const [uid, b] of ruins.seen) {
+    if (!now.has(uid) && b.hp <= 0 && b.id !== "canal" && b.id !== "paddy") ruins.list.push({ gx: b.gx, gy: b.gy, n: Math.max(b.w, b.h) > 1 ? 2 : 1, t: S.time });
+  }
+  ruins.seen = now;
+  ruins.list = ruins.list.filter(r => S.time - r.t < 60);
+  for (const r of ruins.list) {
+    const occ = buildingAt(r.gx, r.gy);
+    if (occ && buildProgress(occ) >= 0.3) continue;
+    drawSprite(`rubble.${r.n}`, r.gx, r.gy, 0, { alpha: clamp((60 - (S.time - r.t)) / 10, 0, 1) });
+  }
+}
+
 function drawBuilding(b, now) {
-  if (drawSprite(b.id, b.gx + b.w / 2, b.gy + b.h / 2)) return;
+  if (drawBuildingSprite(b, now)) return;
   const { gx, gy, w, h } = b;
   switch (b.id) {
     case "citadel": drawCitadel(b, now); break;
@@ -1083,10 +1261,18 @@ function puff(gx, gy, n, col) {
 
 function updateFx(dt) {
   if (!S.fx) S.fx = [];
-  // Hearth smoke from the citadel and houses
   for (const b of S.buildings) {
+    // Hearth smoke from the citadel and houses
     if ((b.id === "citadel" || b.id === "house") && Math.random() < dt * 0.8) {
-      S.fx.push({ gx: b.gx + b.w * 0.3, gy: b.gy + b.h * 0.3, z: b.id === "citadel" ? 58 : 26, vx: 0.15, vy: -0.05, vz: 9, life: 2.5, max: 2.5, r: 2.5, col: "#d8d4cc" });
+      S.fx.push({ gx: b.gx + b.w * 0.3, gy: b.gy + b.h * 0.3, z: b.id === "citadel" ? 58 : 24, vx: 0.15, vy: -0.05, vz: 9, life: 2.5, max: 2.5, r: 2.5, col: "#d8d4cc" });
+    }
+    // Damaged buildings smoke; badly damaged ones burn
+    const k = b.hp / b.maxHp;
+    if (k < 0.6 && Math.random() < dt * (0.6 - k) * 8) {
+      S.fx.push({ gx: b.gx + Math.random() * b.w, gy: b.gy + Math.random() * b.h, z: (b.def.z || 10) * (0.4 + Math.random() * 0.6), vx: 0.2, vy: -0.1, vz: 14, life: 3, max: 3, r: 3, col: "#4a4440", kind: "smoke" });
+    }
+    if (k < 0.35 && Math.random() < dt * 14) {
+      S.fx.push({ gx: b.gx + 0.15 + Math.random() * (b.w - 0.3), gy: b.gy + 0.15 + Math.random() * (b.h - 0.3), z: (b.def.z || 10) * Math.random() * 0.8, vx: 0.05, vy: -0.03, vz: 18 + Math.random() * 10, life: 0.7, max: 0.7, r: 2.5 + Math.random() * 2, col: "#ff9a2a", kind: "flame" });
     }
   }
   for (let i = S.fx.length - 1; i >= 0; i--) {
@@ -1098,11 +1284,28 @@ function updateFx(dt) {
 
 function drawFx() {
   for (const f of S.fx || []) {
+    if (f.kind === "flame") continue;
     const p = iso(f.gx, f.gy, f.z);
-    ctx.globalAlpha = Math.max(0, f.life / f.max) * 0.45;
-    ctx.fillStyle = f.col;
+    const a = Math.max(0, f.life / f.max);
+    ctx.globalAlpha = a * (f.kind === "smoke" ? 0.55 : 0.45);
+    const g = ctx.createRadialGradient(p.x, p.y, 0, p.x, p.y, f.r);
+    g.addColorStop(0, f.col); g.addColorStop(1, "rgba(0,0,0,0)");
+    ctx.fillStyle = g;
     ctx.beginPath(); ctx.arc(p.x, p.y, f.r, 0, Math.PI * 2); ctx.fill();
   }
+  // flames glow additively
+  ctx.globalCompositeOperation = "lighter";
+  for (const f of S.fx || []) {
+    if (f.kind !== "flame") continue;
+    const p = iso(f.gx, f.gy, f.z);
+    const a = Math.max(0, f.life / f.max);
+    const r = f.r * (0.5 + a * 0.7);
+    const g = ctx.createRadialGradient(p.x, p.y, 0, p.x, p.y, r);
+    g.addColorStop(0, `rgba(255,236,160,${a})`); g.addColorStop(0.4, `rgba(255,140,30,${a * 0.8})`); g.addColorStop(1, "rgba(200,40,0,0)");
+    ctx.fillStyle = g;
+    ctx.beginPath(); ctx.ellipse(p.x, p.y, r * 0.75, r * 1.2, 0, 0, Math.PI * 2); ctx.fill();
+  }
+  ctx.globalCompositeOperation = "source-over";
   ctx.globalAlpha = 1;
 }
 
@@ -1111,6 +1314,20 @@ function drawGhost() {
   if (!S.tool || !inb(h.gx, h.gy)) return;
   const def = BUILDINGS[S.tool];
   const ok = !canPlace(def, h.gx, h.gy);
+  const gk = { house: "house.0", palisade: "palisade.c", rampart: "rampart.c", gate: "gate.b", canal: "canal.0", sluice: "sluice.closed", paddy: "paddy.w1", wewa: "wewa.front" }[S.tool] || S.tool;
+  if (hasSprite(gk)) {
+    diamond(h.gx, h.gy, def.w, def.h, 0, ok ? "rgba(110,230,110,0.35)" : "rgba(245,75,75,0.4)", ok ? "rgba(140,255,140,0.9)" : "rgba(255,110,110,0.9)");
+    if (S.tool === "wewa") drawSprite("wewa.base", h.gx, h.gy, 0, { alpha: 0.6 });
+    drawSprite(gk, h.gx, h.gy, 0, { alpha: ok ? 0.75 : 0.45 });
+    if (def.tower) {
+      const c = iso(h.gx + 0.5, h.gy + 0.5, 0);
+      ctx.strokeStyle = "rgba(233,185,73,0.7)"; ctx.lineWidth = 1;
+      ctx.setLineDash([4, 4]);
+      ctx.beginPath(); ctx.ellipse(c.x, c.y, def.tower.range * TW / 1.41, def.tower.range * TH / 1.41, 0, 0, Math.PI * 2); ctx.stroke();
+      ctx.setLineDash([]);
+    }
+    return;
+  }
   ctx.globalAlpha = 0.55;
   block(h.gx, h.gy, def.w, def.h, 0, def.ground ? 2 : (def.z || 16),
     ok ? "#7ef07e" : "#f54b4b", ok ? "#46b446" : "#be2d2d", ok ? "#329632" : "#962323");
