@@ -124,6 +124,9 @@ function person(c, o, pose) {
   } else if (H.kind === "hood") {
     c.fillStyle = shadeFill(c, hx - 3, hx + 3, H.col);
     c.beginPath(); c.moveTo(hx - 3, headY + 2.4); c.quadraticCurveTo(hx - 3.2, headY - 3.6, hx + 0.4, headY - 3.4); c.quadraticCurveTo(hx + 3.2, headY - 3, hx + 2.8, headY + 2.4); c.lineTo(hx + 1.8, headY + 1); c.lineTo(hx + 1.8, headY - 1.2); c.lineTo(hx - 1, headY - 1.2); c.lineTo(hx - 1, headY + 1.5); c.closePath(); c.fill();
+  } else if (H.kind === "shaved") { // monk: shaved head, faint stubble
+    c.fillStyle = "rgba(60,40,25,0.22)"; c.beginPath(); c.ellipse(hx, headY - 1.0, 2.4, 1.7, 0, Math.PI, 0); c.fill();
+    c.fillStyle = "rgba(255,230,200,0.25)"; c.beginPath(); c.ellipse(hx - 0.9, headY - 1.6, 0.8, 0.5, -0.4, 0, 7); c.fill();
   } else if (H.kind === "konde") { // hair knot with a cloth band (Angampora)
     c.fillStyle = "#1a120c"; c.beginPath(); c.ellipse(hx, headY - 1.2, 2.5, 1.8, 0, Math.PI, 0); c.fill();
     c.beginPath(); c.arc(hx - 1.2, headY - 3, 1.2, 0, 7); c.fill();
@@ -152,6 +155,20 @@ function person(c, o, pose) {
 
 // ----- held items -----
 const ITEMS = {
+  bowl(c, h, pose) { // black lacquered alms bowl, raised when receiving
+    const lift = pose.act >= 0 ? Math.sin(pose.act * Math.PI) * 2 : 0;
+    const x = h.x - 1.6, y = h.y - 0.6 - lift;
+    c.fillStyle = "#1e1a18"; c.beginPath(); c.ellipse(x, y, 2.2, 1.6, 0, 0, Math.PI); c.fill();
+    c.fillStyle = "#3a332e"; c.beginPath(); c.ellipse(x, y, 2.2, 0.7, 0, 0, 7); c.fill();
+    c.fillStyle = "rgba(255,255,255,0.35)"; c.fillRect(x - 1.6, y + 0.3, 0.8, 0.4);
+  },
+  talapata(c, h, pose, o, behind) { // palm-leaf sunshade over the shoulder
+    c.save(); c.translate(h.x, h.y); c.rotate(-0.5);
+    c.strokeStyle = "#6b4426"; c.lineWidth = 0.6; c.beginPath(); c.moveTo(0, 0); c.lineTo(0, -12); c.stroke();
+    c.fillStyle = "#d8c48a"; c.beginPath(); c.moveTo(0, -12); c.arc(0, -12, 6, Math.PI * 1.05, Math.PI * 1.95); c.closePath(); c.fill();
+    c.strokeStyle = "rgba(120,95,50,0.6)"; c.lineWidth = 0.3; for (let a = 1.1; a < 1.95; a += 0.12) { c.beginPath(); c.moveTo(0, -12); c.lineTo(Math.cos(a * Math.PI) * 6, -12 + Math.sin(a * Math.PI) * 6); c.stroke(); }
+    c.restore();
+  },
   spear(c, h, pose) {
     const a = pose.act >= 0 ? -0.6 + pose.act * 0.9 : -1.45;
     const len = 26;
@@ -227,6 +244,7 @@ const LOOKS = {
   "v.farmer": { skin: SKIN.villager, upper: "#f2efe6", lower: "#3d6fa8", lowerBand: "#e8e2d0", head: { kind: "turban", col: "#f4f1e8" }, sleeves: false, item: ITEMS.hoe, work: "work" },
   "v.woodcutter": { skin: SKIN.villager, bare: true, lower: "#a8321e", lowerBand: "#e9b949", head: {}, item: ITEMS.axe, work: "work", short: true },
   "v.mason": { skin: SKIN.villager, upper: "#e8e0d0", lower: "#6b4a2a", head: { kind: "turban", col: "#c9b48a" }, item: ITEMS.hammer, work: "work", short: true },
+  "v.monk": { skin: SKIN.villager, upper: "#d9822b", lower: "#d9822b", lowerBand: "#b8641c", head: { kind: "shaved" }, sleeves: true, sash: "#b8641c", item: ITEMS.bowl, offItem: ITEMS.talapata, work: "work" },
   "v.trader": { skin: SKIN.villager, upper: "#e9b949", lower: "#f2efe6", lowerBand: "#a8321e", head: { kind: "turban", col: "#a8321e" }, sleeves: true, item: ITEMS.scales, work: "work", beard: "#2a1a10" },
   // soldiers
   archer: { skin: SKIN.soldier, upper: "#2f8f4e", lower: "#f2efe6", lowerBand: "#2f8f4e", head: { kind: "turban", col: "#2f8f4e" }, offItem: ITEMS.bow, quiver: ITEMS.quiver, short: true, sash: "#e9b949", attack: "shoot", bowHand: true },

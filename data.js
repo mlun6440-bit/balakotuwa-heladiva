@@ -45,6 +45,8 @@ const BUILDINGS = {
   storehouse: { name: "Gabadawa (Storehouse)", cat: "industry", icon: "📦", w: 2, h: 2, hp: 400, cost: { timber: 12 }, solid: true, z: 18, store: ["timber", "stone"],
                 desc: "Drop-off for timber and stone." },
 
+  pansala:    { name: "Pansala (Monastery)", cat: "town", icon: "🪷", w: 2, h: 2, hp: 600, cost: { timber: 20, stone: 12, gold: 20 }, solid: true, z: 34, worker: "monk",
+                desc: "A monk walks alms rounds among the houses. While staffed: +5 harmony (up to two) and soldiers cost 25% less." },
   house:      { name: "Gedara (House)", cat: "town", icon: "🏠", w: 1, h: 1, hp: 220, cost: { timber: 8 }, solid: true, z: 18, pop: 5,
                 desc: "Room for 5 more villagers." },
   dagoba:     { name: "Dagoba (Stupa)", cat: "town", icon: "🛕", w: 2, h: 2, hp: 1000, cost: { stone: 30, gold: 40 }, solid: true, z: 44, harmony: 12,

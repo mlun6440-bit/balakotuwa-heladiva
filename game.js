@@ -484,6 +484,14 @@ function planJob(w) {
     }
     if (!best) { goTo(w, hx, hy + 0.6, "wait"); w.timer = 3; return; }
     goTo(w, best[0] + 0.5, best[1] + 0.9, "toSite");
+  } else if (w.job === "monk") {
+    // Alternate between the alms round (a house) and meditation at the pansala.
+    const houses = S.buildings.filter(h => h.id === "house");
+    w.alms = !w.alms && houses.length > 0;
+    if (w.alms) {
+      const h = houses[Math.floor(Math.random() * houses.length)];
+      goTo(w, h.gx + 0.5, h.gy + 1.25, "wait"); w.timer = 9;
+    } else goTo(w, hx + 0.3, hy + 1.1, "toSite");
   } else {
     goTo(w, hx + 0.2, hy + 0.3, "toSite");
   }
@@ -543,6 +551,9 @@ function updateWorker(w, dt) {
     case "tend":
       if (w.job === "farmer") {
         if (w.b.growth >= 100) { w.b.growth = 0; carryHome(w, "rice", 12); }
+      } else if (w.job === "monk") {
+        w.timer -= dt;
+        if (w.timer <= 0) planJob(w);
       } else if (w.job === "trader") {
         w.timer -= dt * workMult();
         if (w.timer <= 0) {
@@ -813,6 +824,7 @@ function tick() {
 
   let target = 55 + Math.min(2, count("dagoba")) * BUILDINGS.dagoba.harmony - S.fear + (S.season === "maha" ? 3 : 0);
   if (edictOn("perahera")) target += EDICTS.perahera.harmonyTarget;
+  target += Math.min(2, staffedPansalas()) * 5;
   if (S.rice <= 0) target -= 35;
   else if (S.rice >= S.villagers * 3) target += 8;
   target = clamp(target, 5, 100);
@@ -1054,8 +1066,15 @@ function proclaim(id) {
   syncHud();
 }
 
-// Soldiers' price (monks at a staffed pansala lower it; see troopDiscount).
-function troopCost(id) { return TROOPS[id].cost; }
+// Soldiers' price: monks at a staffed pansala teach discipline, 25% off.
+const staffedPansalas = () => S.buildings.filter(b => b.id === "pansala" && b.worker).length;
+function troopCost(id) {
+  const c = TROOPS[id].cost;
+  if (!staffedPansalas()) return c;
+  const out = {};
+  for (const [k, v] of Object.entries(c)) out[k] = Math.ceil(v * 0.75);
+  return out;
+}
 
 function recruit(id) {
   const t = TROOPS[id];
@@ -1124,7 +1143,7 @@ function spawnFloat(text, gx, gy, color) {
 
 function describe(b) {
   const lines = [`<b>${b.def.icon} ${b.def.name}</b>`, `HP ${Math.ceil(b.hp)}/${b.maxHp}`];
-  if (b.def.worker) lines.push(b.worker ? "Staffed" : "💤 No villager free. Build houses.");
+  if (b.def.worker) lines.push(b.worker ? (b.id === "pansala" ? (b.worker.alms ? "The monk is on his alms round" : "The monk is in meditation") : "Staffed") : "💤 No villager free. Build houses.");
   if (b.id === "wewa") {
     lines.push(`Water ${Math.round(b.water)}/${WEWA_CAP}${riverBeside(b) ? " · river-fed" : ""}`);
     const id = S.netOf[b.gy][b.gx], linked = id !== -1 ? S.nets[id].wewas.size - 1 : 0;

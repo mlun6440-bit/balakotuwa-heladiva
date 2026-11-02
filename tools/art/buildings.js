@@ -287,6 +287,33 @@ ART.add("dagoba", () => {
   for (let i = 0; i < 10; i++) at(rr(0.5, 1.5), 1.97, 4, c => { c.fillStyle = pick(["#f4f0e6", "#f2c94c", "#e68aa6"]); c.beginPath(); c.arc(0, 0, 0.5, 0, 7); c.fill(); });
 }, { size: 260, oy: 0.7 });
 
+// Pansala (monastery): image house, bodhighara with a bo tree, small stupa, sand court.
+ART.add("pansala", () => {
+  box(0, 0, 0, 2, 2, 0.8, { top: { col: "#d8c9a4", tex: TEX.earth }, left: M.earth, right: M.earth }, { edges: false });
+  // low white boundary wall at the back
+  box(0.02, 0.02, 0.8, 1.96, 0.08, 5, M.lime, { ao: 1 }); box(0.02, 0.1, 0.8, 0.08, 1.88, 5, M.lime, { ao: 1 });
+  // bodhighara: raised square terrace with the sacred bo tree
+  box(1.05, 0.15, 0.8, 0.8, 0.8, 4, { top: M.graniteSlab, left: M.lime, right: M.lime }, { ao: 1 });
+  box(1.05, 0.15, 4.8, 0.8, 0.06, 2.4, M.lime); box(1.79, 0.15, 4.8, 0.06, 0.8, 2.4, M.lime);
+  latheAt([1.45, 0.55, 4.8], [[0.07, 0], [0.05, 4], [0.045, 14]], { col: "#7a6a58", band: (a, t, f) => lit(jit("#7a6a58", 0.06), f) }, { seg: 10 });
+  for (const [dx, dy, z, r] of [[-0.18, 0.05, 24, 11], [0.2, -0.1, 25, 10], [0, 0.15, 28, 10], [0, -0.05, 32, 9]]) {
+    canopy(1.45 + dx, 0.55 + dy, z, r, r * 0.75, SEASON_GREENS.maha, { n: 110, leaf: 1.7, leaves: 6 });
+  }
+  // prayer flags strung from the tree
+  if (!MODE.shadow) { const cols = ["#2d5e8a", "#e9b949", "#a8321e", "#f2efe6", "#d9822b"]; for (let i = 0; i < 10; i++) { const a = P(1.1 + i * 0.07, 0.95, 16 - Math.sin(i / 9 * Math.PI) * 3); g.fillStyle = cols[i % 5]; g.fillRect(a.x - 0.6, a.y, 1.2, 1.6); } }
+  // image house (pilimage)
+  hall(0.15, 0.95, 1.0, 0.9, { plinth: 3, wallH: 13, roofH: 12, roof: M.tile, wall: M.white, windows: 1, veranda: true, plinthMat: M.laterite });
+  // small stupa
+  lathe(1.55, 1.45, [[0.2, 0.8], [0.2, 2.6], [0.17, 2.6], [0.17, 4]], M.lime, { seg: 28 });
+  const dome = []; for (let i = 0; i <= 8; i++) { const a = (i / 8) * Math.PI / 2; dome.push([0.16 * Math.cos(a), 4 + Math.sin(a) * 9]); }
+  lathe(1.55, 1.45, dome, { col: "#efe9dc", spec: 0.25 }, { seg: 28 });
+  box(1.51, 1.41, 12.6, 0.08, 0.08, 2, M.lime);
+  lathe(1.55, 1.45, [[0.03, 14.6], [0.0, 20]], { col: "#e8e1d0" }, { seg: 10 });
+  lathe(1.55, 1.45, [[0.012, 19.5], [0.0, 21.5]], M.gold, { seg: 8 });
+  // oil-lamp stand and flowers at the stupa
+  for (let i = 0; i < 8; i++) at(1.55 + rr(-0.22, 0.22), 1.7, 0.8, c => { c.fillStyle = pick(["#f4f0e6", "#f2c94c", "#e68aa6"]); c.beginPath(); c.arc(0, 0, 0.5, 0, 7); c.fill(); });
+}, { size: 230 });
+
 // Atuwa (watchtower): tapering laterite base, timber lookout, tiled roof.
 ART.add("tower", () => {
   box(0.06, 0.06, 0, 0.88, 0.88, 4, { top: M.graniteSlab, left: M.granite, right: M.granite }, { ao: 2 });
