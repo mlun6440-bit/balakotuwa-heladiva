@@ -203,7 +203,7 @@ function unlockedFor(idx) {
 // ==================== SKIRMISH ====================
 // A seeded random map with every building unlocked and endless raids that
 // grow each time. Survive as many raids as you can.
-function makeSkirmish(seed) {
+function makeSkirmish(seed, sandbox = false) {
   const r = mulberry32(seed), ri = (a, b) => a + Math.floor(r() * (b - a + 1));
   const edges = ["west", "north", "south", "east"];
   const riverEdge = edges[ri(0, 2)];
@@ -221,8 +221,13 @@ function makeSkirmish(seed) {
     rocks: Array.from({ length: ri(2, 3) }, () => rect(ri(2, 4), ri(2, 4))),
     forests: Array.from({ length: ri(3, 5) }, () => [...rect(ri(4, 7), ri(4, 7)), 0.35 + r() * 0.2]),
     unlocks: {}, all,
-    waves: [0, 1, 2].map(k => skirmishWave(k, seed, riverEdge)),
-    hpScale: 1, objectives: [{ type: "endless" }]
+    waves: sandbox ? [] : [0, 1, 2].map(k => skirmishWave(k, seed, riverEdge)),
+    hpScale: 1, objectives: [{ type: sandbox ? "sandbox" : "endless" }],
+    ...(sandbox ? {
+      id: `sandbox-${seed}`, name: "Sandbox", sandbox: true, endless: false, era: `Royal sandbox · seed ${seed}`,
+      intro: "A peaceful valley with full stores. Build anything; open 👑 Decrees to send raids of any size from any edge and test your defences.",
+      start: { timber: 999, stone: 999, rice: 600, gold: 999, villagers: 30, arms: 60 }
+    } : {})
   };
 }
 function skirmishWave(k, seed, riverEdge) {
@@ -232,9 +237,25 @@ function skirmishWave(k, seed, riverEdge) {
   const from = [...edges].sort(() => r() - 0.5).slice(0, n);
   return { t: 150 + k * 95, from, raider: 3 + 2 * k, bowman: 1 + Math.floor(k * 0.8), brute: Math.floor(k / 2) };
 }
-const startSkirmish = seed => startLevel(LEVELS.length, "brief", makeSkirmish(seed ?? (Date.now() % 900000) + 1));
-const restartLevel = () => (S.L.skirmish ? startSkirmish(S.L.seed) : startLevel(S.idx));
-const levelTitle = () => (S.L.skirmish ? "Skirmish" : `${S.idx + 1}. ${S.L.name}`);
+const newSeed = () => (Date.now() % 900000) + 1;
+const startSkirmish = seed => startLevel(LEVELS.length, "brief", makeSkirmish(seed ?? newSeed()));
+const startSandbox = seed => startLevel(LEVELS.length, "brief", makeSkirmish(seed ?? newSeed(), true));
+const restartLevel = () => (S.L.sandbox ? startSandbox(S.L.seed) : S.L.skirmish ? startSkirmish(S.L.seed) : startLevel(S.idx));
+const levelTitle = () => (S.L.sandbox ? "Sandbox" : S.L.skirmish ? "Skirmish" : `${S.idx + 1}. ${S.L.name}`);
+
+// Sandbox: send a raid of a chosen size from a chosen edge (also a balance harness).
+const RAID_SIZES = { small: 6, medium: 14, large: 30, extreme: 60 };
+function sendRaid(size, edge) {
+  const n = RAID_SIZES[size];
+  const list = [];
+  for (let i = 0; i < n; i++) list.push(i % 10 === 9 ? "brute" : i % 3 === 2 ? "bowman" : "raider");
+  const party = 1000 + (S.raidsSent = (S.raidsSent || 0) + 1);
+  S.parties = S.parties || {};
+  S.parties[party] = { total: list.length, spawned: 0, fled: false };
+  list.forEach((type, i) => S.spawnQueue.push({ at: S.time + i * 0.35, type, edge, party }));
+  say(`A ${size} raid of ${n} sets out from the ${edge}.`, true);
+  sfx("conch");
+}
 
 function startLevel(idx, mode = "brief", custom = null) {
   const L = custom || LEVELS[idx];
@@ -1208,6 +1229,7 @@ function objective(o) {
     case "harmony": return { label: `😊 Harmony ${o.n}+`, cur: Math.floor(S.harmony), n: o.n };
     case "pop": return { label: `👥 ${o.n} villagers`, cur: S.villagers, n: o.n };
     case "catch": return { label: `🌧️ Catch ${o.n} rain (${rainKept()}% kept)`, cur: Math.floor(S.rain.caught), n: o.n };
+    case "sandbox": return { label: `🏗️ Sandbox · raids sent: ${S.raidsSent || 0} (send more from 👑)`, cur: 0, n: Infinity };
     case "endless": {
       const busy = foesAlive() || S.spawnQueue.length > 0;
       return { label: `🛡️ Raids survived: ${Math.max(0, S.nextWave - (busy ? 1 : 0))} (best ${progress.skirmishBest || 0})`, cur: 0, n: Infinity };
@@ -1346,7 +1368,18 @@ function affordable(cost) {
 function renderPalette() {
   const pal = document.getElementById("palette");
   pal.innerHTML = "";
-  if (S.cat === "realm") {
+  if (S.cat === "realm" && S.L.sandbox) {
+    S.raidEdge = S.raidEdge || "east";
+    const card = (html, onClick) => { const c = document.createElement("div"); c.className = "card wide"; c.innerHTML = html; pal.appendChild(c); onClick(c); };
+    card(`<div class="card-head">🚩 Raid edge</div><div class="card-desc">${["north", "east", "south", "west"].map(e => `<button class="btn ${S.raidEdge === e ? "primary" : ""}" data-edge="${e}">${e}</button>`).join(" ")}</div>`,
+      c => c.querySelectorAll("[data-edge]").forEach(b => b.addEventListener("click", () => { S.raidEdge = b.dataset.edge; renderPalette(); })));
+    card(`<div class="card-head">⚔️ Send a raid</div><div class="card-desc">${Object.entries(RAID_SIZES).map(([k, n]) => `<button class="btn" data-size="${k}">${k} (${n})</button>`).join(" ")}</div>`,
+      c => c.querySelectorAll("[data-size]").forEach(b => b.addEventListener("click", () => { sendRaid(b.dataset.size, S.raidEdge); syncHud(); })));
+    card(`<div class="card-head">🏺 Royal stores</div><div class="card-desc"><button class="btn" id="sbFill">+500 of everything</button> <button class="btn" id="sbSeason">Change season</button></div>`, c => {
+      c.querySelector("#sbFill").addEventListener("click", () => { for (const k of Object.keys(RES)) S[k] += 500; syncHud(); });
+      c.querySelector("#sbSeason").addEventListener("click", () => { S.seasonLeft = 1; tick(); });
+    });
+  } else if (S.cat === "realm") {
     for (const [id, e] of Object.entries(EDICTS)) {
       if (!S.unlocked.edicts.has(id)) continue;
       const why = edictBlocked(id);
@@ -1385,6 +1418,7 @@ function renderPalette() {
 
 function updateAffordability() {
   for (const card of document.querySelectorAll("#palette .card")) {
+    if (!card.dataset.edict && !card.dataset.troop && !card.dataset.build) continue; // sandbox controls
     if (card.dataset.edict) { card.classList.toggle("poor", !!edictBlocked(card.dataset.edict) && !edictOn(card.dataset.edict)); continue; }
     const cost = card.dataset.troop ? troopCost(card.dataset.troop) : buildCost(BUILDINGS[card.dataset.build]);
     card.classList.toggle("poor", !affordable(cost));
@@ -1479,7 +1513,7 @@ function syncHud() {
   document.getElementById("pauseBtn").disabled = S.mode !== "play";
   document.getElementById("speedBtn").textContent = `⏩ ${S.speed}×`;
   // decree cards show live timers; building costs change while rajakariya runs
-  if (S.cat === "realm" || (S.cat !== "army" && S.lastDiscount !== edictOn("rajakariya"))) { S.lastDiscount = edictOn("rajakariya"); renderPalette(); }
+  if ((S.cat === "realm" && !S.L.sandbox) || (S.cat !== "army" && S.cat !== "realm" && S.lastDiscount !== edictOn("rajakariya"))) { S.lastDiscount = edictOn("rajakariya"); renderPalette(); }
   else updateAffordability();
 }
 
@@ -1556,6 +1590,12 @@ function showMenu() {
           <div class="lc-era">Random map, everything unlocked</div>
           <div class="lc-stars">Best: ${progress.skirmishBest || 0} raids</div>
         </button>
+        <button class="level-card" id="sandboxCard">
+          <div class="lc-num">Sandbox</div>
+          <div class="lc-name">Royal sandbox</div>
+          <div class="lc-era">Full stores; send raids yourself</div>
+          <div class="lc-stars">🏗️</div>
+        </button>
       </div>
       <details class="how">
         <summary>How to play</summary>
@@ -1568,10 +1608,11 @@ function showMenu() {
           <li>Finish every objective and survive every raid to win. Stars depend on how much of the citadel is left standing.</li>
         </ul>
       </details>
-      ${S && S.mode === "menu" ? `<div class="actions"><button class="btn primary" id="resumeBtn">▶ Resume ${S.L.skirmish ? "skirmish" : `level ${S.idx + 1}`}</button></div>` : ""}
+      ${S && S.mode === "menu" ? `<div class="actions"><button class="btn primary" id="resumeBtn">▶ Resume ${S.L.sandbox ? "sandbox" : S.L.skirmish ? "skirmish" : `level ${S.idx + 1}`}</button></div>` : ""}
     </div>`;
   overlay.querySelectorAll(".level-card[data-level]").forEach(btn => btn.addEventListener("click", () => startLevel(Number(btn.dataset.level))));
   document.getElementById("skirmishCard").addEventListener("click", () => startSkirmish());
+  document.getElementById("sandboxCard").addEventListener("click", () => startSandbox());
   const cont = document.getElementById("continueBtn");
   if (cont) cont.addEventListener("click", continueRun);
   const resume = document.getElementById("resumeBtn");
@@ -1584,7 +1625,7 @@ function showBriefing() {
   const unlocks = [...(L.unlocks.buildings || []).map(id => BUILDINGS[id].name), ...(L.unlocks.troops || []).map(id => TROOPS[id].name)];
   overlay.innerHTML = `
     <div class="card-screen">
-      <div class="lc-num">${L.skirmish ? "Skirmish" : `Level ${S.idx + 1}`} · ${L.era}</div>
+      <div class="lc-num">${L.sandbox ? "Sandbox" : L.skirmish ? "Skirmish" : `Level ${S.idx + 1}`} · ${L.era}</div>
       <h2>${L.name}</h2>
       <p>${L.intro}</p>
       <b>Objectives</b>

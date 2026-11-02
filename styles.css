@@ -269,3 +269,8 @@ details.how summary { cursor: pointer; color: var(--gold); }
   .hint-pill { display: none; }
   .topbar { flex-wrap: wrap; }
 }
+
+/* Sandbox controls in the Decrees tab */
+.card.wide { flex: 0 0 auto; max-width: 300px; }
+.card.wide .card-desc { display: flex; flex-wrap: wrap; gap: 4px; }
+.card.wide .btn { padding: 3px 8px; font-size: 12px; }
