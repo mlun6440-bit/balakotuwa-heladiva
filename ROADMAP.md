@@ -67,6 +67,12 @@ system, not a copy of any other game's mechanic.
       tool, market orders.
 - [ ] **Genre notes step 5:** raider stone-thrower that outranges towers vs a
       player bolt tower; hill tiles that block building; scorched ground.
+- [x] **Tribute** (notes #14): from level 2, pay rice and gold in the 30s before
+      a raid to turn it back; −5 harmony; +50% price each time.
+- [x] **Defeat screen names the causes** (notes #19): `S.stats` tally; the end
+      screen lists the 2–3 most telling reasons with what to do next time.
+- [ ] Notes #15 (raiders strengthen while you wait), #16 (home-ground bonus),
+      #17 (hidden forest paths), #18 (buried coin hoards).
 - [ ] Minimap arrows for incoming raids (notes #4); wall stairs (notes #7);
       merit currency for elite units (notes #10); sealed-citadel pathing test (notes #12).
 

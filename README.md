@@ -34,6 +34,8 @@ The sprite art is original, modelled in code under `tools/art/` and baked into
 - **Fire (from Lion Rock).** Raider bowmen shoot fire arrows at thatch and timber. Fire spreads in the dry season and dies in the monsoon. Villagers run with water pots from the nearest wewa, canal or river.
 - **Morale.** A raid party that loses most of its strength breaks and flees (no gold for those who escape).
 - **Defences.** Thorn barriers slow and scratch raiders. Upgrade palisades to ramparts and houses to walawwas, and repair damage with the 🔧 tool.
+- **Tribute (from level 2).** In the 30 seconds before a raid you can pay rice and gold to turn it back. It costs more each time and shames your people.
+- **Defeat is explained.** If the Maligawa falls, the end screen names the two or three main reasons and what to try next.
 - **Raiders.** They follow the cheapest path to the citadel. They walk around walls when there is a gap and break through when there isn't.
 
 ## Campaign
@@ -62,7 +64,7 @@ Progress, star ratings, the skirmish best and the level in progress are saved in
 | Select soldiers | Left-click or drag a box |
 | Move soldiers | Right-click |
 | Cancel | Right-click or Esc |
-| Pause / centre | Space / C |
+| Pause / centre | Space or ▶/⏸ / C |
 | Control groups | Ctrl+1–9 to store selected soldiers, 1–9 to select (twice to centre) |
 | Upgrade / repair | ⬆️ and 🔧 tabs, then click or drag |
 
