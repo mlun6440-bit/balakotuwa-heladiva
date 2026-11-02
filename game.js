@@ -794,9 +794,35 @@ function moveToward(u, tx, ty, dt) {
   u.gx += (dx / d) * step; u.gy += (dy / d) * step;
 }
 
+// ==================== SPATIAL HASH ====================
+// Units are bucketed into 2×2-tile cells once per combat step, so neighbour
+// queries (targeting, volleys, separation) stay fast with hundreds of units.
+const CELL = 2, CELLS = Math.ceil(MAP / CELL) + 2;
+function buildUnitGrid() {
+  const grid = new Map();
+  for (const u of S.units) {
+    const k = (Math.floor(u.gx / CELL) + 1) * CELLS + Math.floor(u.gy / CELL) + 1;
+    let a = grid.get(k);
+    if (!a) grid.set(k, (a = []));
+    a.push(u);
+  }
+  S.ugrid = grid;
+}
+// Every unit whose cell overlaps the square of radius r around (x, y).
+function unitsNear(x, y, r) {
+  if (!S.ugrid) buildUnitGrid();
+  const out = [];
+  const x0 = Math.floor((x - r) / CELL) + 1, x1 = Math.floor((x + r) / CELL) + 1, y0 = Math.floor((y - r) / CELL) + 1, y1 = Math.floor((y + r) / CELL) + 1;
+  for (let cx = x0; cx <= x1; cx++) for (let cy = y0; cy <= y1; cy++) {
+    const a = S.ugrid.get(cx * CELLS + cy);
+    if (a) for (const u of a) out.push(u);
+  }
+  return out;
+}
+
 function nearestFoe(u, radius, from = u) {
   let best = null, bd = radius;
-  for (const v of S.units) {
+  for (const v of unitsNear(from.gx, from.gy, radius)) {
     if (v.team === u.team || v.hp <= 0) continue;
     const d = Math.hypot(v.gx - from.gx, v.gy - from.gy);
     if (u.team === "e" && d > 1.5 && inCover(v)) continue; // hidden in the forest
@@ -809,7 +835,7 @@ function nearestFoe(u, radius, from = u) {
 // enemies in range instead of everyone shooting the same one.
 function volleyTarget(u, range, from = u) {
   const near = [];
-  for (const v of S.units) {
+  for (const v of unitsNear(from.gx, from.gy, range)) {
     if (v.team === u.team || v.hp <= 0 || v.flee) continue;
     const d = Math.hypot(v.gx - from.gx, v.gy - from.gy);
     if (d <= range && !(u.team === "e" && d > 1.5 && inCover(v))) near.push([d, v]);
@@ -921,10 +947,9 @@ function updateSoldier(u, dt) {
 }
 
 function separate() {
-  const us = S.units;
-  for (let i = 0; i < us.length; i++) {
-    for (let j = i + 1; j < us.length; j++) {
-      const a = us[i], b = us[j];
+  for (const a of S.units) {
+    for (const b of unitsNear(a.gx, a.gy, 0.32)) {
+      if (b.uid <= a.uid) continue; // each pair once
       const dx = b.gx - a.gx, dy = b.gy - a.gy, d = Math.hypot(dx, dy);
       if (d > 0.001 && d < 0.32) {
         const push = (0.32 - d) * 0.25;
@@ -936,10 +961,12 @@ function separate() {
 }
 
 function updateCombat(dt) {
+  buildUnitGrid();
   for (const u of S.units) {
     if (u.hp <= 0) continue;
     if (u.team === "p") updateSoldier(u, dt); else updateFoe(u, dt);
   }
+  buildUnitGrid();
   separate();
 
   for (const b of S.buildings) {
