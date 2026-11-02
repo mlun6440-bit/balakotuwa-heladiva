@@ -1483,6 +1483,8 @@ function drawUnit(u, now) {
     else fr = "i0";
     const f = u.type === "elephant" || !g.back ? "f" : "b";
     drawSprite(`${base}.${f}.${fr}`, u.gx, u.gy, u.z, { flip: g.flip });
+    // hidden in the forest: foliage in front of the soldier
+    if (u.team === "p" && typeof inCover === "function" && inCover(u)) drawSprite(`bush.${S.season}.${u.uid % 3}`, u.gx + 0.08, u.gy + 0.08, 0, { scale: u.type === "elephant" ? 1.4 : 0.85, alpha: 0.9 });
   }
   else if (u.type === "elephant") drawElephant(p, u, now);
   else if (u.team === "p") {

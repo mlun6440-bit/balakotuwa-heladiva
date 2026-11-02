@@ -179,7 +179,7 @@ const LEVELS = [
   },
   {
     id: "senkadagala", name: "Hill Kingdom", era: "Senkadagala", seed: 71,
-    intro: "The last free kingdom in the hills. Raiders come from three sides. Keep your people fed and content, and the citadel standing.",
+    intro: "The last free kingdom in the hills. Raiders come from three sides. Hide soldiers in the forest to ambush them, keep your people fed and content, and the citadel standing.",
     citadel: [13, 13], season: "maha",
     start: { timber: 160, stone: 100, rice: 110, gold: 180, villagers: 16 },
     army: { spearman: 4, archer: 4, angampora: 2 },

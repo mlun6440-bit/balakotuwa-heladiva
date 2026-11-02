@@ -169,6 +169,7 @@ function startLevel(idx, mode = "brief") {
     }
   }
   refreshWorld();
+  updateCover();
   centerCamera();
   buildTabs();
   renderPalette();
@@ -587,10 +588,29 @@ function edgeSpawn(edge) {
   }
 }
 
+// ==================== FOREST COVER ====================
+// Kandyan hill warfare: raiders struggle through thick jungle, and soldiers
+// hidden among trees are invisible from range and strike first.
+// S.cover[y*MAP+x] = mature trees in the 3×3 block around the tile.
+function updateCover() {
+  const own = new Uint8Array(MAP * MAP), cover = new Uint8Array(MAP * MAP);
+  for (const t of S.trees) if (t.stage >= 60) { const x = Math.floor(t.gx), y = Math.floor(t.gy); if (inb(x, y)) own[y * MAP + x]++; }
+  for (let y = 0; y < MAP; y++) for (let x = 0; x < MAP; x++) {
+    let n = 0;
+    for (let dy = -1; dy <= 1; dy++) for (let dx = -1; dx <= 1; dx++) if (inb(x + dx, y + dy)) n += own[(y + dy) * MAP + x + dx];
+    cover[y * MAP + x] = Math.min(255, n);
+  }
+  S.cover = cover;
+}
+const coverAt = (gx, gy) => { const x = Math.floor(gx), y = Math.floor(gy); return S.cover && inb(x, y) && !S.occ[y][x] ? S.cover[y * MAP + x] : 0; };
+const inCover = u => !u.z && coverAt(u.gx, u.gy) >= 2;
+const AMBUSH_RESET = 4; // seconds without attacking before the next first strike
+
 function terrainMult(u) {
   const x = Math.floor(u.gx), y = Math.floor(u.gy);
   if (!inb(x, y)) return 1;
   if (u.team === "e" && S.flooded.has(y * MAP + x)) return 0.4;
+  if (u.team === "e" && coverAt(u.gx, u.gy) >= 3) return 0.7; // thick jungle
   const t = S.tiles[y][x].t;
   return t === "river" ? 0.55 : t === "rock" ? 0.85 : 1;
 }
@@ -607,6 +627,7 @@ function nearestFoe(u, radius, from = u) {
   for (const v of S.units) {
     if (v.team === u.team || v.hp <= 0) continue;
     const d = Math.hypot(v.gx - from.gx, v.gy - from.gy);
+    if (u.team === "e" && d > 1.5 && inCover(v)) continue; // hidden in the forest
     if (d <= bd) { bd = d; best = v; }
   }
   return best;
@@ -614,6 +635,11 @@ function nearestFoe(u, radius, from = u) {
 
 function attack(u, target, dmg) {
   if (S.time - u.last < 1.0) return;
+  if (u.team === "p" && inCover(u) && S.time - u.last > AMBUSH_RESET) {
+    dmg *= 2;
+    spawnFloat("Ambush!", u.gx, u.gy, "#bff0a8");
+    if (!S.warnedAmbush) { S.warnedAmbush = true; say("Ambush! Soldiers hidden in the forest strike first for double damage, and raiders can't see them from afar."); }
+  }
   u.last = S.time;
   if (u.def.ranged) fireShot(u.gx, u.gy, u.z + 12, target, dmg);
   else hitUnit(target, dmg, u.def.splash);
@@ -773,6 +799,7 @@ function tick() {
   }
 
   tickWater();
+  updateCover();
 
   for (const u of S.units) {
     if (u.team === "e" && S.flooded.has(Math.floor(u.gy) * MAP + Math.floor(u.gx))) u.hp -= 4;
