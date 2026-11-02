@@ -623,6 +623,7 @@ function render(now) {
   for (const b of S.buildings) drawBuildingStatus(b, now);
   drawShots();
   drawFx();
+  drawBirds(now);
   if (S.season === "maha") drawCloudShadows(now);
   for (const f of S.floats) label(f.text, f.gx, f.gy, f.z, "bold 12px sans-serif", f.color);
 
@@ -1660,6 +1661,136 @@ function drawRain(now) {
     ctx.moveTo(x, y); ctx.lineTo(x - 3, y + 10);
   }
   ctx.stroke();
+}
+
+// ==================== AMBIENT LIFE ====================
+// Purely cosmetic and render-local: boulders and bushes scattered on the
+// meadow, props beside buildings (carts, haystacks, firewood), cattle and
+// water buffalo grazing, egrets stalking the wet paddies, flocks overhead.
+// Animated on wall-clock time; never read by the simulation.
+const amb = { S: null, rocks: [], bushes: [], props: new Map(), animals: [], last: 0, flock: null };
+
+const freeTile = (x, y) => inb(x, y) && S.tiles[y][x].t === "grass" && !S.occ[y][x];
+
+function resetAmbient() {
+  amb.S = S; amb.last = 0; amb.flock = null;
+  amb.rocks = []; amb.bushes = []; amb.props = new Map(); amb.animals = [];
+  for (let y = 0; y < MAP; y++) for (let x = 0; x < MAP; x++) {
+    const t = S.tiles[y][x].t;
+    if (t === "rock") amb.rocks.push({ x, y, v: Math.floor(hash(x, y, 21) * 4) });
+    else if (t === "grass" && hash(x, y, 33) < 0.075 && Math.hypot(x - S.L.citadel[0], y - S.L.citadel[1]) > 3.5) {
+      amb.bushes.push({ gx: x + 0.2 + hash(x, y, 34) * 0.6, gy: y + 0.2 + hash(x, y, 35) * 0.6, v: Math.floor(hash(x, y, 36) * 3) });
+    }
+  }
+  // A herd on an open meadow away from the citadel; buffalo near water if there is any.
+  const [cx, cy] = S.L.citadel;
+  let best = null, bs = -1;
+  for (let i = 0; i < 80; i++) {
+    const x = 2 + Math.floor(hash(i, S.idx, 41) * (MAP - 4)), y = 2 + Math.floor(hash(S.idx, i, 42) * (MAP - 4));
+    if (!freeTile(x, y)) continue;
+    let open = 0;
+    for (let dy = -2; dy <= 2; dy++) for (let dx = -2; dx <= 2; dx++) if (freeTile(x + dx, y + dy)) open++;
+    const score = open + Math.min(8, Math.hypot(x - cx, y - cy)) * 0.8;
+    if (score > bs) { bs = score; best = [x, y]; }
+  }
+  if (best) {
+    let wet = false;
+    for (let dy = -4; dy <= 4 && !wet; dy++) for (let dx = -4; dx <= 4; dx++) if (inb(best[0] + dx, best[1] + dy) && S.tiles[best[1] + dy][best[0] + dx].t === "river") { wet = true; break; }
+    const n = 4 + Math.floor(hash(S.idx, 7) * 3);
+    for (let i = 0; i < n; i++) {
+      const type = wet && i < 2 ? "buffalo" : "cow";
+      amb.animals.push({ type, home: best, gx: best[0] + 0.5 + (hash(i, 1) - 0.5) * 2, gy: best[1] + 0.5 + (hash(i, 2) - 0.5) * 2, tx: 0, ty: 0, state: "graze", t: hash(i, 3) * 6, d: 0, flip: hash(i, 4) > 0.5, seed: i });
+    }
+  }
+}
+
+// Props beside buildings, placed once per building on free neighbouring ground.
+const PROP_FOR = { house: ["prop.woodpile", "prop.pots", "prop.fence"], storehouse: ["prop.cart", "prop.stones"], market: ["prop.cart", "prop.pots"], paddy: ["prop.haystack"], bissa: ["prop.haystack"], woodcutter: ["prop.woodpile"], quarry: ["prop.stones"], barracks: ["prop.fence"] };
+function propsFor(b) {
+  let list = amb.props.get(b.uid);
+  if (list) return list;
+  list = [];
+  const opts = PROP_FOR[b.id];
+  if (opts) {
+    const n = b.id === "house" ? (hash(b.uid, 2) < 0.6 ? 1 : 0) : 1;
+    for (let i = 0; i < n; i++) {
+      const key = opts[Math.floor(hash(b.uid, i, 5) * opts.length)];
+      // try the tiles in front of the building first
+      const cand = [[b.gx + b.w, b.gy + Math.floor(b.h / 2)], [b.gx + Math.floor(b.w / 2), b.gy + b.h], [b.gx - 1, b.gy], [b.gx, b.gy - 1]];
+      for (const [x, y] of cand) if (freeTile(x, y)) { list.push({ key, gx: x + 0.3 + hash(b.uid, 8) * 0.4, gy: y + 0.3 + hash(b.uid, 9) * 0.4, b }); break; }
+    }
+  }
+  amb.props.set(b.uid, list);
+  return list;
+}
+const propFree = pr => S.buildings.includes(pr.b) && !buildingAt(Math.floor(pr.gx), Math.floor(pr.gy)) && onScreen(pr.gx, pr.gy) && buildProgress(pr.b) >= 1;
+
+function updateAmbient(now) {
+  const dt = amb.last ? Math.min(0.1, (now - amb.last) / 1000) : 0;
+  amb.last = now;
+  for (const b of S.buildings) propsFor(b);
+  if (amb.props.size > S.buildings.length + 20) {
+    const live = new Set(S.buildings.map(b => b.uid));
+    for (const k of amb.props.keys()) if (!live.has(k)) amb.props.delete(k);
+  }
+  const playing = S.mode === "play" && !S.paused;
+  if (!playing) return;
+  for (const a of amb.animals) {
+    a.t -= dt;
+    if (a.state === "walk") {
+      const dx = a.tx - a.gx, dy = a.ty - a.gy, d = Math.hypot(dx, dy);
+      // shy away from fighting
+      if (d < 0.05 || a.t < 0) { a.state = "graze"; a.t = 4 + hash(a.seed, now | 0) * 8; continue; }
+      const sp = (a.type === "buffalo" ? 0.22 : 0.3) * dt;
+      a.gx += dx / d * sp; a.gy += dy / d * sp; a.d += sp;
+      a.flip = dx - dy < 0;
+    } else if (a.t <= 0) {
+      // pick a free spot near home, with a clear straight path
+      for (let tries = 0; tries < 6; tries++) {
+        const tx = a.home[0] + 0.5 + (Math.random() - 0.5) * 5, ty = a.home[1] + 0.5 + (Math.random() - 0.5) * 5;
+        let ok = true;
+        for (let k = 0; k <= 8 && ok; k++) { const x = Math.floor(a.gx + (tx - a.gx) * k / 8), y = Math.floor(a.gy + (ty - a.gy) * k / 8); if (!inb(x, y) || S.occ[y][x] || S.tiles[y][x].t === "rock") ok = false; }
+        if (ok) { a.tx = tx; a.ty = ty; a.state = "walk"; a.t = 20; break; }
+      }
+      if (a.state !== "walk") a.t = 3;
+    }
+  }
+  // egrets come and go over the wet paddies
+  if (!amb.flock && Math.random() < dt / 25) {
+    const fromLeft = Math.random() < 0.5;
+    amb.flock = { x: fromLeft ? -2 : MAP + 2, y: Math.random() * MAP, vx: fromLeft ? 1.6 : -1.6, vy: (Math.random() - 0.5) * 0.6, n: 3 + Math.floor(Math.random() * 4), t: 0 };
+  }
+  if (amb.flock) {
+    const f = amb.flock;
+    f.x += f.vx * dt; f.y += f.vy * dt; f.t += dt;
+    if (f.x < -4 || f.x > MAP + 4) amb.flock = null;
+  }
+}
+
+function drawAnimal(a, now) {
+  let fr;
+  if (a.state === "walk") fr = `w${Math.floor(a.d * 9) % 4}`;
+  else fr = Math.floor(now / 2400 + a.seed) % 3 === 0 ? "i0" : "g0";
+  drawSprite(`animal.${a.type}.${fr}`, a.gx, a.gy, 0, { flip: a.flip });
+}
+
+function drawBirds(now) {
+  // egrets on wet paddies
+  for (const b of S.buildings) {
+    if (b.id !== "paddy" || !(b.irrigated || S.season === "maha") || b.growth > 70 || hash(b.uid, 3) < 0.35) continue;
+    if (!onScreen(b.gx + 1, b.gy + 1)) continue;
+    for (let i = 0; i < 2; i++) {
+      const t = Math.floor(now / 1700 + hash(b.uid, i) * 9);
+      const gx = b.gx + 0.35 + hash(b.uid, i, t % 5) * 1.3, gy = b.gy + 0.35 + hash(i, b.uid, t % 5) * 1.3;
+      drawSprite(t % 3 === 0 ? "animal.egret.s" : "animal.egret.p", gx, gy, 0.5, { flip: (t + i) % 2 === 0 });
+    }
+  }
+  const f = amb.flock;
+  if (f) for (let i = 0; i < f.n; i++) {
+    const row = Math.ceil(i / 2), side = i % 2 ? 1 : -1;
+    const gx = f.x - Math.sign(f.vx) * row * 0.35, gy = f.y + side * row * 0.3;
+    drawSprite(`animal.egret.f${Math.floor(now / 180 + i) % 2}`, gx, gy, 70 + Math.sin(now * 0.002 + i) * 2, { flip: f.vx < 0 });
+  }
 }
 
 // ==================== MINIMAP ====================
