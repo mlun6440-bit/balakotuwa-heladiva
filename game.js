@@ -1308,7 +1308,7 @@ function objective(o) {
     case "water": return { label: "💧 water held", cur: Math.floor(totalWater()), n: o.n };
     case "harmony": return { label: `😊 Harmony ${o.n}+`, cur: Math.floor(S.harmony), n: o.n };
     case "pop": return { label: "👥 villagers", cur: S.villagers, n: o.n };
-    case "catch": return { label: `🌧️ rain caught, ${rainKept()}% kept`, cur: Math.floor(S.rain.caught), n: o.n };
+    case "catch": return { label: `🌧️ rain (${rainKept()}% kept)`, cur: Math.floor(S.rain.caught), n: o.n };
     case "sandbox": return { label: `🏗️ Sandbox · ${S.raidsSent || 0} raids sent from 👑`, cur: 0, n: Infinity };
     case "endless": {
       const busy = foesAlive() || S.spawnQueue.length > 0;
@@ -1316,7 +1316,7 @@ function objective(o) {
     }
     case "waves": {
       const busy = foesAlive() || S.spawnQueue.length > 0;
-      return { label: "🛡️ raids survived", cur: Math.max(0, S.nextWave - (busy ? 1 : 0)), n: L.waves.length };
+      return { label: "🛡️ raids", cur: Math.max(0, S.nextWave - (busy ? 1 : 0)), n: L.waves.length };
     }
   }
   return { label: "?", cur: 0, n: 1 };
@@ -1648,11 +1648,11 @@ function syncHud() {
   tb.hidden = !open;
   if (open) {
     const c = tributeCost();
-    tb.textContent = `🪙 Tribute ${costText(c)}`;
+    tb.textContent = `🪙 Pay ${costText(c)}`;
     tb.disabled = !affordable(c);
     tb.title = "Pay rice and gold to turn the coming raid back; it costs more each time and −5 harmony.";
   }
-  document.getElementById("pauseBtn").textContent = S.paused ? "▶ Resume" : "⏸ Pause";
+  document.getElementById("pauseBtn").textContent = S.paused ? "▶" : "⏸";
   document.getElementById("pauseBtn").disabled = S.mode !== "play";
   document.getElementById("speedBtn").textContent = `⏩ ${S.speed}×`;
   if (S.realmTab !== realmTabUseful()) buildTabs();
