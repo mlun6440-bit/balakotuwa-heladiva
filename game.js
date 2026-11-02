@@ -1182,6 +1182,37 @@ function launchWave() {
   sfx("conch");
 }
 
+// ==================== TRIBUTE ====================
+// While a raid gathers (from level 2), rice and gold can turn it back. The
+// raid counts as survived; the price grows each time and the shame costs harmony.
+const TRIBUTE_WINDOW = 30;
+function tributeCost() {
+  const w = S.L.waves[S.nextWave];
+  if (!w) return null;
+  const n = Object.keys(FOES).reduce((a, k) => a + (w[k] || 0), 0);
+  const k = 1 + 0.5 * (S.tributes || 0);
+  return { gold: Math.round(6 * n * k), rice: Math.round(4 * n * k) };
+}
+const tributeOpen = () => S.mode === "play" && (S.idx >= 1 || S.L.skirmish) && !S.L.sandbox && nextWaveIn() <= TRIBUTE_WINDOW && S.nextWave < S.L.waves.length;
+
+function payTribute() {
+  if (!tributeOpen()) return;
+  const cost = tributeCost();
+  if (!affordable(cost)) { say(`The raiders want ${costText(cost)} to turn back.`, true); return; }
+  for (const [k, v] of Object.entries(cost)) S[k] -= v;
+  const w = S.L.waves[S.nextWave++];
+  S.waveClock = Math.max(S.waveClock, w.t);
+  if (S.L.endless) while (S.L.waves.length <= S.nextWave + 1) S.L.waves.push(skirmishWave(S.L.waves.length, S.L.seed, S.L.rivers[0].edge));
+  S.tributes = (S.tributes || 0) + 1;
+  S.harmony = clamp(S.harmony - 5, 0, 100);
+  S.stats.tributes++;
+  spawnFloat(`-${costText(cost)}`, S.citadel.gx + 1, S.citadel.gy, "#e9b949");
+  say(`The raiders take the tribute and turn back from the ${w.from.join(" and ")}. They will ask for more next time.`);
+  sfx("coin");
+  checkVictory();
+  syncHud();
+}
+
 function callRaidEarly() {
   if (!S || S.mode !== "play" || S.nextWave >= S.L.waves.length) return;
   S.waveClock = S.L.waves[S.nextWave].t;
@@ -1613,6 +1644,14 @@ function syncHud() {
     ? (foesAlive() || S.spawnQueue.length ? "Under attack!" : "None left")
     : `${String(Math.floor(n / 60)).padStart(2, "0")}:${String(n % 60).padStart(2, "0")}`;
   document.getElementById("conchBtn").disabled = n === Infinity || S.mode !== "play";
+  const tb = document.getElementById("tributeBtn"), open = tributeOpen();
+  tb.hidden = !open;
+  if (open) {
+    const c = tributeCost();
+    tb.textContent = `🪙 Tribute ${costText(c)}`;
+    tb.disabled = !affordable(c);
+    tb.title = "Pay rice and gold to turn the coming raid back; it costs more each time and −5 harmony.";
+  }
   document.getElementById("pauseBtn").textContent = S.paused ? "▶ Resume" : "⏸ Pause";
   document.getElementById("pauseBtn").disabled = S.mode !== "play";
   document.getElementById("speedBtn").textContent = `⏩ ${S.speed}×`;
@@ -1979,6 +2018,7 @@ mini.addEventListener("mousedown", e => {
 });
 
 document.getElementById("conchBtn").addEventListener("click", callRaidEarly);
+document.getElementById("tributeBtn").addEventListener("click", payTribute);
 document.getElementById("pauseBtn").addEventListener("click", togglePause);
 document.getElementById("speedBtn").addEventListener("click", () => {
   if (!S) return;
