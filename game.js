@@ -271,7 +271,8 @@ function startLevel(idx, mode = "brief", custom = null) {
     nets: [], netOf: null, flooded: new Set(), flow: null,
     tool: null, demolish: false, cat: "water",
     paused: true, speed: 1, mode, growAcc: 0, starveAcc: 0, tutorialStep: 0, warnedWave: -1, uid: 0,
-    seasonNo: 0, edictEnd: {}, edictUsed: {}, rain: { caught: 0, lost: 0, spilled: 0 }
+    seasonNo: 0, edictEnd: {}, edictUsed: {}, rain: { caught: 0, lost: 0, spilled: 0 },
+    stats: { starved: 0, starveSeason: null, lost: {}, burned: 0, trained: 0, tributes: 0, lastFrom: [], lastSize: 0, hungry: 0 }
   };
   const [cx, cy] = L.citadel;
   S.citadel = addBuilding("citadel", cx, cy);
@@ -433,6 +434,8 @@ function damageBuilding(b, amt) {
   b.hp -= amt;
   if (b.hp > 0) return;
   if (b === S.citadel) { endLevel(false); return; }
+  S.stats.lost[b.id] = (S.stats.lost[b.id] || 0) + 1;
+  if (b.fire > 0) S.stats.burned++;
   puff(b.gx + b.w / 2, b.gy + b.h / 2, 14, "#7a6a58");
   spawnFloat(`${b.def.name} destroyed!`, b.gx + b.w / 2, b.gy + b.h / 2, "#ff6b5b");
   S.fear = Math.min(30, S.fear + 6);
@@ -1168,9 +1171,12 @@ function launchWave() {
   }
   const list = [];
   for (const type of Object.keys(FOES)) for (let i = 0; i < (w[type] || 0); i++) list.push(type);
+  S.stats.lastFrom = w.from;
+  S.stats.lastSize = 0;
   const party = S.nextWave;
   S.parties = S.parties || {};
   S.parties[party] = { total: list.length, spawned: 0, fled: false };
+  S.stats.lastSize = list.length;
   list.forEach((type, i) => S.spawnQueue.push({ at: S.time + i * 0.7, type, edge: w.from[i % w.from.length], party }));
   say(`Raid ${S.nextWave} of ${S.L.waves.length}: ${list.length} raiders from the ${w.from.join(" and ")}!`, true);
   sfx("conch");
@@ -1230,10 +1236,13 @@ function tick() {
   S.harmony += clamp(target - S.harmony, -1, 1);
 
   if (S.rice <= 0) {
+    S.stats.hungry++;
     S.starveAcc += 0.25;
     if (S.starveAcc >= 1 && S.villagers > 0) {
       S.starveAcc = 0;
       S.villagers--;
+      S.stats.starved++;
+      if (!S.stats.starveSeason) S.stats.starveSeason = S.season;
       spawnFloat("A family left — no rice!", S.citadel.gx + 1, S.citadel.gy + 1, "#ff6b5b");
       say("The granary is empty and families are leaving. Plant paddies beside water!", true);
     }
@@ -1291,6 +1300,31 @@ function checkVictory() {
   if (S.L.objectives.every(o => { const r = objective(o); return r.cur >= r.n; })) endLevel(true);
 }
 
+// ==================== WHY THE CITADEL FELL ====================
+// Hard but fair: the defeat screen names the likely causes, most telling first.
+function defeatCauses() {
+  const st = S.stats, out = [];
+  const c = S.citadel, cx = c.gx + 1, cy = c.gy + 1;
+  const side = { east: (x, y) => x > cx + 1, west: (x, y) => x < cx - 1, north: (x, y) => y < cy - 1, south: (x, y) => y > cy + 1 };
+  if (st.starved >= 2) out.push([5, `🍚 The granary ran dry${st.starveSeason ? ` in ${st.starveSeason === "yala" ? "the Yala dry season" : "the Maha monsoon"}` : ""} and ${st.starved} famil${st.starved === 1 ? "y" : "ies"} left. Keep about one watered paddy per house.`]);
+  else if (st.hungry >= 20) out.push([3, "🍚 The granary was empty for long stretches, so few new families came to work and fight."]);
+  for (const e of st.lastFrom || []) {
+    const inSide = side[e] || (() => false);
+    const towers = S.buildings.filter(b => b.id === "tower" && inSide(b.gx, b.gy)).length;
+    const archers = S.units.filter(u => u.team === "p" && u.def.ranged && inSide(u.gx, u.gy)).length;
+    const walls = S.buildings.filter(b => b.def.wall && inSide(b.gx, b.gy)).length;
+    if (!towers && !archers) out.push([4, `🏹 The ${e} side had no archers or watchtowers to meet the last raid.`]);
+    else if (!walls && (st.lastSize || 0) >= 6) out.push([2, `🧱 No walls stood on the ${e} side, so the raiders walked straight in.`]);
+  }
+  const wallsLost = Object.entries(st.lost).filter(([id]) => BUILDINGS[id] && BUILDINGS[id].wall).reduce((a, [, n]) => a + n, 0);
+  if (wallsLost >= 3) out.push([2, `🧱 Raiders broke through ${wallsLost} wall sections. Stone ramparts hold far longer than palisades.`]);
+  if (st.burned >= 2) out.push([3, `🔥 Fire took ${st.burned} buildings. Keep wewas full so villagers can carry water, and keep archers near the thatch.`]);
+  const army = S.units.filter(u => u.team === "p").length;
+  if (st.trained <= 2 && army <= 2) out.push([3, `⚔️ ${st.trained ? `Only ${st.trained} soldier${st.trained === 1 ? " was" : "s were"}` : "No soldiers were"} trained. A barracks and a few spearmen go a long way.`]);
+  if (!out.length) out.push([1, `⚔️ The last raid (${st.lastSize || "many"} raiders from the ${(st.lastFrom || []).join(" and ") || "edges"}) was stronger than the defence. Flood a sluice or wall the approach.`]);
+  return out.sort((a, b) => b[0] - a[0]).slice(0, 3).map(r => r[1]);
+}
+
 function endLevel(won) {
   if (S.mode !== "play") return;
   clearRun();
@@ -1300,6 +1334,7 @@ function endLevel(won) {
   let stars = won ? (pct >= 0.9 ? 3 : pct >= 0.5 ? 2 : 1) : 0;
   // "Let not one drop of rain reach the sea unused": three stars need 70% kept.
   if (S.L.objectives.some(o => o.type === "catch") && rainKept() < 70) stars = Math.min(stars, 2);
+  if (!won) S.causes = defeatCauses();
   if (S.L.endless) {
     S.survived = Math.max(0, S.nextWave - 1);
     S.newBest = S.survived > (progress.skirmishBest || 0);
@@ -1547,6 +1582,7 @@ function recruit(id) {
   }
   for (const [k, v] of Object.entries(cost)) S[k] -= v;
   S.villagers--;
+  S.stats.trained++;
   const b = barracks[0];
   spawnSoldier(id, b.gx + 1 + Math.random() * 0.5, b.gy + b.h + 0.3 + Math.random() * 0.4);
   staff();
@@ -1723,6 +1759,7 @@ function showEnd(won, starCount) {
       <div class="card-screen">
         <h2>The Maligawa has fallen</h2>
         <p>You held the valley through <b>${S.survived}</b> raid${S.survived === 1 ? "" : "s"}.${S.newBest ? " A new best!" : ` Best: ${progress.skirmishBest}.`}</p>
+        ${S.causes ? `<div class="causes"><b>Why it fell</b><ul>${S.causes.map(c => `<li>${c}</li>`).join("")}</ul></div>` : ""}
         <div class="actions">
           <button class="btn primary" id="newMapBtn">New map ▶</button>
           <button class="btn" id="retryBtn">↻ Same map</button>
@@ -1741,7 +1778,8 @@ function showEnd(won, starCount) {
       ${won ? `<div class="lc-stars" style="font-size:28px">${stars(starCount)}</div>` : ""}
       <p>${won
         ? (S.idx + 1 === LEVELS.length ? "The hill kingdom endures. You have completed the campaign." : "The kingdom is fed and the walls still stand. A new region awaits.")
-        : "Raiders breached the Maligawa. Build more wewas, wall the approaches and keep soldiers at home."}</p>
+        : "Raiders breached the Maligawa."}</p>
+      ${!won && S.causes ? `<div class="causes"><b>Why it fell</b><ul>${S.causes.map(c => `<li>${c}</li>`).join("")}</ul></div>` : ""}
       ${S.rain.caught + S.rain.lost > 0 ? `<p>🌧️ Rain kept: <b>${rainKept()}%</b>${S.L.objectives.some(o => o.type === "catch") ? (rainKept() >= 70 ? " · Parakramabahu would be pleased." : " · Below 70%: too much rain reached the sea for three stars.") : ""}</p>` : ""}
       <div class="actions">
         ${hasNext ? `<button class="btn primary" id="nextBtn">Next level ▶</button>` : ""}
