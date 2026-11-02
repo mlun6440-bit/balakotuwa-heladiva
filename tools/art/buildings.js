@@ -351,6 +351,32 @@ ART.add("pansala", () => {
 }, { size: 230 });
 
 // Atuwa (watchtower): tapering laterite base, timber lookout, tiled roof.
+// Yantra Atuwa (bolt tower): squat granite tower with a great bolt-thrower on top.
+ART.add("bolt", () => {
+  box(0.06, 0.06, 0, 0.88, 0.88, 4, { top: M.graniteSlab, left: M.granite, right: M.granite }, { ao: 2 });
+  box(0.1, 0.1, 4, 0.8, 0.8, 22, M.granite, { ao: 2 });
+  box(0.06, 0.06, 26, 0.88, 0.88, 1.8, M.lateriteBig);
+  // crenellated parapet
+  for (let i = 0; i < 4; i++) {
+    box(0.06 + i * 0.24, 0.84, 27.8, 0.14, 0.1, 4, M.laterite);
+    box(0.84, 0.06 + i * 0.24, 27.8, 0.1, 0.14, 4, M.laterite);
+  }
+  windowR(0.42, 0.58, 0.9, 14, 20);
+  // the engine: a timber stock on a turntable, with a great composite bow
+  post(0.5, 0.5, 0.08, 27.8, 31, M.darkTimber, 12);
+  box(0.25, 0.42, 31, 0.55, 0.16, 2, M.timberH);
+  if (!MODE.shadow) {
+    const a = P(0.78, 0.5, 33), l = P(0.62, 0.12, 33.5), r = P(0.62, 0.88, 33.5), back = P(0.28, 0.5, 33);
+    g.strokeStyle = "#5a3418"; g.lineWidth = 1.6; g.lineCap = "round";
+    g.beginPath(); g.moveTo(l.x, l.y); g.quadraticCurveTo(a.x + 3, a.y - 1, r.x, r.y); g.stroke();
+    g.strokeStyle = "rgba(240,230,200,0.85)"; g.lineWidth = 0.5;
+    g.beginPath(); g.moveTo(l.x, l.y); g.lineTo(back.x, back.y); g.lineTo(r.x, r.y); g.stroke();
+    g.strokeStyle = "#3a2a1a"; g.lineWidth = 1.2; g.beginPath(); g.moveTo(back.x, back.y); g.lineTo(a.x + 4, a.y - 1); g.stroke();
+    g.fillStyle = "#c8ccd0"; g.beginPath(); g.moveTo(a.x + 6, a.y - 1); g.lineTo(a.x + 3, a.y - 2.4); g.lineTo(a.x + 3, a.y + 0.4); g.fill();
+  }
+  finial([0.12, 0.12], 31.8, "#9a4426");
+}, { size: 150, oy: 0.78 });
+
 ART.add("tower", () => {
   box(0.06, 0.06, 0, 0.88, 0.88, 4, { top: M.graniteSlab, left: M.granite, right: M.granite }, { ao: 2 });
   box(0.12, 0.12, 4, 0.76, 0.76, 14, M.lateriteBig, { ao: 2 });

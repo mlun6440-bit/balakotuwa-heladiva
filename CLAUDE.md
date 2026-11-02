@@ -98,6 +98,11 @@ for (const lv of LEVELS.keys()) { startLevel(lv); document.getElementById('begin
 `node tools/shoot.mjs docs/screens/check --smoke` runs the same smoke test in
 headless Chromium and saves screenshots of a sample town in both seasons.
 
+For balance changes, run `node tools/playtest.mjs learn` (learning bots,
+a few minutes) and read `docs/playtest/REPORT.md`: it catches exploits and
+stalls a single hand-played minute won't. The learned dials live in
+`tools/playtest-brain.json`; commit it so learning continues next time.
+
 Then play level 1 by hand for a minute: build, paint canals, open a sluice,
 train a soldier, zoom and pan.
 

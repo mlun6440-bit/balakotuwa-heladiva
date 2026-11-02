@@ -78,7 +78,7 @@ function saveProgress() {
 // field, water networks, cover, staffing) is rebuilt by refreshWorld().
 const RUN_KEY = "balakotuwa.run.v1";
 const RUN_SKIP = new Set(["L", "tiles", "trees", "unlocked", "buildings", "occ", "workers", "units", "shots", "floats", "nets",
-  "netOf", "flooded", "flow", "citadel", "cover", "fx", "tool", "demolish", "upgrade", "repair", "mode", "paused"]);
+  "netOf", "flooded", "flow", "citadel", "cover", "fx", "tool", "demolish", "improve", "mode", "paused"]);
 const plain = v => v === null || typeof v !== "object" || Array.isArray(v) || Object.getPrototypeOf(v) === Object.prototype;
 
 function saveRun() {
@@ -91,9 +91,9 @@ function saveRun() {
     L: S.L.skirmish ? { ...S.L, all: undefined } : null, st,
     trees: S.trees.map(t => [r3(t.gx), r3(t.gy), r3(t.stage)]),
     buildings: S.buildings.map(b => ({ uid: b.uid, id: b.id, gx: b.gx, gy: b.gy, hp: b.hp, maxHp: b.maxHp, water: b.water, growth: b.growth,
-      open: b.open, next: b.next, at: b.at, fire: b.fire, irrigated: b.irrigated })),
+      open: b.open, next: b.next, at: b.at, fire: b.fire, silt: b.silt, irrigated: b.irrigated })),
     units: S.units.map(u => ({ uid: u.uid, team: u.team, type: u.type, gx: r3(u.gx), gy: r3(u.gy), tx: u.tx, ty: u.ty, hp: u.hp, maxHp: u.maxHp,
-      last: u.last, z: u.z, ordered: u.ordered, lastFire: u.lastFire, party: u.party, hx: u.hx, hy: u.hy, flee: u.flee }))
+      last: u.last, z: u.z, ordered: u.ordered, lastFire: u.lastFire, party: u.party, hx: u.hx, hy: u.hy, flee: u.flee, looted: u.looted }))
   };
   try { localStorage.setItem(RUN_KEY, JSON.stringify(data)); } catch (e) { /* storage full or blocked */ }
   S.lastSave = S.time;
@@ -212,10 +212,10 @@ function makeSkirmish(seed, sandbox = false) {
   const rect = (w, h) => { for (;;) { const x = ri(2, MAP - 3 - w), y = ri(2, MAP - 3 - h); if (away(x + w / 2, y + h / 2)) return [x, y, x + w, y + h]; } };
   const all = unlockedFor(LEVELS.length - 1);
   return {
-    id: `skirmish-${seed}`, name: "Skirmish", era: `Random map · seed ${seed}`, seed, skirmish: true, endless: true,
+    id: `skirmish-${seed}`, name: "Skirmish", era: `Random map · seed ${seed}`, seed, skirmish: true, endless: true, fireArrows: true,
     intro: "A fresh valley and no end to the raiders. Each raid is larger than the last. How long can the Maligawa stand?",
     citadel: [cx, cy], season: r() < 0.5 ? "maha" : "yala",
-    start: { timber: 150, stone: 80, rice: 100, gold: 150, villagers: 12, arms: 8 },
+    start: { timber: 150, stone: 80, rice: 100, gold: 150, villagers: 12 },
     army: { spearman: 3, archer: 2 },
     rivers: [{ edge: riverEdge, at: ri(0, 2), width: ri(1, 2), wobble: 0.8 + r() * 1.4 }],
     rocks: Array.from({ length: ri(2, 3) }, () => rect(ri(2, 4), ri(2, 4))),
@@ -226,7 +226,7 @@ function makeSkirmish(seed, sandbox = false) {
     ...(sandbox ? {
       id: `sandbox-${seed}`, name: "Sandbox", sandbox: true, endless: false, era: `Royal sandbox · seed ${seed}`,
       intro: "A peaceful valley with full stores. Build anything; open 👑 Decrees to send raids of any size from any edge and test your defences.",
-      start: { timber: 999, stone: 999, rice: 600, gold: 999, villagers: 30, arms: 60 }
+      start: { timber: 999, stone: 999, rice: 600, gold: 999, villagers: 30 }
     } : {})
   };
 }
@@ -235,7 +235,7 @@ function skirmishWave(k, seed, riverEdge) {
   const edges = ["east", "south", "north", "west"].filter(e => e !== riverEdge);
   const n = Math.min(edges.length, 1 + Math.floor(k / 3));
   const from = [...edges].sort(() => r() - 0.5).slice(0, n);
-  return { t: 150 + k * 95, from, raider: 3 + 2 * k, bowman: 1 + Math.floor(k * 0.8), brute: Math.floor(k / 2) };
+  return { t: 150 + k * 95, from, raider: 3 + 2 * k, bowman: 1 + Math.floor(k * 0.8), brute: Math.floor(k / 2), thrower: k >= 4 ? Math.floor((k - 2) / 2) : 0 };
 }
 const newSeed = () => (Date.now() % 900000) + 1;
 const startSkirmish = seed => startLevel(LEVELS.length, "brief", makeSkirmish(seed ?? newSeed()));
@@ -248,7 +248,7 @@ const RAID_SIZES = { small: 6, medium: 14, large: 30, extreme: 60 };
 function sendRaid(size, edge) {
   const n = RAID_SIZES[size];
   const list = [];
-  for (let i = 0; i < n; i++) list.push(i % 10 === 9 ? "brute" : i % 3 === 2 ? "bowman" : "raider");
+  for (let i = 0; i < n; i++) list.push(i % 15 === 14 ? "thrower" : i % 10 === 9 ? "brute" : i % 3 === 2 ? "bowman" : "raider");
   const party = 1000 + (S.raidsSent = (S.raidsSent || 0) + 1);
   S.parties = S.parties || {};
   S.parties[party] = { total: list.length, spawned: 0, fled: false };
@@ -264,14 +264,15 @@ function startLevel(idx, mode = "brief", custom = null) {
     idx, L, tiles, trees,
     unlocked: custom ? custom.all : unlockedFor(idx),
     buildings: [], occ: [], workers: [], units: [], shots: [], floats: [], spawnQueue: [],
-    timber: L.start.timber, stone: L.start.stone, rice: L.start.rice, gold: L.start.gold, arms: L.start.arms || 0,
+    timber: L.start.timber, stone: L.start.stone, rice: L.start.rice, gold: L.start.gold,
     villagers: L.start.villagers, cap: 0, harmony: 60, fear: 0,
     season: L.season, seasonLeft: SEASONS[L.season].len,
     time: 0, tickAcc: 0, waveClock: 0, nextWave: 0,
     nets: [], netOf: null, flooded: new Set(), flow: null,
     tool: null, demolish: false, cat: "water",
     paused: true, speed: 1, mode, growAcc: 0, starveAcc: 0, tutorialStep: 0, warnedWave: -1, uid: 0,
-    seasonNo: 0, edictEnd: {}, edictUsed: {}, rain: { caught: 0, lost: 0, spilled: 0 }
+    seasonNo: 0, edictEnd: {}, edictUsed: {}, rain: { caught: 0, lost: 0, spilled: 0 },
+    stats: { starved: 0, starveSeason: null, lost: {}, burned: 0, trained: 0, tributes: 0, lastFrom: [], lastSize: 0, hungry: 0 }
   };
   const [cx, cy] = L.citadel;
   S.citadel = addBuilding("citadel", cx, cy);
@@ -294,7 +295,7 @@ function startLevel(idx, mode = "brief", custom = null) {
 // ==================== BUILDINGS ====================
 function addBuilding(id, gx, gy) {
   const def = BUILDINGS[id];
-  const b = { uid: ++S.uid, id, def, gx, gy, w: def.w, h: def.h, hp: def.hp, maxHp: def.hp, worker: null, water: 0, growth: 0, open: false, next: 0, at: S.time, fire: 0 };
+  const b = { uid: ++S.uid, id, def, gx, gy, w: def.w, h: def.h, hp: def.hp, maxHp: def.hp, worker: null, water: 0, growth: 0, open: false, next: 0, at: S.time, fire: 0, silt: 0 };
   S.buildings.push(b);
   S.trees = S.trees.filter(t => !(t.gx >= gx && t.gx < gx + def.w && t.gy >= gy && t.gy < gy + def.h));
   return b;
@@ -418,6 +419,13 @@ function repairAt(gx, gy, quiet = false) {
   return true;
 }
 
+// One tool for both: a damaged building is repaired, a sound one upgraded.
+function improveAt(gx, gy, quiet = false) {
+  const b = buildingAt(gx, gy);
+  return b && b.hp < b.maxHp ? repairAt(gx, gy, quiet) : upgradeAt(gx, gy, quiet);
+}
+const canImprove = b => !!b && (b.hp < b.maxHp ? !(b.fire > 0) && affordable(repairCost(b)) : !upgradeBlocked(b));
+
 function demolishAt(gx, gy) {
   const b = buildingAt(gx, gy);
   if (!b) return;
@@ -433,6 +441,8 @@ function damageBuilding(b, amt) {
   b.hp -= amt;
   if (b.hp > 0) return;
   if (b === S.citadel) { endLevel(false); return; }
+  S.stats.lost[b.id] = (S.stats.lost[b.id] || 0) + 1;
+  if (b.fire > 0) S.stats.burned++;
   puff(b.gx + b.w / 2, b.gy + b.h / 2, 14, "#7a6a58");
   spawnFloat(`${b.def.name} destroyed!`, b.gx + b.w / 2, b.gy + b.h / 2, "#ff6b5b");
   S.fear = Math.min(30, S.fear + 6);
@@ -558,6 +568,8 @@ function waterSource(b) {
 }
 
 const RAIN = 2.4; // water each wewa catches per second of Maha
+const SILT_RATE = 0.25, SILT_MAX = 60; // Maha rain washes silt in; it eats capacity
+const wewaCap = w => WEWA_CAP - (w.silt || 0);
 
 function tickWater() {
   const maha = S.season === "maha";
@@ -565,19 +577,21 @@ function tickWater() {
   for (const w of S.buildings) {
     if (w.id !== "wewa") continue;
     if (maha) {
-      const add = Math.min(RAIN, WEWA_CAP - w.water);
+      w.silt = Math.min(SILT_MAX, (w.silt || 0) + SILT_RATE);
+      const add = Math.max(0, Math.min(RAIN, wewaCap(w) - w.water));
       w.water += add; S.rain.caught += add;
       if (add < RAIN) { const id = S.netOf[w.gy][w.gx]; spill.set(id, (spill.get(id) || 0) + RAIN - add); }
     } else w.water = Math.max(0, w.water - 0.3);
-    if (riverBeside(w)) w.water = Math.min(WEWA_CAP, w.water + 1.2);
+    if (riverBeside(w)) w.water = Math.min(wewaCap(w), w.water + 1.2);
+    w.water = Math.min(w.water, wewaCap(w));
   }
   // Ellangawa (cascading tanks): a full wewa spills into the emptiest wewas
   // on its canal network. Whatever no tank can hold runs off to the sea.
   for (const [id, amt0] of spill) {
     let amt = amt0;
-    const ws = id === -1 ? [] : [...S.nets[id].wewas].filter(w => w.water < WEWA_CAP).sort((a, b) => a.water - b.water);
+    const ws = id === -1 ? [] : [...S.nets[id].wewas].filter(w => w.water < wewaCap(w)).sort((a, b) => a.water - b.water);
     for (const w of ws) {
-      const add = Math.min(amt, WEWA_CAP - w.water);
+      const add = Math.min(amt, wewaCap(w) - w.water);
       w.water += add; amt -= add; S.rain.caught += add; S.rain.spilled += add;
       if (amt <= 0) break;
     }
@@ -604,12 +618,44 @@ function tickWater() {
   updateNetWater();
 }
 
+// ==================== SHRAMADANA (communal work) ====================
+// Outside the monsoon, idle villagers gather in work parties to dig silt out
+// of the wewas, and carry it to the paddies, where tank silt is good manure.
+function assignShramadana() {
+  if (S.season === "maha") { S.workers = S.workers.filter(w => w.job !== "shramadana" || w.fireTarget); return; }
+  for (const b of S.buildings) {
+    if (b.id !== "wewa" || (b.silt || 0) < 8) continue;
+    let have = S.workers.filter(w => w.job === "shramadana" && w.siltTarget === b).length;
+    while (have < 3 && idleVillagers() > 0) {
+      goTo(helper("shramadana", { siltTarget: b }), b.gx + 1, b.gy + 2.25, "toSilt");
+      have++;
+    }
+  }
+  if (!S.warnedSilt && S.buildings.some(b => b.id === "wewa" && b.silt >= 20)) {
+    S.warnedSilt = true;
+    say("Monsoon rain washes silt into the wewas, and they hold less. In Yala, idle villagers gather for shramadana to dig it out and manure the paddies.");
+  }
+}
+const endParty = w => { S.workers = S.workers.filter(x => x !== w); };
+// A temporary helper drawn from the idle villagers (water carrier or work party).
+function helper(job, extra) {
+  const w = { b: S.citadel, job, temp: true, gx: S.citadel.gx + 1, gy: S.citadel.gy + 2.2, tx: 0, ty: 0, phase: "plan", timer: 0, carry: null, target: null, ...extra };
+  S.workers.push(w);
+  return w;
+}
+// Send a helper (or a worker borrowed for a fire) home: helpers leave, workers go back to their job.
+function dismiss(w) { if (w.temp) endParty(w); else planJob(w); }
+
 // ==================== VILLAGERS & JOBS ====================
 function staff() {
   while (S.workers.length > S.villagers) releaseWorker(S.workers.pop());
   for (const b of S.buildings) {
     if (!b.def.worker || b.worker) continue;
-    if (S.workers.length >= S.villagers) break;
+    if (S.workers.length >= S.villagers) {
+      const party = S.workers.findIndex(w => w.job === "shramadana" && !w.fireTarget);
+      if (party < 0) break;
+      S.workers.splice(party, 1); // a real job beats a work party
+    }
     const w = { b, job: b.def.worker, gx: S.citadel.gx + 1, gy: S.citadel.gy + 2.2, tx: 0, ty: 0, phase: "plan", timer: 0, carry: null, target: null };
     b.worker = w;
     S.workers.push(w);
@@ -699,6 +745,22 @@ function updateWorker(w, dt) {
       w.timer -= dt * workMult();
       if (w.timer <= 0) planJob(w);
       break;
+    case "toSilt":
+      if (walk(w, dt)) {
+        const b = w.siltTarget;
+        if (!b || !S.buildings.includes(b) || b.silt < 2 || S.season === "maha") { endParty(w); break; }
+        w.phase = "work"; w.timer = 5;
+      }
+      break;
+    case "toField":
+      if (walk(w, dt)) {
+        if (w.field && S.buildings.includes(w.field)) { w.field.growth = Math.min(100, w.field.growth + 12); spawnFloat("🌱", w.gx, w.gy, "#bff0a8"); }
+        w.carry = null;
+        const b = w.siltTarget;
+        if (b && S.buildings.includes(b) && b.silt >= 4 && S.season !== "maha") goTo(w, b.gx + 1, b.gy + 2.25, "toSilt");
+        else endParty(w);
+      }
+      break;
     case "toWater":
       if (walk(w, dt)) {
         const src = w.waterSrc || {};
@@ -706,7 +768,7 @@ function updateWorker(w, dt) {
         else if (src.net) drainNet(src.net, 2);
         w.carry = { key: "water", n: 1 };
         const b = w.fireTarget;
-        if (!b) { if (w.temp) S.workers = S.workers.filter(x => x !== w); else planJob(w); break; }
+        if (!b) { dismiss(w); break; }
         goTo(w, b.gx + b.w / 2, b.gy + b.h + 0.3, "toFire");
       }
       break;
@@ -720,7 +782,7 @@ function updateWorker(w, dt) {
           sfx("splash");
         }
         if (b && b.fire > 0 && S.buildings.includes(b)) seekWater(w);
-        else { w.fireTarget = null; if (w.temp) S.workers = S.workers.filter(x => x !== w); else planJob(w); }
+        else { w.fireTarget = null; dismiss(w); }
       }
       break;
     case "fetch":
@@ -741,6 +803,17 @@ function updateWorker(w, dt) {
     case "work":
       w.timer -= dt * workMult();
       if (w.timer > 0) break;
+      if (w.job === "shramadana") {
+        const b = w.siltTarget;
+        if (b && S.buildings.includes(b)) b.silt = Math.max(0, b.silt - 6);
+        w.carry = { key: "silt", n: 1 };
+        let best = null, bd = 8;
+        for (const p of S.buildings) if (p.id === "paddy") { const d = Math.hypot(p.gx + 1 - w.gx, p.gy + 1 - w.gy); if (d < bd) { bd = d; best = p; } }
+        w.field = best;
+        if (best) goTo(w, best.gx + 1, best.gy + 2.2, "toField");
+        else goTo(w, w.gx + 1, w.gy + 0.8, "toField");
+        break;
+      }
       if (w.job === "woodcutter") {
         const t = w.target;
         w.target = null;
@@ -748,7 +821,10 @@ function updateWorker(w, dt) {
         t.stage = 0; t.reserved = false;
         carryHome(w, "timber", 5);
       } else if (w.job === "smith") {
-        carryHome(w, "arms", 1);
+        // carry the forged arms to the barracks (or citadel); no stockpile
+        const dest = S.buildings.find(b => b.id === "barracks") || S.citadel;
+        w.carry = { key: "arms", n: 1 };
+        goTo(w, dest.gx + dest.w / 2, dest.gy + dest.h + 0.2, "toStore");
       } else {
         carryHome(w, "stone", 4);
       }
@@ -775,8 +851,10 @@ function updateWorker(w, dt) {
       break;
     case "toStore":
       if (walk(w, dt)) {
-        S[w.carry.key] += w.carry.n;
-        spawnFloat(`+${w.carry.n} ${RES[w.carry.key]}`, w.gx, w.gy, "#bff0a8");
+        if (w.carry.key in RES) {
+          S[w.carry.key] += w.carry.n;
+          spawnFloat(`+${w.carry.n} ${RES[w.carry.key]}`, w.gx, w.gy, "#bff0a8");
+        }
         if (w.carry.key === "rice") sfx("harvest");
         w.carry = null;
         planJob(w);
@@ -878,6 +956,7 @@ function nearestFoe(u, radius, from = u) {
     if (v.team === u.team || v.hp <= 0) continue;
     const d = Math.hypot(v.gx - from.gx, v.gy - from.gy);
     if (u.team === "e" && d > 1.5 && inCover(v)) continue; // hidden in the forest
+    if (u.team === "e" && !u.def.ranged && v.z > 0) continue; // out of reach up on a wall or tower
     if (d <= bd) { bd = d; best = v; }
   }
   return best;
@@ -917,11 +996,32 @@ function hitUnit(target, dmg, splash) {
   }
 }
 
-function fireShot(gx, gy, z, target, dmg) {
+function fireShot(gx, gy, z, target, dmg, kind = null) {
   const d = Math.hypot(target.gx - gx, target.gy - gy);
   // ox/oy: a little landing scatter so a volley reads as a volley (cosmetic)
-  S.shots.push({ sx: gx, sy: gy, sz: z, target, dmg, t: 0, dur: Math.max(0.25, d / 9) * (0.9 + Math.random() * 0.2), ox: (Math.random() - 0.5) * 0.35, oy: (Math.random() - 0.5) * 0.35 });
+  S.shots.push({ sx: gx, sy: gy, sz: z, target, dmg, t: 0, dur: Math.max(0.25, d / (kind === "bolt" ? 14 : 9)) * (0.9 + Math.random() * 0.2), ox: (Math.random() - 0.5) * 0.35, oy: (Math.random() - 0.5) * 0.35, kind });
 }
+
+// ==================== SIEGE ====================
+// Stone throwers stop at range and lob stones at the nearest wall or tower
+// (else any solid building). Bolt towers outrange them and hunt them first.
+function siegeTarget(u, range) {
+  let best = null, bd = Infinity;
+  for (const b of S.buildings) {
+    if (!b.def.solid) continue;
+    const d = rectDist(u, b);
+    if (d > range) continue;
+    const k = d - (b.def.wall || b.def.tower ? 3 : 0); // prefer defences
+    if (k < bd) { bd = k; best = b; }
+  }
+  return best;
+}
+function lobStone(u, b) {
+  const tx = b.gx + b.w / 2, ty = b.gy + b.h / 2, d = Math.hypot(tx - u.gx, ty - u.gy);
+  S.shots.push({ sx: u.gx, sy: u.gy, sz: 14, target: { gx: tx, gy: ty, hp: 0 }, dmg: 0, t: 0, dur: Math.max(0.6, d / 5), stone: b, bdmg: u.def.bdmg, kind: "stone" });
+  if (!S.warnedSiege) { S.warnedSiege = true; say("A stone thrower! It outranges watchtowers. Bolt towers and archers on the walls can reach it, or send soldiers out to cut down its crew.", true); }
+}
+const nearestSiege = (c, range) => { let best = null, bd = range; for (const v of unitsNear(c.gx, c.gy, range)) { if (v.team === "e" && v.def.siege && v.hp > 0) { const d = Math.hypot(v.gx - c.gx, v.gy - c.gy); if (d <= bd) { bd = d; best = v; } } } return best; };
 
 function rectDist(u, b) {
   const dx = Math.max(b.gx - u.gx, 0, u.gx - (b.gx + b.w));
@@ -934,6 +1034,36 @@ function hitBuilding(u, b) {
   u.last = S.time;
   damageBuilding(b, u.def.bdmg);
   sfx("hit");
+}
+
+// Looting: a raider passing within 3 tiles of a ripening paddy, a granary or a
+// storehouse breaks off to trample or rob it once, then marches on. Early
+// raids threaten the food, so guarding the fields matters.
+const LOOTABLE = b => (b.id === "paddy" && b.growth >= 30) || b.id === "bissa" || b.id === "storehouse";
+function lootRaid(u, dt) {
+  if (!u.lootTarget || !S.buildings.includes(u.lootTarget) || !LOOTABLE(u.lootTarget)) {
+    u.lootTarget = null;
+    let best = null, bd = 3;
+    for (const b of S.buildings) if (LOOTABLE(b)) { const d = rectDist(u, b); if (d < bd) { bd = d; best = b; } }
+    if (!best) return false;
+    u.lootTarget = best;
+  }
+  const b = u.lootTarget;
+  if (rectDist(u, b) > 0.35) { moveToward(u, b.gx + b.w / 2, b.gy + b.h / 2, dt); return true; }
+  u.looted = true; u.lootTarget = null;
+  if (b.id === "paddy") {
+    S.stats.trampled = (S.stats.trampled || 0) + 1;
+    b.growth = 0;
+    spawnFloat("Trampled!", b.gx + 1, b.gy + 1, "#ff9a7a");
+  } else {
+    const key = b.id === "bissa" ? "rice" : S.timber >= S.stone ? "timber" : "stone";
+    const n = Math.min(Math.floor(S[key]), 20);
+    S[key] -= n;
+    S.stats.looted = (S.stats.looted || 0) + n;
+    spawnFloat(`−${n}${RES[key]} looted`, b.gx + b.w / 2, b.gy + b.h / 2, "#ff9a7a");
+  }
+  if (!S.warnedLoot) { S.warnedLoot = true; say("Raiders are trampling the paddies and robbing the stores! Post archers or a tower by the fields on the raid side.", true); }
+  return true;
 }
 
 // Morale: once a whole raid party has landed, if fewer than morale × its
@@ -954,6 +1084,13 @@ function checkMorale() {
 
 function updateFoe(u, dt) {
   const d = u.def;
+  if (d.siege && !u.flee) {
+    const tb = siegeTarget(u, d.range);
+    if (tb) {
+      if (S.time - u.last >= d.cd) { u.last = S.time; lobStone(u, tb); }
+      return;
+    }
+  }
   if (u.flee) {
     moveToward(u, u.hx ?? u.gx, u.hy ?? u.gy, dt * 1.2);
     if (Math.hypot((u.hx ?? u.gx) - u.gx, (u.hy ?? u.gy) - u.gy) < 0.3) u.gone = true;
@@ -967,6 +1104,7 @@ function updateFoe(u, dt) {
   }
   const cx = clamp(Math.floor(u.gx), 0, MAP - 1), cy = clamp(Math.floor(u.gy), 0, MAP - 1);
   if (S.occ[cy][cx] === S.citadel || rectDist(u, S.citadel) < 0.45) { hitBuilding(u, S.citadel); return; }
+  if (d.loot && !u.looted && lootRaid(u, dt)) return;
   if (d.fire && S.time - (u.lastFire ?? -9) > 3.5) {
     const tb = nearestFlammable(u, d.range);
     if (tb) { u.lastFire = S.time; u.last = S.time; fireArrow(u, tb); return; }
@@ -1025,8 +1163,8 @@ function updateCombat(dt) {
     const tw = b.def.tower;
     if (!tw || S.time < b.next) continue;
     const c = { gx: b.gx + b.w / 2, gy: b.gy + b.h / 2, team: "p" };
-    const foe = volleyTarget(c, tw.range);
-    if (foe) { fireShot(c.gx, c.gy, 48, foe, tw.dmg); b.next = S.time + tw.cd; }
+    const foe = (tw.siege && nearestSiege(c, tw.range)) || volleyTarget(c, tw.range);
+    if (foe) { fireShot(c.gx, c.gy, 48, foe, tw.dmg, tw.siege ? "bolt" : null); b.next = S.time + tw.cd; }
   }
 
   for (let i = S.shots.length - 1; i >= 0; i--) {
@@ -1034,6 +1172,7 @@ function updateCombat(dt) {
     s.t += dt;
     if (s.t >= s.dur) {
       if (s.fire) ignite(s.fire);
+      else if (s.stone) { if (S.buildings.includes(s.stone)) { const was = s.stone; damageBuilding(was, s.bdmg); if (!S.buildings.includes(was)) S.stats.stoned = (S.stats.stoned || 0) + 1; } puff(s.target.gx, s.target.gy, 6, "#9a9080"); }
       else if (s.target.hp > 0) { s.target.hp -= s.dmg; puff(s.target.gx + (s.ox || 0) * 0.5, s.target.gy + (s.oy || 0) * 0.5, 2, "#c8b48a"); }
       S.shots.splice(i, 1);
     }
@@ -1057,6 +1196,7 @@ function updateCombat(dt) {
 // season, is beaten down by monsoon rain, spreads to flammable neighbours,
 // and villagers run with water pots from the nearest wewa, canal or river.
 function nearestFlammable(u, range) {
+  if (!S.L.fireArrows) return null; // fire arrows arrive from Lion Rock on
   let best = null, bd = range;
   for (const b of S.buildings) {
     if (!b.def.flammable || b.fire >= 1) continue;
@@ -1105,17 +1245,20 @@ function tickFire() {
 // first (temporary "bucket" workers), then nearby workers drop their jobs.
 function assignFirefighters() {
   for (const w of S.workers) {
-    if (w.fireTarget && !(w.fireTarget.fire > 0 && S.buildings.includes(w.fireTarget))) { w.fireTarget = null; w.carry = null; if (!w.temp) planJob(w); }
+    if (w.fireTarget && !(w.fireTarget.fire > 0 && S.buildings.includes(w.fireTarget))) {
+      w.fireTarget = null; w.carry = null;
+      if (w.job === "shramadana" && w.siltTarget) goTo(w, w.siltTarget.gx + 1, w.siltTarget.gy + 2.25, "toSilt");
+      else if (!w.temp) planJob(w);
+    }
   }
-  S.workers = S.workers.filter(w => !w.temp || w.fireTarget);
+  S.workers = S.workers.filter(w => w.job !== "bucket" || w.fireTarget); // water carriers go home when the fire is out
   for (const b of S.buildings) {
     if (!(b.fire > 0)) continue;
     let have = S.workers.filter(w => w.fireTarget === b).length;
     const cx = b.gx + b.w / 2, cy = b.gy + b.h / 2;
     while (have < 3 && idleVillagers() > 0) {
-      const w = { b: S.citadel, job: "bucket", temp: true, gx: S.citadel.gx + 1, gy: S.citadel.gy + 2.2, tx: 0, ty: 0, phase: "plan", timer: 0, carry: null, target: null, fireTarget: b };
-      S.workers.push(w); have++;
-      seekWater(w);
+      seekWater(helper("bucket", { fireTarget: b }));
+      have++;
     }
     const free = S.workers.filter(w => !w.fireTarget && w.b !== b && Math.hypot(w.gx - cx, w.gy - cy) < 11)
       .sort((p, q) => Math.hypot(p.gx - cx, p.gy - cy) - Math.hypot(q.gx - cx, q.gy - cy));
@@ -1144,7 +1287,7 @@ function nearestWater(w) {
 
 function seekWater(w) {
   const src = nearestWater(w);
-  if (!src) { w.fireTarget = null; if (w.temp) S.workers = S.workers.filter(x => x !== w); else planJob(w); return; }
+  if (!src) { w.fireTarget = null; dismiss(w); return; }
   w.waterSrc = src;
   goTo(w, src.x, src.y, "toWater");
 }
@@ -1162,12 +1305,48 @@ function launchWave() {
   }
   const list = [];
   for (const type of Object.keys(FOES)) for (let i = 0; i < (w[type] || 0); i++) list.push(type);
+  S.stats.lastFrom = w.from;
+  S.stats.lastSize = 0;
   const party = S.nextWave;
   S.parties = S.parties || {};
   S.parties[party] = { total: list.length, spawned: 0, fled: false };
+  S.stats.lastSize = list.length;
   list.forEach((type, i) => S.spawnQueue.push({ at: S.time + i * 0.7, type, edge: w.from[i % w.from.length], party }));
   say(`Raid ${S.nextWave} of ${S.L.waves.length}: ${list.length} raiders from the ${w.from.join(" and ")}!`, true);
   sfx("conch");
+}
+
+// ==================== TRIBUTE ====================
+// While a raid gathers (from level 2), rice and gold can turn it back. The
+// raid counts as survived; the price grows each time and the shame costs harmony.
+const TRIBUTE_WINDOW = 30;
+function tributeCost() {
+  const w = S.L.waves[S.nextWave];
+  if (!w) return null;
+  const n = Object.keys(FOES).reduce((a, k) => a + (w[k] || 0), 0);
+  const k = Math.pow(2, S.tributes || 0); // doubles each time
+  return { gold: Math.round(6 * n * k), rice: Math.round(4 * n * k) };
+}
+// The final assault of a campaign level can't be bought off.
+const tributeOpen = () => S.mode === "play" && (S.idx >= 1 || S.L.skirmish) && !S.L.sandbox && nextWaveIn() <= TRIBUTE_WINDOW &&
+  S.nextWave < S.L.waves.length - (S.L.endless ? 0 : 1);
+
+function payTribute() {
+  if (!tributeOpen()) return;
+  const cost = tributeCost();
+  if (!affordable(cost)) { say(`The raiders want ${costText(cost)} to turn back.`, true); return; }
+  for (const [k, v] of Object.entries(cost)) S[k] -= v;
+  const w = S.L.waves[S.nextWave++];
+  S.waveClock = Math.max(S.waveClock, w.t);
+  if (S.L.endless) while (S.L.waves.length <= S.nextWave + 1) S.L.waves.push(skirmishWave(S.L.waves.length, S.L.seed, S.L.rivers[0].edge));
+  S.tributes = (S.tributes || 0) + 1;
+  S.harmony = clamp(S.harmony - 5, 0, 100);
+  S.stats.tributes++;
+  spawnFloat(`-${costText(cost)}`, S.citadel.gx + 1, S.citadel.gy, "#e9b949");
+  say(`The raiders take the tribute and turn back from the ${w.from.join(" and ")}. They will ask twice as much next time, and the final assault cannot be bought off.`);
+  sfx("coin");
+  checkVictory();
+  syncHud();
 }
 
 function callRaidEarly() {
@@ -1177,6 +1356,9 @@ function callRaidEarly() {
   spawnFloat("+15🪙 for courage", S.citadel.gx + 1, S.citadel.gy, "#e9b949");
   launchWave();
 }
+
+// Soldiers eat more than villagers: a standing army has a real cost.
+const SOLDIER_RICE = 0.06;
 
 // ==================== ONE-SECOND TICK ====================
 function tick() {
@@ -1194,11 +1376,16 @@ function tick() {
   while (nextWaveIn() <= 0) launchWave();
   if (nextWaveIn() === 20 && S.warnedWave !== S.nextWave) {
     S.warnedWave = S.nextWave;
-    say(`Scouts report raiders from the ${S.L.waves[S.nextWave].from.join(" and ")} in 20 seconds.`, true);
+    const from = S.L.waves[S.nextWave].from;
+    const fresh = from.filter(e => !S.L.waves.slice(0, S.nextWave).some(w => w.from.includes(e)));
+    say(fresh.length && S.nextWave > 0
+      ? `Scouts report raiders coming from the ${fresh.join(" and ")} for the first time, in 20 seconds! That side may have no towers or archers yet.`
+      : `Scouts report raiders from the ${from.join(" and ")} in 20 seconds.`, true);
   }
 
   tickWater();
   tickFire();
+  assignShramadana();
   updateCover();
 
   for (const u of S.units) {
@@ -1210,7 +1397,7 @@ function tick() {
 
   // Economy & harmony
   const soldiers = S.units.filter(u => u.team === "p").length;
-  S.rice = Math.max(0, S.rice - S.villagers * 0.04 - soldiers * 0.03);
+  S.rice = Math.max(0, S.rice - S.villagers * 0.04 - soldiers * SOLDIER_RICE);
   S.gold += S.villagers * 0.02 * (S.harmony / 60);
   S.fear = Math.max(0, S.fear - 0.5);
 
@@ -1224,10 +1411,13 @@ function tick() {
   S.harmony += clamp(target - S.harmony, -1, 1);
 
   if (S.rice <= 0) {
+    S.stats.hungry++;
     S.starveAcc += 0.25;
     if (S.starveAcc >= 1 && S.villagers > 0) {
       S.starveAcc = 0;
       S.villagers--;
+      S.stats.starved++;
+      if (!S.stats.starveSeason) S.stats.starveSeason = S.season;
       spawnFloat("A family left — no rice!", S.citadel.gx + 1, S.citadel.gy + 1, "#ff6b5b");
       say("The granary is empty and families are leaving. Plant paddies beside water!", true);
     }
@@ -1257,20 +1447,20 @@ function tick() {
 function objective(o) {
   const L = S.L;
   switch (o.type) {
-    case "res": return { label: `${RES[o.key]} Store ${o.n} ${o.key}`, cur: Math.floor(S[o.key]), n: o.n };
-    case "build": return { label: `${BUILDINGS[o.id].icon} Build ${o.n} ${BUILDINGS[o.id].name}`, cur: count(o.id), n: o.n };
-    case "water": return { label: `💧 Hold ${o.n} water in wewas`, cur: Math.floor(totalWater()), n: o.n };
+    case "res": return { label: `${RES[o.key]} ${o.key}`, cur: Math.floor(S[o.key]), n: o.n };
+    case "build": return { label: `${BUILDINGS[o.id].icon} ${BUILDINGS[o.id].name.split(" (")[0]}`, cur: count(o.id), n: o.n };
+    case "water": return { label: "💧 water held", cur: Math.floor(totalWater()), n: o.n };
     case "harmony": return { label: `😊 Harmony ${o.n}+`, cur: Math.floor(S.harmony), n: o.n };
-    case "pop": return { label: `👥 ${o.n} villagers`, cur: S.villagers, n: o.n };
-    case "catch": return { label: `🌧️ Catch ${o.n} rain (${rainKept()}% kept)`, cur: Math.floor(S.rain.caught), n: o.n };
-    case "sandbox": return { label: `🏗️ Sandbox · raids sent: ${S.raidsSent || 0} (send more from 👑)`, cur: 0, n: Infinity };
+    case "pop": return { label: "👥 villagers", cur: S.villagers, n: o.n };
+    case "catch": return { label: `🌧️ rain (${rainKept()}% kept)`, cur: Math.floor(S.rain.caught), n: o.n };
+    case "sandbox": return { label: `🏗️ Sandbox · ${S.raidsSent || 0} raids sent from 👑`, cur: 0, n: Infinity };
     case "endless": {
       const busy = foesAlive() || S.spawnQueue.length > 0;
-      return { label: `🛡️ Raids survived: ${Math.max(0, S.nextWave - (busy ? 1 : 0))} (best ${progress.skirmishBest || 0})`, cur: 0, n: Infinity };
+      return { label: `🛡️ ${Math.max(0, S.nextWave - (busy ? 1 : 0))} raids survived (best ${progress.skirmishBest || 0})`, cur: 0, n: Infinity };
     }
     case "waves": {
       const busy = foesAlive() || S.spawnQueue.length > 0;
-      return { label: `🛡️ Survive ${L.waves.length} raids`, cur: Math.max(0, S.nextWave - (busy ? 1 : 0)), n: L.waves.length };
+      return { label: "🛡️ raids", cur: Math.max(0, S.nextWave - (busy ? 1 : 0)), n: L.waves.length };
     }
   }
   return { label: "?", cur: 0, n: 1 };
@@ -1285,6 +1475,33 @@ function checkVictory() {
   if (S.L.objectives.every(o => { const r = objective(o); return r.cur >= r.n; })) endLevel(true);
 }
 
+// ==================== WHY THE CITADEL FELL ====================
+// Hard but fair: the defeat screen names the likely causes, most telling first.
+function defeatCauses() {
+  const st = S.stats, out = [];
+  const c = S.citadel, cx = c.gx + 1, cy = c.gy + 1;
+  const side = { east: (x, y) => x > cx + 1, west: (x, y) => x < cx - 1, north: (x, y) => y < cy - 1, south: (x, y) => y > cy + 1 };
+  if (st.starved >= 2) out.push([5, `🍚 The granary ran dry${st.starveSeason ? ` in ${st.starveSeason === "yala" ? "the Yala dry season" : "the Maha monsoon"}` : ""} and ${st.starved} famil${st.starved === 1 ? "y" : "ies"} left. Keep about one watered paddy per house.`]);
+  else if (st.hungry >= 20) out.push([3, "🍚 The granary was empty for long stretches, so few new families came to work and fight."]);
+  for (const e of st.lastFrom || []) {
+    const inSide = side[e] || (() => false);
+    const towers = S.buildings.filter(b => b.id === "tower" && inSide(b.gx, b.gy)).length;
+    const archers = S.units.filter(u => u.team === "p" && u.def.ranged && inSide(u.gx, u.gy)).length;
+    const walls = S.buildings.filter(b => b.def.wall && inSide(b.gx, b.gy)).length;
+    if (!towers && !archers) out.push([4, `🏹 The ${e} side had no archers or watchtowers to meet the last raid.`]);
+    else if (!walls && (st.lastSize || 0) >= 6) out.push([2, `🧱 No walls stood on the ${e} side, so the raiders walked straight in.`]);
+  }
+  const wallsLost = Object.entries(st.lost).filter(([id]) => BUILDINGS[id] && BUILDINGS[id].wall).reduce((a, [, n]) => a + n, 0);
+  if (wallsLost >= 3) out.push([2, `🧱 Raiders broke through ${wallsLost} wall sections. Stone ramparts hold far longer than palisades.`]);
+  if ((st.stoned || 0) >= 2) out.push([3, `🪨 Stone throwers knocked down ${st.stoned} buildings from beyond your towers' reach. Bolt towers and archers on the walls outrange them.`]);
+  if ((st.trampled || 0) + (st.looted || 0) / 20 >= 3) out.push([2, `🌾 Raiders trampled ${st.trampled || 0} paddies and looted ${st.looted || 0} goods on the way in. A tower or archers by the fields on the raid side protect the harvest.`]);
+  if (st.burned >= 2) out.push([3, `🔥 Fire took ${st.burned} buildings. Keep wewas full so villagers can carry water, and keep archers near the thatch.`]);
+  const army = S.units.filter(u => u.team === "p").length;
+  if (st.trained <= 2 && army <= 2) out.push([3, `⚔️ ${st.trained ? `Only ${st.trained} soldier${st.trained === 1 ? " was" : "s were"}` : "No soldiers were"} trained. A barracks and a few spearmen go a long way.`]);
+  if (!out.length) out.push([1, `⚔️ The last raid (${st.lastSize || "many"} raiders from the ${(st.lastFrom || []).join(" and ") || "edges"}) was stronger than the defence. Flood a sluice or wall the approach.`]);
+  return out.sort((a, b) => b[0] - a[0]).slice(0, 3).map(r => r[1]);
+}
+
 function endLevel(won) {
   if (S.mode !== "play") return;
   clearRun();
@@ -1294,6 +1511,10 @@ function endLevel(won) {
   let stars = won ? (pct >= 0.9 ? 3 : pct >= 0.5 ? 2 : 1) : 0;
   // "Let not one drop of rain reach the sea unused": three stars need 70% kept.
   if (S.L.objectives.some(o => o.type === "catch") && rainKept() < 70) stars = Math.min(stars, 2);
+  // a kingdom that buys peace is not sung about: tribute caps a level at two stars
+  if (!S.L.endless && (S.stats.tributes || 0) > 0) stars = Math.min(stars, 2);
+  S.starsEarned = stars;
+  if (!won) S.causes = defeatCauses();
   if (S.L.endless) {
     S.survived = Math.max(0, S.nextWave - 1);
     S.newBest = S.survived > (progress.skirmishBest || 0);
@@ -1371,34 +1592,33 @@ function zoomAt(factor, sx = view.w / 2, sy = view.h / 2) {
 }
 
 // ==================== HUD ====================
+// The 👑 tab appears once there is something in it: a decree, a market's orders, or the sandbox.
+const realmTabUseful = () => !!(S.L.sandbox || S.unlocked.edicts.size || count("market"));
+
 function buildTabs() {
   const nav = document.getElementById("tabs");
   nav.innerHTML = "";
+  S.realmTab = realmTabUseful();
   for (const c of CATS) {
+    if (c.id === "realm" && !S.realmTab) continue;
     const btn = document.createElement("button");
-    btn.className = `tab ${S.cat === c.id && !S.demolish && !S.upgrade && !S.repair ? "active" : ""}`;
+    btn.className = `tab ${S.cat === c.id && !S.demolish && !S.improve ? "active" : ""}`;
     btn.innerHTML = `<span>${c.icon}</span><span>${c.label}</span>`;
-    btn.addEventListener("click", () => { S.cat = c.id; S.tool = null; S.demolish = false; S.upgrade = false; S.repair = false; buildTabs(); renderPalette(); });
+    btn.addEventListener("click", () => { S.cat = c.id; S.tool = null; S.demolish = false; S.improve = false; buildTabs(); renderPalette(); });
     nav.appendChild(btn);
   }
   const clear = document.createElement("button");
   clear.className = `tab clear ${S.demolish ? "active" : ""}`;
   clear.title = "Demolish (half refund)";
   clear.innerHTML = "<span>⛏️</span><span>Clear</span>";
-  clear.addEventListener("click", () => { S.demolish = !S.demolish; S.upgrade = false; S.repair = false; S.tool = null; buildTabs(); renderPalette(); });
+  clear.addEventListener("click", () => { S.demolish = !S.demolish; S.improve = false; S.tool = null; buildTabs(); renderPalette(); });
   nav.appendChild(clear);
-  const upg = document.createElement("button");
-  upg.className = `tab clear ${S.upgrade ? "active" : ""}`;
-  upg.title = "Upgrade in place: palisade → rampart, house → walawwa (drag along walls)";
-  upg.innerHTML = "<span>⬆️</span><span>Upgrade</span>";
-  upg.addEventListener("click", () => { S.upgrade = !S.upgrade; S.demolish = false; S.repair = false; S.tool = null; buildTabs(); renderPalette(); });
-  nav.appendChild(upg);
-  const rep = document.createElement("button");
-  rep.className = `tab clear ${S.repair ? "active" : ""}`;
-  rep.title = "Repair damaged buildings for part of their cost (drag along walls)";
-  rep.innerHTML = "<span>🔧</span><span>Repair</span>";
-  rep.addEventListener("click", () => { S.repair = !S.repair; S.demolish = false; S.upgrade = false; S.tool = null; buildTabs(); renderPalette(); });
-  nav.appendChild(rep);
+  const imp = document.createElement("button");
+  imp.className = `tab clear ${S.improve ? "active" : ""}`;
+  imp.title = "Improve: repair a damaged building, or upgrade it (palisade → rampart, house → walawwa); drag along walls";
+  imp.innerHTML = "<span>🔨</span><span>Improve</span>";
+  imp.addEventListener("click", () => { S.improve = !S.improve; S.demolish = false; S.tool = null; buildTabs(); renderPalette(); });
+  nav.appendChild(imp);
 }
 
 function affordable(cost) {
@@ -1467,7 +1687,7 @@ function renderPalette() {
       card.dataset.build = id;
       card.title = b.desc;
       card.innerHTML = `<div class="card-head">${b.icon} ${b.name}</div><div class="card-desc">${b.desc}</div><div class="card-cost">${costText(buildCost(b))}</div>`;
-      card.addEventListener("click", () => { S.tool = S.tool === id ? null : id; S.demolish = false; S.upgrade = false; S.repair = false; buildTabs(); renderPalette(); });
+      card.addEventListener("click", () => { S.tool = S.tool === id ? null : id; S.demolish = false; S.improve = false; buildTabs(); renderPalette(); });
       pal.appendChild(card);
     }
   }
@@ -1515,14 +1735,12 @@ function proclaim(id) {
   syncHud();
 }
 
-// Soldiers' price: monks at a staffed pansala teach discipline, 25% off.
+// Soldiers' price: a staffed kammala (smithy) forges their arms, 30% off the gold.
 const staffedPansalas = () => S.buildings.filter(b => b.id === "pansala" && b.worker).length;
 function troopCost(id) {
   const c = TROOPS[id].cost;
-  if (!staffedPansalas()) return c;
-  const out = {};
-  for (const [k, v] of Object.entries(c)) out[k] = Math.ceil(v * 0.75);
-  return out;
+  if (!S.buildings.some(b => b.id === "kammala" && b.worker)) return c;
+  return { ...c, gold: Math.ceil(c.gold * 0.7) };
 }
 
 function recruit(id) {
@@ -1538,6 +1756,7 @@ function recruit(id) {
   }
   for (const [k, v] of Object.entries(cost)) S[k] -= v;
   S.villagers--;
+  S.stats.trained++;
   const b = barracks[0];
   spawnSoldier(id, b.gx + 1 + Math.random() * 0.5, b.gy + b.h + 0.3 + Math.random() * 0.4);
   staff();
@@ -1550,7 +1769,7 @@ function syncHud() {
   document.getElementById("seasonBadge").textContent = `${SEASONS[S.season].label} · ${S.seasonLeft}s`;
   document.getElementById("objectives").innerHTML = S.L.objectives.map(o => {
     const r = objective(o);
-    return `<li class="${r.cur >= r.n ? "done" : ""}">${r.label}${r.n === Infinity ? "" : ` (${Math.min(r.cur, r.n)}/${r.n})`}</li>`;
+    return `<li class="${r.cur >= r.n ? "done" : ""}">${r.label}${r.n === Infinity ? "" : ` ${Math.min(r.cur, r.n)}/${r.n}`}</li>`;
   }).join("");
   document.getElementById("resources").innerHTML = Object.entries(RES)
     .map(([k, ic]) => `<span>${ic} ${k}: <strong>${Math.floor(S[k])}</strong></span>`).join("") +
@@ -1568,9 +1787,18 @@ function syncHud() {
     ? (foesAlive() || S.spawnQueue.length ? "Under attack!" : "None left")
     : `${String(Math.floor(n / 60)).padStart(2, "0")}:${String(n % 60).padStart(2, "0")}`;
   document.getElementById("conchBtn").disabled = n === Infinity || S.mode !== "play";
-  document.getElementById("pauseBtn").textContent = S.paused ? "▶ Resume" : "⏸ Pause";
+  const tb = document.getElementById("tributeBtn"), open = tributeOpen();
+  tb.hidden = !open;
+  if (open) {
+    const c = tributeCost();
+    tb.textContent = `🪙 Pay ${costText(c)}`;
+    tb.disabled = !affordable(c);
+    tb.title = "Pay to turn this raid back: the price doubles each time, −5 harmony, and the level can earn at most two stars.";
+  }
+  document.getElementById("pauseBtn").textContent = S.paused ? "▶" : "⏸";
   document.getElementById("pauseBtn").disabled = S.mode !== "play";
   document.getElementById("speedBtn").textContent = `⏩ ${S.speed}×`;
+  if (S.realmTab !== realmTabUseful()) buildTabs();
   // decree cards show live timers; building costs change while rajakariya runs
   if ((S.cat === "realm" && !S.L.sandbox) || (S.cat !== "army" && S.cat !== "realm" && S.lastDiscount !== edictOn("rajakariya"))) { S.lastDiscount = edictOn("rajakariya"); renderPalette(); }
   else updateAffordability();
@@ -1592,12 +1820,11 @@ function spawnFloat(text, gx, gy, color) {
 
 function describe(b) {
   const lines = [`<b>${b.def.icon} ${b.def.name}</b>`, `HP ${Math.ceil(b.hp)}/${b.maxHp}`];
-  if (S.repair) lines.push(b.hp < b.maxHp ? `🔧 Repair: ${costText(repairCost(b)) || "free"}` : "Undamaged");
-  if (S.upgrade) lines.push(b.def.upgrade ? `⬆️ ${BUILDINGS[b.def.upgrade.to].name}: ${costText(b.def.upgrade.cost)}` : "No upgrade");
+  if (S.improve) lines.push(b.hp < b.maxHp ? `🔨 Repair: ${costText(repairCost(b)) || "free"}` : b.def.upgrade ? `🔨 Upgrade to ${BUILDINGS[b.def.upgrade.to].name}: ${costText(b.def.upgrade.cost)}` : "Nothing to improve");
   if (b.fire > 0) lines.push(`🔥 On fire (${b.fire >= 2 ? "raging" : "burning"}). Villagers are carrying water.`);
   if (b.def.worker) lines.push(b.worker ? (b.id === "pansala" ? (b.worker.alms ? "The monk is on his alms round" : "The monk is in meditation") : "Staffed") : "💤 No villager free. Build houses.");
   if (b.id === "wewa") {
-    lines.push(`Water ${Math.round(b.water)}/${WEWA_CAP}${riverBeside(b) ? " · river-fed" : ""}`);
+    lines.push(`Water ${Math.round(b.water)}/${Math.round(wewaCap(b))}${riverBeside(b) ? " · river-fed" : ""}${b.silt >= 1 ? ` · silt ${Math.round(b.silt)} (idle villagers dig it out in Yala)` : ""}`);
     const id = S.netOf[b.gy][b.gx], linked = id !== -1 ? S.nets[id].wewas.size - 1 : 0;
     lines.push(linked ? `Spills into ${linked} linked wewa${linked > 1 ? "s" : ""} when full` : "When full, rain runs off. Link another wewa by canal.");
   }
@@ -1689,7 +1916,7 @@ function showBriefing() {
       <h2>${L.name}</h2>
       <p>${L.intro}</p>
       <b>Objectives</b>
-      <ul>${L.objectives.map(o => `<li>${objective(o).label}</li>`).join("")}</ul>
+      <ul>${L.objectives.map(o => { const r = objective(o); return `<li>${r.label}${r.n === Infinity ? "" : `: ${r.n}`}</li>`; }).join("")}</ul>
       ${unlocks.length ? `<b>New this level</b><ul><li>${unlocks.join("</li><li>")}</li></ul>` : ""}
       <div class="actions">
         <button class="btn primary" id="beginBtn">Begin</button>
@@ -1713,6 +1940,7 @@ function showEnd(won, starCount) {
       <div class="card-screen">
         <h2>The Maligawa has fallen</h2>
         <p>You held the valley through <b>${S.survived}</b> raid${S.survived === 1 ? "" : "s"}.${S.newBest ? " A new best!" : ` Best: ${progress.skirmishBest}.`}</p>
+        ${S.causes ? `<div class="causes"><b>Why it fell</b><ul>${S.causes.map(c => `<li>${c}</li>`).join("")}</ul></div>` : ""}
         <div class="actions">
           <button class="btn primary" id="newMapBtn">New map ▶</button>
           <button class="btn" id="retryBtn">↻ Same map</button>
@@ -1731,8 +1959,10 @@ function showEnd(won, starCount) {
       ${won ? `<div class="lc-stars" style="font-size:28px">${stars(starCount)}</div>` : ""}
       <p>${won
         ? (S.idx + 1 === LEVELS.length ? "The hill kingdom endures. You have completed the campaign." : "The kingdom is fed and the walls still stand. A new region awaits.")
-        : "Raiders breached the Maligawa. Build more wewas, wall the approaches and keep soldiers at home."}</p>
-      ${S.rain.caught + S.rain.lost > 0 ? `<p>🌧️ Rain kept: <b>${rainKept()}%</b>${S.L.objectives.some(o => o.type === "catch") ? (rainKept() >= 70 ? " · Parakramabahu would be pleased." : " · Below 70%: too much rain reached the sea for three stars.") : ""}</p>` : ""}
+        : "Raiders breached the Maligawa."}</p>
+      ${!won && S.causes ? `<div class="causes"><b>Why it fell</b><ul>${S.causes.map(c => `<li>${c}</li>`).join("")}</ul></div>` : ""}
+      ${S.L.objectives.some(o => o.type === "catch") && S.rain.caught + S.rain.lost > 0 ? `<p>🌧️ Rain kept: <b>${rainKept()}%</b>${S.L.objectives.some(o => o.type === "catch") ? (rainKept() >= 70 ? " · Parakramabahu would be pleased." : " · Below 70%: too much rain reached the sea for three stars.") : ""}</p>` : ""}
+      ${won && !S.L.endless && S.stats.tributes ? `<p>🪙 Tribute paid ${S.stats.tributes} time${S.stats.tributes > 1 ? "s" : ""}: a kingdom that buys peace earns at most two stars.</p>` : ""}
       <div class="actions">
         ${hasNext ? `<button class="btn primary" id="nextBtn">Next level ▶</button>` : ""}
         <button class="btn" id="retryBtn">↻ Replay</button>
@@ -1780,7 +2010,7 @@ canvas.addEventListener("mousemove", e => {
   }
   const g = screenToGrid(x, y);
   input.hover = { gx: g.gx, gy: g.gy, x: sx, y: sy };
-  if (input.painting && (S.tool || S.upgrade || S.repair)) paintTo(g.gx, g.gy);
+  if (input.painting && (S.tool || S.improve)) paintTo(g.gx, g.gy);
   if (input.drag) { input.drag.x2 = x; input.drag.y2 = y; }
   updateTooltip();
 });
@@ -1790,7 +2020,7 @@ function paintTo(gx, gy) {
   let [x, y] = input.lastPaint.split(",").map(Number);
   while (x !== gx || y !== gy) {
     if (Math.abs(gx - x) >= Math.abs(gy - y)) x += Math.sign(gx - x); else y += Math.sign(gy - y);
-    if (S.upgrade) upgradeAt(x, y, true); else if (S.repair) repairAt(x, y, true); else tryBuild(x, y, true);
+    if (S.improve) improveAt(x, y, true); else tryBuild(x, y, true);
   }
   input.lastPaint = `${gx},${gy}`;
 }
@@ -1816,8 +2046,8 @@ canvas.addEventListener("mousedown", e => {
       return;
     }
     if (S.demolish) { demolishAt(g.gx, g.gy); return; }
-    if (S.upgrade || S.repair) {
-      if (S.upgrade) upgradeAt(g.gx, g.gy); else repairAt(g.gx, g.gy);
+    if (S.improve) {
+      improveAt(g.gx, g.gy);
       input.painting = true; input.lastPaint = `${g.gx},${g.gy}`;
       return;
     }
@@ -1830,8 +2060,8 @@ canvas.addEventListener("mousedown", e => {
     }
     input.drag = { x1: x, y1: y, x2: x, y2: y };
   } else if (e.button === 2) {
-    if (S.tool || S.demolish || S.upgrade || S.repair) {
-      S.tool = null; S.demolish = false; S.upgrade = false; S.repair = false;
+    if (S.tool || S.demolish || S.improve) {
+      S.tool = null; S.demolish = false; S.improve = false;
       buildTabs(); renderPalette();
       return;
     }
@@ -1882,7 +2112,7 @@ window.addEventListener("keydown", e => {
     e.preventDefault();
     togglePause();
   } else if (k === "escape") {
-    S.tool = null; S.demolish = false; S.upgrade = false; S.repair = false;
+    S.tool = null; S.demolish = false; S.improve = false;
     for (const u of S.units) u.sel = false;
     buildTabs(); renderPalette();
   } else if (k === "c") {
@@ -1931,6 +2161,7 @@ mini.addEventListener("mousedown", e => {
 });
 
 document.getElementById("conchBtn").addEventListener("click", callRaidEarly);
+document.getElementById("tributeBtn").addEventListener("click", payTribute);
 document.getElementById("pauseBtn").addEventListener("click", togglePause);
 document.getElementById("speedBtn").addEventListener("click", () => {
   if (!S) return;

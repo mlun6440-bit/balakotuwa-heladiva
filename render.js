@@ -697,9 +697,9 @@ function drawRock(x, y) {
 function drawHoverTile() {
   const h = input.hover;
   if (S.tool || !inb(h.gx, h.gy) || S.mode !== "play") return;
-  if (S.upgrade || S.repair) {
+  if (S.improve) {
     const b = buildingAt(h.gx, h.gy);
-    const ok = b && (S.repair ? b.hp < b.maxHp && !(b.fire > 0) && affordable(repairCost(b)) : !upgradeBlocked(b));
+    const ok = canImprove(b);
     if (b) diamond(b.gx, b.gy, b.w, b.h, 0, ok ? "rgba(233,185,73,0.25)" : "rgba(255,90,70,0.2)", ok ? "rgba(255,215,110,0.95)" : "rgba(255,90,70,0.9)");
     else diamond(h.gx, h.gy, 1, 1, 0, null, "rgba(233,185,73,0.5)");
     return;
@@ -823,6 +823,10 @@ function drawPaddy(b, now) {
 function drawWewaSprite(b, now) {
   const { gx, gy } = b;
   drawSprite("wewa.base", gx, gy);
+  if (b.silt > 1) {
+    const sk = Math.min(1, b.silt / 60), ins = 0.56 - 0.12 * sk;
+    diamond(gx + ins, gy + ins, 2 - ins * 2, 2 - ins * 2, 0.4 + sk * 2.4, `rgba(112,86,52,${0.35 + 0.45 * sk})`);
+  }
   const k = b.water / WEWA_CAP;
   if (k > 0.01) {
     const z = 0.6 + 5.6 * k, inset = 0.56 - 0.2 * (z / 7);
@@ -1154,7 +1158,7 @@ function buildProgress(b) {
   return clamp((S.time - b.at) / BUILD_TIME, 0, 1);
 }
 
-const FLAGS = { citadel: [1.42, 0.5, 52, 20], tower: [0.5, 0.5, 60, 12], gate: [0.5, 0.5, 51, 12], barracks: [1.85, 1.85, 0, 30] };
+const FLAGS = { citadel: [1.42, 0.5, 52, 20], tower: [0.5, 0.5, 60, 12], bolt: [0.5, 0.5, 58, 12], gate: [0.5, 0.5, 51, 12], barracks: [1.85, 1.85, 0, 30] };
 
 function drawBuildingSprite(b, now) {
   const key = b.def.wall && b.id !== "gate" ? null : buildingKey(b);
@@ -1414,7 +1418,7 @@ function stride(o) {
   return g;
 }
 function drawWorkerSprite(w, now) {
-  const base = `u.v.${w.job === "bucket" ? "farmer" : w.job}`;
+  const base = `u.v.${w.job === "bucket" || w.job === "shramadana" ? "farmer" : w.job}`;
   if (!hasSprite(`${base}.f.i0`)) return false;
   const g = stride(w);
   const f = g.back ? "b" : "f";
@@ -1425,7 +1429,7 @@ function drawWorkerSprite(w, now) {
   else if (working) fr = `a${Math.floor(now / (w.job === "farmer" || w.job === "trader" ? 260 : 150) + w.b.uid) % 3}`;
   else fr = "i0";
   drawSprite(`${base}.${f}.${fr}`, w.gx, w.gy, 0, { flip: g.flip });
-  if (w.carry && moving) drawSprite(`load.${w.carry.key}.${f}.${fr}`, w.gx, w.gy, 0, { flip: g.flip });
+  if (w.carry && moving) drawSprite(`load.${w.carry.key === "silt" ? "stone" : w.carry.key}.${f}.${fr}`, w.gx, w.gy, 0, { flip: g.flip });
   if (w.phase === "work" && Math.floor(now / 150) % 3 === 2 && hash(now | 0, 1) > 0.6) {
     const p = iso(w.gx, w.gy, 0);
     ctx.fillStyle = w.job === "mason" ? "#ddd" : "#d9b27a";
@@ -1512,8 +1516,9 @@ function drawUnit(u, now) {
     const look = {
       raider: { upper: "#4a2a2a", lower: "#2a2a2a", item: "sword", shield: "#7a1d1d", head: "helm" },
       bowman: { upper: "#3b3226", lower: "#2a2a2a", item: "bow", head: "helm", headCol: "#5a4a3a" },
-      brute: { upper: "#5a1414", lower: "#2a2a2a", head: "helm", scale: 1.35 }
-    }[u.type];
+      brute: { upper: "#5a1414", lower: "#2a2a2a", head: "helm", scale: 1.35 },
+      thrower: { upper: "#5a4a3a", lower: "#2a2a2a", head: "helm", scale: 1.2 }
+    }[u.type] || { upper: "#4a2a2a", lower: "#2a2a2a", head: "helm" };
     person(p, { ...look, moving, seed: u.uid, skin: "#b98a62", sash: "#a8321e" }, now);
     if (u.type === "brute") {
       box(u.gx - 0.45, u.gy - 0.05, 0.9, 0.1, 12, 4, "#6b4a2a");
@@ -1537,11 +1542,27 @@ function drawShots() {
     const k = s.t / s.dur;
     const tgx = s.target.gx + (s.ox || 0), tgy = s.target.gy + (s.oy || 0);
     const x = s.sx + (tgx - s.sx) * k, y = s.sy + (tgy - s.sy) * k;
-    const z = s.sz * (1 - k) + 10 * k + Math.sin(k * Math.PI) * 26;
+    const arc = s.kind === "stone" ? 70 : s.kind === "bolt" ? 8 : 26;
+    const z = s.sz * (1 - k) + 10 * k + Math.sin(k * Math.PI) * arc;
     const p = iso(x, y, z);
     const k2 = Math.min(1, k + 0.05);
-    const q = iso(s.sx + (tgx - s.sx) * k2, s.sy + (tgy - s.sy) * k2, s.sz * (1 - k2) + 10 * k2 + Math.sin(k2 * Math.PI) * 26);
+    const q = iso(s.sx + (tgx - s.sx) * k2, s.sy + (tgy - s.sy) * k2, s.sz * (1 - k2) + 10 * k2 + Math.sin(k2 * Math.PI) * arc);
     const a = Math.atan2(q.y - p.y, q.x - p.x);
+    if (s.kind === "stone") {
+      // shadow on the ground, then the tumbling stone
+      const gp = iso(x, y, 0);
+      ctx.fillStyle = "rgba(0,0,0,0.25)"; ctx.beginPath(); ctx.ellipse(gp.x, gp.y, 4, 2, 0, 0, Math.PI * 2); ctx.fill();
+      const g = ctx.createRadialGradient(p.x - 1.5, p.y - 1.5, 0.5, p.x, p.y, 4.5);
+      g.addColorStop(0, "#d8d2c4"); g.addColorStop(1, "#6f6a5e");
+      ctx.fillStyle = g; ctx.beginPath(); ctx.arc(p.x, p.y, 4, 0, Math.PI * 2); ctx.fill();
+      continue;
+    }
+    if (s.kind === "bolt") {
+      line({ x: p.x - Math.cos(a) * 14, y: p.y - Math.sin(a) * 14 }, p, "#4a3220", 2.2);
+      line({ x: p.x - Math.cos(a) * 14, y: p.y - Math.sin(a) * 14 }, { x: p.x - Math.cos(a) * 10, y: p.y - Math.sin(a) * 10 }, "#e8dcb0", 2.6);
+      ctx.fillStyle = "#c8ccd0"; ctx.fillRect(p.x - 1.5, p.y - 1.5, 3, 3);
+      continue;
+    }
     line({ x: p.x - Math.cos(a) * 6, y: p.y - Math.sin(a) * 6 }, p, "#e8dcb0", 1.4);
     if (s.fire) {
       const g = ctx.createRadialGradient(p.x, p.y, 0, p.x, p.y, 5);
