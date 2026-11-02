@@ -235,7 +235,7 @@ function skirmishWave(k, seed, riverEdge) {
   const edges = ["east", "south", "north", "west"].filter(e => e !== riverEdge);
   const n = Math.min(edges.length, 1 + Math.floor(k / 3));
   const from = [...edges].sort(() => r() - 0.5).slice(0, n);
-  return { t: 150 + k * 95, from, raider: 3 + 2 * k, bowman: 1 + Math.floor(k * 0.8), brute: Math.floor(k / 2) };
+  return { t: 150 + k * 95, from, raider: 3 + 2 * k, bowman: 1 + Math.floor(k * 0.8), brute: Math.floor(k / 2), thrower: k >= 4 ? Math.floor((k - 2) / 2) : 0 };
 }
 const newSeed = () => (Date.now() % 900000) + 1;
 const startSkirmish = seed => startLevel(LEVELS.length, "brief", makeSkirmish(seed ?? newSeed()));
@@ -248,7 +248,7 @@ const RAID_SIZES = { small: 6, medium: 14, large: 30, extreme: 60 };
 function sendRaid(size, edge) {
   const n = RAID_SIZES[size];
   const list = [];
-  for (let i = 0; i < n; i++) list.push(i % 10 === 9 ? "brute" : i % 3 === 2 ? "bowman" : "raider");
+  for (let i = 0; i < n; i++) list.push(i % 15 === 14 ? "thrower" : i % 10 === 9 ? "brute" : i % 3 === 2 ? "bowman" : "raider");
   const party = 1000 + (S.raidsSent = (S.raidsSent || 0) + 1);
   S.parties = S.parties || {};
   S.parties[party] = { total: list.length, spawned: 0, fled: false };
@@ -982,11 +982,32 @@ function hitUnit(target, dmg, splash) {
   }
 }
 
-function fireShot(gx, gy, z, target, dmg) {
+function fireShot(gx, gy, z, target, dmg, kind = null) {
   const d = Math.hypot(target.gx - gx, target.gy - gy);
   // ox/oy: a little landing scatter so a volley reads as a volley (cosmetic)
-  S.shots.push({ sx: gx, sy: gy, sz: z, target, dmg, t: 0, dur: Math.max(0.25, d / 9) * (0.9 + Math.random() * 0.2), ox: (Math.random() - 0.5) * 0.35, oy: (Math.random() - 0.5) * 0.35 });
+  S.shots.push({ sx: gx, sy: gy, sz: z, target, dmg, t: 0, dur: Math.max(0.25, d / (kind === "bolt" ? 14 : 9)) * (0.9 + Math.random() * 0.2), ox: (Math.random() - 0.5) * 0.35, oy: (Math.random() - 0.5) * 0.35, kind });
 }
+
+// ==================== SIEGE ====================
+// Stone throwers stop at range and lob stones at the nearest wall or tower
+// (else any solid building). Bolt towers outrange them and hunt them first.
+function siegeTarget(u, range) {
+  let best = null, bd = Infinity;
+  for (const b of S.buildings) {
+    if (!b.def.solid) continue;
+    const d = rectDist(u, b);
+    if (d > range) continue;
+    const k = d - (b.def.wall || b.def.tower ? 3 : 0); // prefer defences
+    if (k < bd) { bd = k; best = b; }
+  }
+  return best;
+}
+function lobStone(u, b) {
+  const tx = b.gx + b.w / 2, ty = b.gy + b.h / 2, d = Math.hypot(tx - u.gx, ty - u.gy);
+  S.shots.push({ sx: u.gx, sy: u.gy, sz: 14, target: { gx: tx, gy: ty, hp: 0 }, dmg: 0, t: 0, dur: Math.max(0.6, d / 5), stone: b, bdmg: u.def.bdmg, kind: "stone" });
+  if (!S.warnedSiege) { S.warnedSiege = true; say("A stone thrower! It outranges watchtowers. Bolt towers and archers on the walls can reach it, or send soldiers out to cut down its crew.", true); }
+}
+const nearestSiege = (c, range) => { let best = null, bd = range; for (const v of unitsNear(c.gx, c.gy, range)) { if (v.team === "e" && v.def.siege && v.hp > 0) { const d = Math.hypot(v.gx - c.gx, v.gy - c.gy); if (d <= bd) { bd = d; best = v; } } } return best; };
 
 function rectDist(u, b) {
   const dx = Math.max(b.gx - u.gx, 0, u.gx - (b.gx + b.w));
@@ -1049,6 +1070,13 @@ function checkMorale() {
 
 function updateFoe(u, dt) {
   const d = u.def;
+  if (d.siege && !u.flee) {
+    const tb = siegeTarget(u, d.range);
+    if (tb) {
+      if (S.time - u.last >= d.cd) { u.last = S.time; lobStone(u, tb); }
+      return;
+    }
+  }
   if (u.flee) {
     moveToward(u, u.hx ?? u.gx, u.hy ?? u.gy, dt * 1.2);
     if (Math.hypot((u.hx ?? u.gx) - u.gx, (u.hy ?? u.gy) - u.gy) < 0.3) u.gone = true;
@@ -1121,8 +1149,8 @@ function updateCombat(dt) {
     const tw = b.def.tower;
     if (!tw || S.time < b.next) continue;
     const c = { gx: b.gx + b.w / 2, gy: b.gy + b.h / 2, team: "p" };
-    const foe = volleyTarget(c, tw.range);
-    if (foe) { fireShot(c.gx, c.gy, 48, foe, tw.dmg); b.next = S.time + tw.cd; }
+    const foe = (tw.siege && nearestSiege(c, tw.range)) || volleyTarget(c, tw.range);
+    if (foe) { fireShot(c.gx, c.gy, 48, foe, tw.dmg, tw.siege ? "bolt" : null); b.next = S.time + tw.cd; }
   }
 
   for (let i = S.shots.length - 1; i >= 0; i--) {
@@ -1130,6 +1158,7 @@ function updateCombat(dt) {
     s.t += dt;
     if (s.t >= s.dur) {
       if (s.fire) ignite(s.fire);
+      else if (s.stone) { if (S.buildings.includes(s.stone)) { const was = s.stone; damageBuilding(was, s.bdmg); if (!S.buildings.includes(was)) S.stats.stoned = (S.stats.stoned || 0) + 1; } puff(s.target.gx, s.target.gy, 6, "#9a9080"); }
       else if (s.target.hp > 0) { s.target.hp -= s.dmg; puff(s.target.gx + (s.ox || 0) * 0.5, s.target.gy + (s.oy || 0) * 0.5, 2, "#c8b48a"); }
       S.shots.splice(i, 1);
     }
@@ -1451,6 +1480,7 @@ function defeatCauses() {
   }
   const wallsLost = Object.entries(st.lost).filter(([id]) => BUILDINGS[id] && BUILDINGS[id].wall).reduce((a, [, n]) => a + n, 0);
   if (wallsLost >= 3) out.push([2, `🧱 Raiders broke through ${wallsLost} wall sections. Stone ramparts hold far longer than palisades.`]);
+  if ((st.stoned || 0) >= 2) out.push([3, `🪨 Stone throwers knocked down ${st.stoned} buildings from beyond your towers' reach. Bolt towers and archers on the walls outrange them.`]);
   if ((st.trampled || 0) + (st.looted || 0) / 20 >= 3) out.push([2, `🌾 Raiders trampled ${st.trampled || 0} paddies and looted ${st.looted || 0} goods on the way in. A tower or archers by the fields on the raid side protect the harvest.`]);
   if (st.burned >= 2) out.push([3, `🔥 Fire took ${st.burned} buildings. Keep wewas full so villagers can carry water, and keep archers near the thatch.`]);
   const army = S.units.filter(u => u.team === "p").length;

@@ -65,8 +65,8 @@ system, not a copy of any other game's mechanic.
 - [x] **Genre notes steps 1–4** (`docs/GENRE-NOTES.md`): volley spread, raider
       morale, control groups, spatial hash, sandbox, thorn barriers, repair
       tool, market orders.
-- [ ] **Genre notes step 5:** raider stone-thrower that outranges towers vs a
-      player bolt tower; hill tiles that block building; scorched ground.
+- [x] **Genre notes step 5 (siege pair):** stone thrower vs bolt tower.
+- [ ] Hill tiles that block building; scorched ground.
 - [x] **Tribute** (notes #14): from level 2, pay rice and gold in the 30s before
       a raid to turn it back; −5 harmony; +50% price each time.
 - [x] **Defeat screen names the causes** (notes #19): `S.stats` tally; the end
@@ -99,11 +99,18 @@ Recorded so these are not re-added without a strong reason:
 
 - [x] Tribute could buy whole levels → final raid can't be bought, price doubles, max 2 stars.
 - [x] Walls were worthless → archers on walls/towers are out of melee reach.
-- [ ] Idle villagers (50–70%): a water-loop job for them (desilting, bund repair).
-- [ ] Early raids lack tension: raiders that threaten fields, bunds and granaries.
-- [ ] Hill Kingdom difficulty cliff for novices.
-- [ ] Army balloons without upkeep.
-- [ ] UI: card text clips at three lines; "Rain kept" shown on levels without a rain goal.
+- [~] Idle villagers: siltation + shramadana work parties (R1). Helps in Yala;
+      idle share only modestly lower (planner 42–59%). Still open: a job for
+      idle people in Maha, or growth capped by land and water.
+- [x] Early raids lack tension → raiders trample paddies and rob granaries (R2).
+- [~] Hill Kingdom cliff: new-edge raid warning, later first raid, a granary
+      sized for its army (R3). The weak novice bot still loses the finale;
+      the learned planner wins at ~80%. Accepted as a hard finale for now.
+- [x] Army upkeep: soldiers eat 0.06 rice/s (R3).
+- [x] UI: cards no longer clip; "Rain kept" only on the rain-goal level (R3).
+- [x] Siege pair (genre-notes step 5, R4): raider stone thrower vs bolt tower,
+      in Hill Kingdom and skirmish. Budget note: the finale now has two
+      headline mechanics (siege and decrees), a deliberate exception.
 
 ## Later
 

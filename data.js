@@ -28,7 +28,7 @@ const BUILDINGS = {
                 tower: { range: 4.5, dmg: 8, cd: 1.3 } },
 
   wewa:       { name: "Wewa (Tank)", cat: "water", icon: "💧", w: 2, h: 2, hp: 700, cost: { timber: 10, stone: 6 }, solid: true, water: true, z: 5,
-                desc: "Stores water from Maha rain (or a river); silt builds up, and idle villagers dig it out in Yala." },
+                desc: "Stores Maha rain; silt builds up, and idle villagers dig it out in Yala." },
   canal:      { name: "Ela (Canal)", cat: "water", icon: "〰️", w: 1, h: 1, hp: 150, cost: { stone: 1 }, ground: true, water: true, paint: true,
                 desc: "Carries wewa water to paddies; drag to paint." },
   sluice:     { name: "Sorowwa (Sluice)", cat: "water", icon: "🚪", w: 1, h: 1, hp: 400, cost: { timber: 6, stone: 8 }, ground: true, water: true,
@@ -69,6 +69,8 @@ const BUILDINGS = {
                 desc: "Your soldiers pass through; raiders must break it." },
   tower:      { name: "Atuwa (Watchtower)", cat: "defence", icon: "🗼", w: 1, h: 1, hp: 750, cost: { timber: 12, stone: 10 }, solid: true, z: 48,
                 tower: { range: 5.5, dmg: 12, cd: 1.1 }, desc: "Shoots raiders within 5.5 tiles; archers on it shoot farther." },
+  bolt:       { name: "Yantra Atuwa (Bolt tower)", cat: "defence", icon: "🎯", w: 1, h: 1, hp: 800, cost: { timber: 20, stone: 16, gold: 20 }, solid: true, z: 44,
+                tower: { range: 8, dmg: 45, cd: 3.2, siege: true }, desc: "A great bolt-thrower that outranges stone throwers and hunts them first." },
   barracks:   { name: "Angam Maduwa (Barracks)", cat: "defence", icon: "⚔️", w: 2, h: 2, hp: 700, cost: { timber: 18, stone: 8 }, solid: true, z: 22,
                 desc: "Needed to train soldiers in the Army tab." }
 };
@@ -111,9 +113,11 @@ const TROOPS = {
 const FOES = {
   raider: { name: "Raider", hp: 90, dmg: 12, bdmg: 12, range: 0.9, speed: 1.5, gold: 6, morale: 0.35, loot: true },
   bowman: { name: "Raider bowman", hp: 60, dmg: 9, bdmg: 4, range: 4.2, speed: 1.5, ranged: true, gold: 6, fire: true, morale: 0.45 },
-  brute:  { name: "Ram bearer", hp: 280, dmg: 10, bdmg: 48, range: 0.9, speed: 1.0, heavy: true, gold: 15, morale: 0 }
+  brute:  { name: "Ram bearer", hp: 280, dmg: 10, bdmg: 48, range: 0.9, speed: 1.0, heavy: true, gold: 15, morale: 0 },
+  thrower: { name: "Stone thrower", hp: 240, dmg: 0, bdmg: 70, range: 6.8, speed: 0.7, ranged: true, siege: true, cd: 4.5, heavy: true, gold: 25, morale: 0 }
 };
 
+// siege: stops at range and lobs stones at walls and towers (outranges watchtowers).
 // fire: shoots fire arrows at flammable buildings when no soldier is in range
 // (only on levels with fireArrows: true).
 // loot: on the way in, breaks off to trample a ripening paddy or rob a granary.
@@ -196,22 +200,22 @@ const LEVELS = [
   },
   {
     id: "senkadagala", name: "Hill Kingdom", era: "Senkadagala", seed: 71,
-    intro: "The last free kingdom in the hills, and the home of the Perahera. Raiders come from three sides. Use royal decrees to rally your people and keep the citadel standing.",
+    intro: "The last free kingdom in the hills, and the home of the Perahera. Raiders come from three sides and bring stone throwers that outrange your towers: answer with bolt towers and archers on the walls, and use royal decrees to rally your people.",
     citadel: [13, 13], season: "maha",
     start: { timber: 160, stone: 100, rice: 190, gold: 180, villagers: 16 },
     army: { spearman: 4, archer: 4, angampora: 2 },
     rivers: [{ edge: "west", at: 1, width: 1, wobble: 2 }],
     rocks: [[3, 3, 7, 6], [20, 20, 24, 24], [19, 3, 22, 6]],
     forests: [[2, 9, 8, 16, 0.4], [9, 19, 16, 25, 0.4], [18, 8, 24, 13, 0.35]],
-    unlocks: { edicts: ["rajakariya", "perahera"] }, fireArrows: true,
+    unlocks: { buildings: ["bolt"], edicts: ["rajakariya", "perahera"] }, fireArrows: true,
     waves: [
       { t: 180, from: ["east"], raider: 5, bowman: 2 },
       { t: 230, from: ["south"], raider: 6, bowman: 3 },
       { t: 320, from: ["north"], raider: 7, bowman: 3, brute: 1 },
       { t: 410, from: ["east", "south"], raider: 8, bowman: 4, brute: 1 },
-      { t: 500, from: ["north", "east"], raider: 9, bowman: 4, brute: 2 },
-      { t: 590, from: ["south", "north"], raider: 10, bowman: 5, brute: 2 },
-      { t: 690, from: ["east", "south", "north"], raider: 12, bowman: 6, brute: 3 }
+      { t: 500, from: ["north", "east"], raider: 9, bowman: 4, brute: 2, thrower: 1 },
+      { t: 590, from: ["south", "north"], raider: 10, bowman: 5, brute: 2, thrower: 1 },
+      { t: 690, from: ["east", "south", "north"], raider: 12, bowman: 6, brute: 3, thrower: 2 }
     ],
     hpScale: 1.45,
     objectives: [{ type: "harmony", n: 60 }, { type: "pop", n: 30 }, { type: "res", key: "rice", n: 150 }, { type: "waves" }]

@@ -390,3 +390,53 @@ function elephant(c, pose) {
 for (let i = 0; i < WALK; i++) ART.add(`u.elephant.f.w${i}`, () => { if (!MODE.shadow) elephant(g, { walk: true, ph: (i / WALK) * Math.PI * 2, act: -1 }); }, { k: 4, size: 70, shadow: false });
 ART.add("u.elephant.f.i0", () => { if (!MODE.shadow) elephant(g, { walk: false, ph: 0, act: -1 }); }, { k: 4, size: 70, shadow: false });
 for (let i = 0; i < ACT; i++) ART.add(`u.elephant.f.a${i}`, () => { if (!MODE.shadow) elephant(g, { walk: false, ph: 0, act: (i + 0.5) / ACT }); }, { k: 4, size: 70, shadow: false });
+
+// ----- raider stone thrower (side view, mirrored at runtime) -----
+function thrower(c, pose) {
+  const ph = pose.walk ? pose.ph : 0;
+  const act = pose.act;
+  c.fillStyle = "rgba(0,0,0,0.3)"; c.beginPath(); c.ellipse(0, 0.6, 16, 4.5, 0, 0, 7); c.fill();
+  // crew pushing from behind
+  c.save(); c.translate(-13, 0); c.scale(0.8, 0.8);
+  person(c, LOOKS.raider, { walk: pose.walk, ph: ph + 1, act: -1 });
+  c.restore();
+  const wood = "#7a5530", dark = "#4e3218";
+  const wheel = (x, far) => {
+    c.save(); c.translate(x, -3.6);
+    c.strokeStyle = far ? dark : wood; c.lineWidth = 1.4; c.beginPath(); c.arc(0, 0, 3.4, 0, 7); c.stroke();
+    c.rotate(ph * 0.7);
+    c.lineWidth = 0.6; for (let i = 0; i < 4; i++) { c.beginPath(); c.moveTo(0, 0); c.lineTo(Math.cos(i * 1.57) * 3.2, Math.sin(i * 1.57) * 3.2); c.stroke(); }
+    c.restore();
+  };
+  wheel(-7, true); wheel(7, true);
+  // base frame
+  const gr = c.createLinearGradient(0, -9, 0, -5); gr.addColorStop(0, "#9a7046"); gr.addColorStop(1, dark);
+  c.fillStyle = gr; c.fillRect(-11, -8.5, 22, 3);
+  // A-frame uprights
+  c.strokeStyle = wood; c.lineWidth = 1.6;
+  c.beginPath(); c.moveTo(-6, -7); c.lineTo(0, -19); c.lineTo(6, -7); c.stroke();
+  c.strokeStyle = dark; c.lineWidth = 0.8; c.beginPath(); c.moveTo(-3.5, -12); c.lineTo(3.5, -12); c.stroke();
+  // throwing arm: cocked back when idle, swings forward through the attack frames
+  const ang = act >= 0 ? -2.6 + act * 2.3 : -2.6;
+  const ax = Math.cos(ang), ay = Math.sin(ang);
+  c.strokeStyle = "#8a6038"; c.lineWidth = 1.8; c.lineCap = "round";
+  c.beginPath(); c.moveTo(-ax * 5, -19 - ay * 5); c.lineTo(ax * 15, -19 + ay * 15); c.stroke();
+  // counterweight box
+  c.fillStyle = "#5a5652"; c.fillRect(-ax * 5 - 2.4, -19 - ay * 5 - 1, 4.8, 4.2);
+  // sling and stone
+  const ex = ax * 15, ey = -19 + ay * 15;
+  c.strokeStyle = "#c9b48a"; c.lineWidth = 0.5;
+  const sx = ex + (act >= 0 ? 3 : -1), sy = ey + (act >= 0 ? -2 : 4);
+  c.beginPath(); c.moveTo(ex, ey); c.lineTo(sx, sy); c.stroke();
+  if (act < 0.6) { c.fillStyle = "#8f897c"; c.beginPath(); c.arc(sx, sy + 1.5, 1.8, 0, 7); c.fill(); }
+  // pivot pin
+  c.fillStyle = "#3a3a3e"; c.beginPath(); c.arc(0, -19, 0.9, 0, 7); c.fill();
+  wheel(-6, false); wheel(8, false);
+  // second crewman beside the wheel
+  c.save(); c.translate(11, 1); c.scale(0.75, 0.75);
+  person(c, LOOKS.raider, { walk: pose.walk, ph, act: -1 });
+  c.restore();
+}
+for (let i = 0; i < WALK; i++) ART.add(`u.thrower.f.w${i}`, () => { if (!MODE.shadow) thrower(g, { walk: true, ph: (i / WALK) * Math.PI * 2, act: -1 }); }, { k: 4, size: 70, shadow: false });
+ART.add("u.thrower.f.i0", () => { if (!MODE.shadow) thrower(g, { walk: false, ph: 0, act: -1 }); }, { k: 4, size: 70, shadow: false });
+for (let i = 0; i < ACT; i++) ART.add(`u.thrower.f.a${i}`, () => { if (!MODE.shadow) thrower(g, { walk: false, ph: 0, act: (i + 0.5) / ACT }); }, { k: 4, size: 70, shadow: false });

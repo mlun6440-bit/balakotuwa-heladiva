@@ -23,6 +23,7 @@ const BOT = (() => {
     towersPerEdge: [1, 0, 3],         // watchtowers facing the next raid
     towerAt: [60, 0, 400],
     walls: [0, 0, 12],                // wall tiles facing the next raid
+    boltTowers: [1, 0, 3],            // bolt towers (vs stone throwers) facing the raid
     tribute: [0, 0, 3],               // pay tribute if gold > cost × this (0 = never)
     reserve: [1, 0, 1],               // hold back resources a "store N" objective needs
     decrees: [1, 0, 1]
@@ -246,6 +247,11 @@ const BOT = (() => {
     if (!count("barracks") && wantBarracks) near("barracks", "train soldiers", 3.5);
     if (!novice && S.time >= P.towerAt) for (const e of nextFrom()) for (let k = 0; k < Math.round(P.towersPerEdge); k++) towerFacing(e, k);
     if (!novice && P.walls >= 1 && S.time > 30) wallFacing(nextFrom()[0], Math.round(P.walls));
+    if (!novice && S.unlocked.buildings.has("bolt") && count("bolt") < Math.round(P.boltTowers ?? 1) && S.time > 120) {
+      const [ex, ey] = EDGE[nextFrom()[0]], c = C();
+      const t = best("bolt", (x, y) => Math.hypot(x - (c.x + ex * 3), y - (c.y + ey * 3)), 8);
+      if (t && canAfford("bolt")) place("bolt", t[0], t[1], "against stone throwers");
+    }
     const target = novice ? (raidSoon || under ? 3 : 0) : Math.round(P.armyBase + S.nextWave * P.armyPerRaid);
     army(target, style);
     if (raidSoon || under) rally(nextFrom()[0]);

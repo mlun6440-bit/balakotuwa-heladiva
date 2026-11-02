@@ -34,6 +34,9 @@ The sprite art is original, modelled in code under `tools/art/` and baked into
 - **Fire (from Lion Rock).** Raider bowmen shoot fire arrows at thatch and timber. Fire spreads in the dry season and dies in the monsoon. Villagers run with water pots from the nearest wewa, canal or river.
 - **Morale.** A raid party that loses most of its strength breaks and flees (no gold for those who escape).
 - **Defences.** Thorn barriers slow and scratch raiders. Upgrade palisades to ramparts and houses to walawwas, and repair damage with the 🔧 tool.
+- **Silt and shramadana.** Monsoon rain washes silt into the wewas and they hold less. In the dry season idle villagers form work parties to dig it out and carry it to the paddies as manure.
+- **Raids on the fields.** Raiders break off to trample ripening paddies and rob granaries on their way in, so guard the harvest, not just the citadel.
+- **Siege (Hill Kingdom).** Stone throwers outrange watchtowers. Bolt towers and archers on the walls can reach them. Melee raiders can't reach soldiers standing on walls or towers.
 - **Tribute (from level 2).** In the 30 seconds before a raid you can pay rice and gold to turn it back. It costs more each time and shames your people.
 - **Defeat is explained.** If the Maligawa falls, the end screen names the two or three main reasons and what to try next.
 - **Raiders.** They follow the cheapest path to the citadel. They walk around walls when there is a gap and break through when there isn't.
@@ -46,9 +49,9 @@ The sprite art is original, modelled in code under `tools/art/` and baked into
 | 2 | The Dry Zone | Rajarata | **Sluice flooding**; watchtowers, pansala |
 | 3 | Lion Rock | Sigiriya | **Fire arrows and water carriers**; ramparts, gates, thorn barriers, upgrades, market, smithy, Angampora fighters |
 | 4 | Sea of Parakrama | Polonnaruwa | **Cascading tanks and the rain-catch goal**; dagoba, war elephants, ram bearers |
-| 5 | Hill Kingdom | Senkadagala | **Royal decrees** (rajakariya, perahera); raids from three sides |
+| 5 | Hill Kingdom | Senkadagala | **The great siege** (stone throwers, bolt towers) and **royal decrees**; raids from three sides |
 
-Each level introduces one headline mechanic (in bold); the rest are buildings and units that use ideas you already know.
+Each level introduces one headline mechanic (in bold); the finale brings two. The rest are buildings and units that use ideas you already know.
 | ∞ | Skirmish | Random map | Endless escalating raids; best score saved |
 | ∞ | Sandbox | Random map | Full stores; send raids of any size yourself |
 
