@@ -7,14 +7,99 @@
 // laterite plinths, thatched village huts, dagobas, terraced paddies.
 // Light comes from the upper left: left faces lit, right faces in shade.
 //
-// Upgrade path: drawBuilding/drawUnit/drawTree check SPRITES first, so
-// painted sprite sheets can replace any procedural drawing later.
+// Art pipeline: painted sprites are baked offline by tools/bake.mjs (see
+// tools/art/) into assets/atlas*.png + assets/atlas.js. drawBuilding,
+// drawUnit, drawTree etc. use them first and fall back to the procedural
+// drawing below when the atlas is missing, so the game never depends on it.
+//
+// Cosmetic state lives here and never touches the simulation: S.fx
+// (particles) plus the render-local caches below (terrain, shadows,
+// footpaths, ruins, construction timers, ambient animals).
 // ============================================================================
 
-// Optional painted art: SPRITES[key] = { img: HTMLImageElement, ax, ay, scale }.
-// key is a building id, troop/foe type, or "tree". Anchor (ax, ay) is the
-// pixel in the image that sits on the object's ground point.
+// SPRITES[key] = { img, sx, sy, sw, sh, ax, ay, k }: a rectangle of an atlas
+// page, its anchor (ax, ay) in world pixels (the ground point / footprint top
+// corner), and the bake scale k (atlas pixels per world pixel). A hand-made
+// image can be dropped in as { img, ax, ay, scale } too.
 const SPRITES = {};
+const atlas = { pages: [], mips: [], ready: false, version: 0 };
+
+(function loadAtlas() {
+  const A = window.ATLAS;
+  if (!A) return;
+  let left = A.pages.length;
+  atlas.pages = A.pages.map(src => {
+    const im = new Image();
+    im.onload = () => { if (--left === 0) buildMips(); };
+    im.src = src;
+    return im;
+  });
+  for (const [key, [pg, sx, sy, sw, sh, ax, ay, k]] of Object.entries(A.sprites)) {
+    SPRITES[key] = { img: atlas.pages[pg], page: pg, sx, sy, sw, sh, ax, ay, k };
+  }
+})();
+
+// Pre-filtered half and quarter size copies of each page, so sprites drawn
+// smaller than their bake size stay smooth instead of aliasing.
+function buildMips() {
+  atlas.mips = atlas.pages.map(im => {
+    const levels = [im];
+    let src = im;
+    for (let l = 1; l <= 2; l++) {
+      const c = document.createElement("canvas");
+      c.width = Math.ceil(src.width / 2); c.height = Math.ceil(src.height / 2);
+      const x = c.getContext("2d");
+      x.imageSmoothingQuality = "high";
+      x.drawImage(src, 0, 0, c.width, c.height);
+      levels.push(c); src = c;
+    }
+    return levels;
+  });
+  atlas.ready = true;
+  atlas.version++;
+}
+
+const hasSprite = key => { const s = SPRITES[key]; return !!(s && s.img.complete && s.img.naturalWidth); };
+
+// Draw sprite `key` with its anchor at grid point (gx, gy, z).
+// o: { flip, scale, alpha, clip (0..1 visible fraction from the bottom) }
+function drawSprite(key, gx, gy, z = 0, o) {
+  const s = SPRITES[key];
+  if (!s || !s.img.complete || !s.img.naturalWidth) return false;
+  const p = iso(gx, gy, z);
+  return blitSprite(s, p.x, p.y, o);
+}
+function blitSprite(s, x, y, o) {
+  const sc = (o && o.scale) || 1;
+  if (s.sw === undefined) { // hand-made single image
+    const k = s.scale || 1;
+    ctx.drawImage(s.img, x - s.ax * k * sc, y - s.ay * k * sc, s.img.width * k * sc, s.img.height * k * sc);
+    return true;
+  }
+  // pick the mip level whose density still covers the screen density
+  let img = s.img, f = 1;
+  if (atlas.ready) {
+    const need = view.zoom * view.dpr * sc;
+    let L = 0;
+    while (L < 2 && s.k / (2 << L) >= need * 0.95) L++;
+    img = atlas.mips[s.page][L]; f = 1 / (1 << L);
+  }
+  const w = (s.sw / s.k) * sc, h = (s.sh / s.k) * sc;
+  let sy = s.sy * f, sh = s.sh * f, dy = y - s.ay * sc, dh = h;
+  if (o && o.clip !== undefined && o.clip < 1) {
+    const cut = 1 - Math.max(0, o.clip);
+    sy += sh * cut; dy += dh * cut; sh *= 1 - cut; dh *= 1 - cut;
+    if (sh <= 0.5) return true;
+  }
+  if (o && o.alpha !== undefined) ctx.globalAlpha = o.alpha;
+  if (o && o.flip) {
+    ctx.save(); ctx.translate(x, 0); ctx.scale(-1, 1);
+    ctx.drawImage(img, s.sx * f, sy, s.sw * f, sh, -s.ax * sc, dy, w, dh);
+    ctx.restore();
+  } else ctx.drawImage(img, s.sx * f, sy, s.sw * f, sh, x - s.ax * sc, dy, w, dh);
+  if (o && o.alpha !== undefined) ctx.globalAlpha = 1;
+  return true;
+}
 
 const PAL = {
   whitewash: "#ece3cf", laterite: "#a9572f", lateriteDark: "#7d3a1c",
