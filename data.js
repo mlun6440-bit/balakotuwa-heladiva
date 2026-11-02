@@ -109,13 +109,14 @@ const TROOPS = {
 };
 
 const FOES = {
-  raider: { name: "Raider", hp: 90, dmg: 12, bdmg: 12, range: 0.9, speed: 1.5, gold: 6, morale: 0.35 },
+  raider: { name: "Raider", hp: 90, dmg: 12, bdmg: 12, range: 0.9, speed: 1.5, gold: 6, morale: 0.35, loot: true },
   bowman: { name: "Raider bowman", hp: 60, dmg: 9, bdmg: 4, range: 4.2, speed: 1.5, ranged: true, gold: 6, fire: true, morale: 0.45 },
   brute:  { name: "Ram bearer", hp: 280, dmg: 10, bdmg: 48, range: 0.9, speed: 1.0, heavy: true, gold: 15, morale: 0 }
 };
 
 // fire: shoots fire arrows at flammable buildings when no soldier is in range
 // (only on levels with fireArrows: true).
+// loot: on the way in, breaks off to trample a ripening paddy or rob a granary.
 // morale: when its raid party falls below this share of its strength, the
 // raider flees back to its edge (0 = never). Fleeing raiders give no gold.
 

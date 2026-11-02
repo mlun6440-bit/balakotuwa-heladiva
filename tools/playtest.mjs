@@ -83,7 +83,7 @@ async function play(page, lv, style, P, shotPrefix = null) {
       level: S.idx + 1, name: S.L.name, style: PT.style, outcome: S.mode !== "end" ? "unfinished" : won ? "won" : "lost",
       time: Math.round(S.time), citadel: Math.round(100 * Math.max(0, S.citadel.hp) / S.citadel.maxHp), stars: won ? (S.starsEarned || 0) : 0,
       raidsDone: S.nextWave, raids: S.L.waves.length, starved: S.stats.starved, hungry: S.stats.hungry, burned: S.stats.burned,
-      trained: S.stats.trained, tributes: S.stats.tributes, rainKept: rainKept(), objectives: objs, causes: S.causes || [],
+      trained: S.stats.trained, tributes: S.stats.tributes, trampled: S.stats.trampled || 0, looted: S.stats.looted || 0, rainKept: rainKept(), objectives: objs, causes: S.causes || [],
       buildings: S.buildings.reduce((m, b) => (m[b.id] = (m[b.id] || 0) + 1, m), {}),
       samples: PT.samples, said: PT.said.slice(0, 80), bot: BOT.log.slice(0, 120)
     };
@@ -151,7 +151,7 @@ for (const lv of levels) {
   jobs.push({ lv, style: "planner", P: { ...DEFAULTS, ...(brain.levels[lv]?.P || {}) }, shot: `L${lv}` });
 }
 const results = await runAll(jobs);
-for (const r of results) console.log(`L${r.level} ${r.style.padEnd(7)} ${r.outcome.padEnd(10)} t=${r.time}s citadel ${r.citadel}% stars ${r.stars} raids ${r.raidsDone}/${r.raids} starved ${r.starved} burned ${r.burned} tributes ${r.tributes} errors ${r.errors.length}`);
+for (const r of results) console.log(`L${r.level} ${r.style.padEnd(7)} ${r.outcome.padEnd(10)} t=${r.time}s citadel ${r.citadel}% stars ${r.stars} raids ${r.raidsDone}/${r.raids} starved ${r.starved} burned ${r.burned} trampled ${r.trampled} looted ${r.looted} tributes ${r.tributes} errors ${r.errors.length}`);
 fs.writeFileSync(path.join(outDir, "results.json"), JSON.stringify(results, null, 1));
 fs.writeFileSync(path.join(outDir, "REPORT.md"), report(results));
 console.log("wrote", path.relative(root, path.join(outDir, "REPORT.md")));

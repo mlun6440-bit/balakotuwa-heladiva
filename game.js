@@ -93,7 +93,7 @@ function saveRun() {
     buildings: S.buildings.map(b => ({ uid: b.uid, id: b.id, gx: b.gx, gy: b.gy, hp: b.hp, maxHp: b.maxHp, water: b.water, growth: b.growth,
       open: b.open, next: b.next, at: b.at, fire: b.fire, silt: b.silt, irrigated: b.irrigated })),
     units: S.units.map(u => ({ uid: u.uid, team: u.team, type: u.type, gx: r3(u.gx), gy: r3(u.gy), tx: u.tx, ty: u.ty, hp: u.hp, maxHp: u.maxHp,
-      last: u.last, z: u.z, ordered: u.ordered, lastFire: u.lastFire, party: u.party, hx: u.hx, hy: u.hy, flee: u.flee }))
+      last: u.last, z: u.z, ordered: u.ordered, lastFire: u.lastFire, party: u.party, hx: u.hx, hy: u.hy, flee: u.flee, looted: u.looted }))
   };
   try { localStorage.setItem(RUN_KEY, JSON.stringify(data)); } catch (e) { /* storage full or blocked */ }
   S.lastSave = S.time;
@@ -1001,6 +1001,36 @@ function hitBuilding(u, b) {
   sfx("hit");
 }
 
+// Looting: a raider passing within 3 tiles of a ripening paddy, a granary or a
+// storehouse breaks off to trample or rob it once, then marches on. Early
+// raids threaten the food, so guarding the fields matters.
+const LOOTABLE = b => (b.id === "paddy" && b.growth >= 30) || b.id === "bissa" || b.id === "storehouse";
+function lootRaid(u, dt) {
+  if (!u.lootTarget || !S.buildings.includes(u.lootTarget) || !LOOTABLE(u.lootTarget)) {
+    u.lootTarget = null;
+    let best = null, bd = 3;
+    for (const b of S.buildings) if (LOOTABLE(b)) { const d = rectDist(u, b); if (d < bd) { bd = d; best = b; } }
+    if (!best) return false;
+    u.lootTarget = best;
+  }
+  const b = u.lootTarget;
+  if (rectDist(u, b) > 0.35) { moveToward(u, b.gx + b.w / 2, b.gy + b.h / 2, dt); return true; }
+  u.looted = true; u.lootTarget = null;
+  if (b.id === "paddy") {
+    S.stats.trampled = (S.stats.trampled || 0) + 1;
+    b.growth = 0;
+    spawnFloat("Trampled!", b.gx + 1, b.gy + 1, "#ff9a7a");
+  } else {
+    const key = b.id === "bissa" ? "rice" : S.timber >= S.stone ? "timber" : "stone";
+    const n = Math.min(Math.floor(S[key]), 20);
+    S[key] -= n;
+    S.stats.looted = (S.stats.looted || 0) + n;
+    spawnFloat(`−${n}${RES[key]} looted`, b.gx + b.w / 2, b.gy + b.h / 2, "#ff9a7a");
+  }
+  if (!S.warnedLoot) { S.warnedLoot = true; say("Raiders are trampling the paddies and robbing the stores! Post archers or a tower by the fields on the raid side.", true); }
+  return true;
+}
+
 // Morale: once a whole raid party has landed, if fewer than morale × its
 // strength still stand, the faint-hearted run back to their edge.
 function checkMorale() {
@@ -1032,6 +1062,7 @@ function updateFoe(u, dt) {
   }
   const cx = clamp(Math.floor(u.gx), 0, MAP - 1), cy = clamp(Math.floor(u.gy), 0, MAP - 1);
   if (S.occ[cy][cx] === S.citadel || rectDist(u, S.citadel) < 0.45) { hitBuilding(u, S.citadel); return; }
+  if (d.loot && !u.looted && lootRaid(u, dt)) return;
   if (d.fire && S.time - (u.lastFire ?? -9) > 3.5) {
     const tb = nearestFlammable(u, d.range);
     if (tb) { u.lastFire = S.time; u.last = S.time; fireArrow(u, tb); return; }
@@ -1413,6 +1444,7 @@ function defeatCauses() {
   }
   const wallsLost = Object.entries(st.lost).filter(([id]) => BUILDINGS[id] && BUILDINGS[id].wall).reduce((a, [, n]) => a + n, 0);
   if (wallsLost >= 3) out.push([2, `🧱 Raiders broke through ${wallsLost} wall sections. Stone ramparts hold far longer than palisades.`]);
+  if ((st.trampled || 0) + (st.looted || 0) / 20 >= 3) out.push([2, `🌾 Raiders trampled ${st.trampled || 0} paddies and looted ${st.looted || 0} goods on the way in. A tower or archers by the fields on the raid side protect the harvest.`]);
   if (st.burned >= 2) out.push([3, `🔥 Fire took ${st.burned} buildings. Keep wewas full so villagers can carry water, and keep archers near the thatch.`]);
   const army = S.units.filter(u => u.team === "p").length;
   if (st.trained <= 2 && army <= 2) out.push([3, `⚔️ ${st.trained ? `Only ${st.trained} soldier${st.trained === 1 ? " was" : "s were"}` : "No soldiers were"} trained. A barracks and a few spearmen go a long way.`]);
