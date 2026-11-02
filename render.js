@@ -1400,7 +1400,7 @@ function stride(o) {
   return g;
 }
 function drawWorkerSprite(w, now) {
-  const base = `u.v.${w.job}`;
+  const base = `u.v.${w.job === "bucket" ? "farmer" : w.job}`;
   if (!hasSprite(`${base}.f.i0`)) return false;
   const g = stride(w);
   const f = g.back ? "b" : "f";
@@ -1528,7 +1528,11 @@ function drawShots() {
     const q = iso(s.sx + (s.target.gx - s.sx) * k2, s.sy + (s.target.gy - s.sy) * k2, s.sz * (1 - k2) + 10 * k2 + Math.sin(k2 * Math.PI) * 26);
     const a = Math.atan2(q.y - p.y, q.x - p.x);
     line({ x: p.x - Math.cos(a) * 6, y: p.y - Math.sin(a) * 6 }, p, "#e8dcb0", 1.4);
-    ctx.fillStyle = "#cfcfcf"; ctx.fillRect(p.x - 1, p.y - 1, 2, 2);
+    if (s.fire) {
+      const g = ctx.createRadialGradient(p.x, p.y, 0, p.x, p.y, 5);
+      g.addColorStop(0, "rgba(255,240,170,1)"); g.addColorStop(0.4, "rgba(255,140,30,0.8)"); g.addColorStop(1, "rgba(255,60,0,0)");
+      ctx.fillStyle = g; ctx.beginPath(); ctx.arc(p.x, p.y, 5, 0, Math.PI * 2); ctx.fill();
+    } else { ctx.fillStyle = "#cfcfcf"; ctx.fillRect(p.x - 1, p.y - 1, 2, 2); }
   }
 }
 
@@ -1552,6 +1556,11 @@ function updateFx(dt) {
     if (b.id === "kammala" && b.worker && b.worker.phase === "work") {
       if (Math.random() < dt * 6) S.fx.push({ gx: b.gx + 0.35, gy: b.gy + 0.75, z: 7, vx: (Math.random() - 0.5) * 0.6, vy: (Math.random() - 0.5) * 0.6, vz: 20 + Math.random() * 15, life: 0.5, max: 0.5, r: 1.2, col: "#ffb040", kind: "flame" });
       if (Math.random() < dt * 1.2) S.fx.push({ gx: b.gx + 0.3, gy: b.gy + 0.3, z: 24, vx: 0.15, vy: -0.05, vz: 9, life: 2.5, max: 2.5, r: 2.5, col: "#7a7470", kind: "smoke" });
+    }
+    // Burning buildings (fire arrows)
+    if (b.fire > 0) {
+      if (Math.random() < dt * 10 * b.fire) S.fx.push({ gx: b.gx + 0.15 + Math.random() * (b.w - 0.3), gy: b.gy + 0.15 + Math.random() * (b.h - 0.3), z: (b.def.z || 10) * (0.3 + Math.random() * 0.7), vx: 0.05, vy: -0.03, vz: 20 + Math.random() * 12, life: 0.8, max: 0.8, r: 3 + Math.random() * 2.5 * b.fire, col: "#ff9a2a", kind: "flame" });
+      if (Math.random() < dt * 3 * b.fire) S.fx.push({ gx: b.gx + Math.random() * b.w, gy: b.gy + Math.random() * b.h, z: (b.def.z || 10) + 4, vx: 0.25, vy: -0.1, vz: 16, life: 3.5, max: 3.5, r: 4, col: "#3a3430", kind: "smoke" });
     }
     // Damaged buildings smoke; badly damaged ones burn
     const k = b.hp / b.maxHp;

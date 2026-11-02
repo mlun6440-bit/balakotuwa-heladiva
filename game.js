@@ -180,7 +180,7 @@ function startLevel(idx, mode = "brief") {
 // ==================== BUILDINGS ====================
 function addBuilding(id, gx, gy) {
   const def = BUILDINGS[id];
-  const b = { uid: ++S.uid, id, def, gx, gy, w: def.w, h: def.h, hp: def.hp, maxHp: def.hp, worker: null, water: 0, growth: 0, open: false, next: 0, at: S.time };
+  const b = { uid: ++S.uid, id, def, gx, gy, w: def.w, h: def.h, hp: def.hp, maxHp: def.hp, worker: null, water: 0, growth: 0, open: false, next: 0, at: S.time, fire: 0 };
   S.buildings.push(b);
   S.trees = S.trees.filter(t => !(t.gx >= gx && t.gx < gx + def.w && t.gy >= gy && t.gy < gy + def.h));
   return b;
@@ -534,6 +534,29 @@ function updateWorker(w, dt) {
       w.timer -= dt * workMult();
       if (w.timer <= 0) planJob(w);
       break;
+    case "toWater":
+      if (walk(w, dt)) {
+        const src = w.waterSrc || {};
+        if (src.wewa) src.wewa.water = Math.max(0, src.wewa.water - 2);
+        else if (src.net) drainNet(src.net, 2);
+        w.carry = { key: "water", n: 1 };
+        const b = w.fireTarget;
+        if (!b) { if (w.temp) S.workers = S.workers.filter(x => x !== w); else planJob(w); break; }
+        goTo(w, b.gx + b.w / 2, b.gy + b.h + 0.3, "toFire");
+      }
+      break;
+    case "toFire":
+      if (walk(w, dt)) {
+        const b = w.fireTarget;
+        w.carry = null;
+        if (b && S.buildings.includes(b) && b.fire > 0) {
+          b.fire = Math.max(0, b.fire - 1);
+          spawnFloat("💧", w.gx, w.gy, "#9fd8ff");
+        }
+        if (b && b.fire > 0 && S.buildings.includes(b)) seekWater(w);
+        else { w.fireTarget = null; if (w.temp) S.workers = S.workers.filter(x => x !== w); else planJob(w); }
+      }
+      break;
     case "fetch":
       if (walk(w, dt)) {
         if (S.timber < 3) { planJob(w); break; }
@@ -708,6 +731,10 @@ function updateFoe(u, dt) {
   }
   const cx = clamp(Math.floor(u.gx), 0, MAP - 1), cy = clamp(Math.floor(u.gy), 0, MAP - 1);
   if (S.occ[cy][cx] === S.citadel || rectDist(u, S.citadel) < 0.45) { hitBuilding(u, S.citadel); return; }
+  if (d.fire && S.time - (u.lastFire ?? -9) > 3.5) {
+    const tb = nearestFlammable(u, d.range);
+    if (tb) { u.lastFire = S.time; u.last = S.time; fireArrow(u, tb); return; }
+  }
   const nxt = nextFlowTile(cx, cy);
   if (!nxt) { moveToward(u, S.citadel.gx + 1, S.citadel.gy + 1, dt); return; }
   const b = S.occ[nxt.y][nxt.x];
@@ -769,7 +796,8 @@ function updateCombat(dt) {
     const s = S.shots[i];
     s.t += dt;
     if (s.t >= s.dur) {
-      if (s.target.hp > 0) s.target.hp -= s.dmg;
+      if (s.fire) ignite(s.fire);
+      else if (s.target.hp > 0) s.target.hp -= s.dmg;
       S.shots.splice(i, 1);
     }
   }
@@ -783,6 +811,103 @@ function updateCombat(dt) {
     }
     S.units.splice(i, 1);
   }
+}
+
+// ==================== FIRE ====================
+// Raider bowmen loose fire arrows at thatch and timber. Fire grows in the dry
+// season, is beaten down by monsoon rain, spreads to flammable neighbours,
+// and villagers run with water pots from the nearest wewa, canal or river.
+function nearestFlammable(u, range) {
+  let best = null, bd = range;
+  for (const b of S.buildings) {
+    if (!b.def.flammable || b.fire >= 1) continue;
+    const d = rectDist(u, b);
+    if (d <= bd) { bd = d; best = b; }
+  }
+  return best;
+}
+
+function fireArrow(u, b) {
+  const tx = b.gx + b.w / 2, ty = b.gy + b.h / 2;
+  S.shots.push({ sx: u.gx, sy: u.gy, sz: 12, target: { gx: tx, gy: ty, hp: 0 }, dmg: 0, t: 0, dur: Math.max(0.3, Math.hypot(tx - u.gx, ty - u.gy) / 8), fire: b });
+}
+
+function ignite(b) {
+  if (!S.buildings.includes(b) || !b.def.flammable) return;
+  if (!(b.fire > 0)) spawnFloat("🔥 Fire!", b.gx + b.w / 2, b.gy + b.h / 2, "#ffb04a");
+  b.fire = Math.max(b.fire, 1);
+  sfx("fire");
+  if (!S.warnedFire) {
+    S.warnedFire = true;
+    say(S.season === "maha"
+      ? "Fire arrows! The monsoon rain will help, but villagers are running with water pots."
+      : "Fire arrows on the thatch! In Yala it spreads fast. Villagers fetch water from the wewas: keep them full.", true);
+  }
+}
+
+function tickFire() {
+  const maha = S.season === "maha";
+  for (const b of [...S.buildings]) {
+    if (!(b.fire > 0)) continue;
+    b.fire = Math.min(3, b.fire + (maha ? -0.35 : 0.12));
+    if (b.fire <= 0) { b.fire = 0; continue; }
+    if (b.fire >= 1.5) {
+      for (const [x, y] of edgeTiles(b)) {
+        const nb = S.occ[y][x];
+        if (nb && nb !== b && nb.def.flammable && !(nb.fire > 0) && Math.random() < 0.05 * b.fire) ignite(nb);
+      }
+    }
+    damageBuilding(b, 6 * b.fire);
+  }
+  assignFirefighters();
+}
+
+// Three water carriers per fire: idle villagers come out of the citadel
+// first (temporary "bucket" workers), then nearby workers drop their jobs.
+function assignFirefighters() {
+  for (const w of S.workers) {
+    if (w.fireTarget && !(w.fireTarget.fire > 0 && S.buildings.includes(w.fireTarget))) { w.fireTarget = null; w.carry = null; if (!w.temp) planJob(w); }
+  }
+  S.workers = S.workers.filter(w => !w.temp || w.fireTarget);
+  for (const b of S.buildings) {
+    if (!(b.fire > 0)) continue;
+    let have = S.workers.filter(w => w.fireTarget === b).length;
+    const cx = b.gx + b.w / 2, cy = b.gy + b.h / 2;
+    while (have < 3 && idleVillagers() > 0) {
+      const w = { b: S.citadel, job: "bucket", temp: true, gx: S.citadel.gx + 1, gy: S.citadel.gy + 2.2, tx: 0, ty: 0, phase: "plan", timer: 0, carry: null, target: null, fireTarget: b };
+      S.workers.push(w); have++;
+      seekWater(w);
+    }
+    const free = S.workers.filter(w => !w.fireTarget && w.b !== b && Math.hypot(w.gx - cx, w.gy - cy) < 11)
+      .sort((p, q) => Math.hypot(p.gx - cx, p.gy - cy) - Math.hypot(q.gx - cx, q.gy - cy));
+    for (const w of free) {
+      if (have >= 3) break;
+      if (w.target && w.target.reserved) w.target.reserved = false;
+      w.target = null; w.carry = null; w.fireTarget = b; have++;
+      seekWater(w);
+    }
+  }
+}
+
+function nearestWater(w) {
+  let best = null, bd = Infinity;
+  const consider = (x, y, src) => { const d = Math.hypot(x - w.gx, y - w.gy); if (d < bd) { bd = d; best = { x, y, ...src }; } };
+  for (const b of S.buildings) {
+    if (b.id === "wewa" && b.water >= 2) consider(b.gx + 1, b.gy + 2.25, { wewa: b });
+    else if (b.def.water && b.id !== "wewa") { const id = S.netOf[b.gy][b.gx]; if (id !== -1 && S.nets[id].water >= 2) consider(b.gx + 0.5, b.gy + 0.5, { net: S.nets[id] }); }
+  }
+  for (let y = 0; y < MAP; y++) for (let x = 0; x < MAP; x++) {
+    if (S.tiles[y][x].t !== "river") continue;
+    for (const [dx, dy] of DIRS4) if (inb(x + dx, y + dy) && S.tiles[y + dy][x + dx].t !== "river") { consider(x + 0.5 + dx * 0.45, y + 0.5 + dy * 0.45, {}); break; }
+  }
+  return best;
+}
+
+function seekWater(w) {
+  const src = nearestWater(w);
+  if (!src) { w.fireTarget = null; if (w.temp) S.workers = S.workers.filter(x => x !== w); else planJob(w); return; }
+  w.waterSrc = src;
+  goTo(w, src.x, src.y, "toWater");
 }
 
 // ==================== RAIDS ====================
@@ -826,6 +951,7 @@ function tick() {
   }
 
   tickWater();
+  tickFire();
   updateCover();
 
   for (const u of S.units) {
@@ -1159,6 +1285,7 @@ function spawnFloat(text, gx, gy, color) {
 
 function describe(b) {
   const lines = [`<b>${b.def.icon} ${b.def.name}</b>`, `HP ${Math.ceil(b.hp)}/${b.maxHp}`];
+  if (b.fire > 0) lines.push(`🔥 On fire (${b.fire >= 2 ? "raging" : "burning"}). Villagers are carrying water.`);
   if (b.def.worker) lines.push(b.worker ? (b.id === "pansala" ? (b.worker.alms ? "The monk is on his alms round" : "The monk is in meditation") : "Staffed") : "💤 No villager free. Build houses.");
   if (b.id === "wewa") {
     lines.push(`Water ${Math.round(b.water)}/${WEWA_CAP}${riverBeside(b) ? " · river-fed" : ""}`);
@@ -1281,7 +1408,7 @@ function unlockAudio() {
 
 function sfx(kind) {
   if (!audio.on || !audio.ctx) return;
-  const spec = { build: [330, 0.08, "triangle"], conch: [146, 0.9, "sawtooth"], harvest: [660, 0.1, "sine"], hit: [110, 0.05, "square"], win: [523, 0.6, "triangle"], lose: [98, 0.8, "sawtooth"] }[kind];
+  const spec = { build: [330, 0.08, "triangle"], conch: [146, 0.9, "sawtooth"], harvest: [660, 0.1, "sine"], hit: [110, 0.05, "square"], win: [523, 0.6, "triangle"], lose: [98, 0.8, "sawtooth"], fire: [80, 0.3, "sawtooth"] }[kind];
   try {
     const o = audio.ctx.createOscillator(), g = audio.ctx.createGain();
     o.type = spec[2];

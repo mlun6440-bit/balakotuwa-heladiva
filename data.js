@@ -19,6 +19,7 @@ const RES = { timber: "🪵", stone: "🪨", rice: "🍚", gold: "🪙", arms: "
 
 // ==================== BUILDINGS ====================
 // solid: blocks raiders (they must break it). ground: flat, walkable.
+// flammable: thatch or timber that raider fire arrows can set alight.
 // worker: job type staffed by one villager. store: drop-off for those resources.
 const BUILDINGS = {
   citadel:    { name: "Maligawa (Citadel)", cat: null, icon: "🏯", w: 2, h: 2, hp: 2500, solid: true, z: 40, store: ["timber", "stone", "rice", "arms"],
@@ -33,28 +34,28 @@ const BUILDINGS = {
 
   paddy:      { name: "Kumbura (Paddy)", cat: "food", icon: "🌾", w: 2, h: 2, hp: 150, cost: { timber: 6 }, ground: true, worker: "farmer",
                 desc: "Grows rice. In Yala it only grows beside a watered canal, wewa or river." },
-  bissa:      { name: "Vee Bissa (Granary)", cat: "food", icon: "🏺", w: 1, h: 1, hp: 350, cost: { timber: 12 }, solid: true, z: 26, store: ["rice"],
+  bissa:      { name: "Vee Bissa (Granary)", cat: "food", icon: "🏺", w: 1, h: 1, hp: 350, cost: { timber: 12 }, solid: true, flammable: true, z: 26, store: ["rice"],
                 desc: "Farmers drop rice here instead of walking to the citadel." },
-  market:     { name: "Pola (Market)", cat: "food", icon: "⚖️", w: 2, h: 2, hp: 320, cost: { timber: 14, stone: 4 }, solid: true, z: 16, worker: "trader",
+  market:     { name: "Pola (Market)", cat: "food", icon: "⚖️", w: 2, h: 2, hp: 320, cost: { timber: 14, stone: 4 }, solid: true, flammable: true, z: 16, worker: "trader",
                 desc: "A trader sells rice above 30 for gold." },
 
-  woodcutter: { name: "Dara Maduwa (Woodcutter)", cat: "industry", icon: "🪓", w: 1, h: 1, hp: 200, cost: { timber: 4 }, solid: true, z: 18, worker: "woodcutter",
+  woodcutter: { name: "Dara Maduwa (Woodcutter)", cat: "industry", icon: "🪓", w: 1, h: 1, hp: 200, cost: { timber: 4 }, solid: true, flammable: true, z: 18, worker: "woodcutter",
                 desc: "Fells mature trees within 9 tiles." },
-  quarry:     { name: "Gal Wala (Quarry)", cat: "industry", icon: "⛏️", w: 1, h: 1, hp: 260, cost: { timber: 10 }, solid: true, z: 16, worker: "mason", needsRock: true,
+  quarry:     { name: "Gal Wala (Quarry)", cat: "industry", icon: "⛏️", w: 1, h: 1, hp: 260, cost: { timber: 10 }, solid: true, flammable: true, z: 16, worker: "mason", needsRock: true,
                 desc: "Cuts stone. Must stand within 2 tiles of rock." },
   kammala:    { name: "Kammala (Smithy)", cat: "industry", icon: "⚒️", w: 1, h: 1, hp: 260, cost: { timber: 10, stone: 4 }, solid: true, z: 20, worker: "smith",
                 desc: "A smith fetches 3 timber and forges 1 weapon (🗡️) for the barracks. Archers, spearmen and elephants need weapons." },
-  storehouse: { name: "Gabadawa (Storehouse)", cat: "industry", icon: "📦", w: 2, h: 2, hp: 400, cost: { timber: 12 }, solid: true, z: 18, store: ["timber", "stone"],
+  storehouse: { name: "Gabadawa (Storehouse)", cat: "industry", icon: "📦", w: 2, h: 2, hp: 400, cost: { timber: 12 }, solid: true, flammable: true, z: 18, store: ["timber", "stone"],
                 desc: "Drop-off for timber and stone." },
 
   pansala:    { name: "Pansala (Monastery)", cat: "town", icon: "🪷", w: 2, h: 2, hp: 600, cost: { timber: 20, stone: 12, gold: 20 }, solid: true, z: 34, worker: "monk",
                 desc: "A monk walks alms rounds among the houses. While staffed: +5 harmony (up to two) and soldiers cost 25% less." },
-  house:      { name: "Gedara (House)", cat: "town", icon: "🏠", w: 1, h: 1, hp: 220, cost: { timber: 8 }, solid: true, z: 18, pop: 5,
+  house:      { name: "Gedara (House)", cat: "town", icon: "🏠", w: 1, h: 1, hp: 220, cost: { timber: 8 }, solid: true, flammable: true, z: 18, pop: 5,
                 desc: "Room for 5 more villagers." },
   dagoba:     { name: "Dagoba (Stupa)", cat: "town", icon: "🛕", w: 2, h: 2, hp: 1000, cost: { stone: 30, gold: 40 }, solid: true, z: 44, harmony: 12,
                 desc: "+12 harmony (counts up to two)." },
 
-  palisade:   { name: "Palisade", cat: "defence", icon: "🪵", w: 1, h: 1, hp: 320, cost: { timber: 3 }, solid: true, wall: true, z: 20, paint: true,
+  palisade:   { name: "Palisade", cat: "defence", icon: "🪵", w: 1, h: 1, hp: 320, cost: { timber: 3 }, solid: true, flammable: true, wall: true, z: 20, paint: true,
                 desc: "Cheap wall. Raiders must break through. Drag to paint." },
   rampart:    { name: "Gal Bamma (Rampart)", cat: "defence", icon: "🧱", w: 1, h: 1, hp: 950, cost: { stone: 5 }, solid: true, wall: true, z: 26, paint: true,
                 desc: "Heavy stone wall. Drag to paint." },
@@ -103,9 +104,11 @@ const TROOPS = {
 
 const FOES = {
   raider: { name: "Raider", hp: 90, dmg: 12, bdmg: 12, range: 0.9, speed: 1.5, gold: 6 },
-  bowman: { name: "Raider bowman", hp: 60, dmg: 9, bdmg: 4, range: 4.2, speed: 1.5, ranged: true, gold: 6 },
+  bowman: { name: "Raider bowman", hp: 60, dmg: 9, bdmg: 4, range: 4.2, speed: 1.5, ranged: true, gold: 6, fire: true },
   brute:  { name: "Ram bearer", hp: 280, dmg: 10, bdmg: 48, range: 0.9, speed: 1.0, heavy: true, gold: 15 }
 };
+
+// fire: shoots fire arrows at flammable buildings when no soldier is in range.
 
 // ==================== CAMPAIGN ====================
 // Rects are [x1, y1, x2, y2] inclusive; forests add a density. Waves split
