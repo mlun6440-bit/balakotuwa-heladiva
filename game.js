@@ -91,7 +91,7 @@ function saveRun() {
     L: S.L.skirmish ? { ...S.L, all: undefined } : null, st,
     trees: S.trees.map(t => [r3(t.gx), r3(t.gy), r3(t.stage)]),
     buildings: S.buildings.map(b => ({ uid: b.uid, id: b.id, gx: b.gx, gy: b.gy, hp: b.hp, maxHp: b.maxHp, water: b.water, growth: b.growth,
-      open: b.open, next: b.next, at: b.at, fire: b.fire, irrigated: b.irrigated })),
+      open: b.open, next: b.next, at: b.at, fire: b.fire, silt: b.silt, irrigated: b.irrigated })),
     units: S.units.map(u => ({ uid: u.uid, team: u.team, type: u.type, gx: r3(u.gx), gy: r3(u.gy), tx: u.tx, ty: u.ty, hp: u.hp, maxHp: u.maxHp,
       last: u.last, z: u.z, ordered: u.ordered, lastFire: u.lastFire, party: u.party, hx: u.hx, hy: u.hy, flee: u.flee }))
   };
@@ -295,7 +295,7 @@ function startLevel(idx, mode = "brief", custom = null) {
 // ==================== BUILDINGS ====================
 function addBuilding(id, gx, gy) {
   const def = BUILDINGS[id];
-  const b = { uid: ++S.uid, id, def, gx, gy, w: def.w, h: def.h, hp: def.hp, maxHp: def.hp, worker: null, water: 0, growth: 0, open: false, next: 0, at: S.time, fire: 0 };
+  const b = { uid: ++S.uid, id, def, gx, gy, w: def.w, h: def.h, hp: def.hp, maxHp: def.hp, worker: null, water: 0, growth: 0, open: false, next: 0, at: S.time, fire: 0, silt: 0 };
   S.buildings.push(b);
   S.trees = S.trees.filter(t => !(t.gx >= gx && t.gx < gx + def.w && t.gy >= gy && t.gy < gy + def.h));
   return b;
@@ -561,6 +561,8 @@ function waterSource(b) {
 }
 
 const RAIN = 2.4; // water each wewa catches per second of Maha
+const SILT_RATE = 0.25, SILT_MAX = 60; // Maha rain washes silt in; it eats capacity
+const wewaCap = w => WEWA_CAP - (w.silt || 0);
 
 function tickWater() {
   const maha = S.season === "maha";
@@ -568,19 +570,21 @@ function tickWater() {
   for (const w of S.buildings) {
     if (w.id !== "wewa") continue;
     if (maha) {
-      const add = Math.min(RAIN, WEWA_CAP - w.water);
+      w.silt = Math.min(SILT_MAX, (w.silt || 0) + SILT_RATE);
+      const add = Math.max(0, Math.min(RAIN, wewaCap(w) - w.water));
       w.water += add; S.rain.caught += add;
       if (add < RAIN) { const id = S.netOf[w.gy][w.gx]; spill.set(id, (spill.get(id) || 0) + RAIN - add); }
     } else w.water = Math.max(0, w.water - 0.3);
-    if (riverBeside(w)) w.water = Math.min(WEWA_CAP, w.water + 1.2);
+    if (riverBeside(w)) w.water = Math.min(wewaCap(w), w.water + 1.2);
+    w.water = Math.min(w.water, wewaCap(w));
   }
   // Ellangawa (cascading tanks): a full wewa spills into the emptiest wewas
   // on its canal network. Whatever no tank can hold runs off to the sea.
   for (const [id, amt0] of spill) {
     let amt = amt0;
-    const ws = id === -1 ? [] : [...S.nets[id].wewas].filter(w => w.water < WEWA_CAP).sort((a, b) => a.water - b.water);
+    const ws = id === -1 ? [] : [...S.nets[id].wewas].filter(w => w.water < wewaCap(w)).sort((a, b) => a.water - b.water);
     for (const w of ws) {
-      const add = Math.min(amt, WEWA_CAP - w.water);
+      const add = Math.min(amt, wewaCap(w) - w.water);
       w.water += add; amt -= add; S.rain.caught += add; S.rain.spilled += add;
       if (amt <= 0) break;
     }
@@ -607,12 +611,37 @@ function tickWater() {
   updateNetWater();
 }
 
+// ==================== SHRAMADANA (communal work) ====================
+// Outside the monsoon, idle villagers gather in work parties to dig silt out
+// of the wewas, and carry it to the paddies, where tank silt is good manure.
+function assignShramadana() {
+  if (S.season === "maha") { S.workers = S.workers.filter(w => w.job !== "shramadana" || w.fireTarget); return; }
+  for (const b of S.buildings) {
+    if (b.id !== "wewa" || (b.silt || 0) < 8) continue;
+    let have = S.workers.filter(w => w.job === "shramadana" && w.siltTarget === b).length;
+    while (have < 3 && idleVillagers() > 0) {
+      const w = { b: S.citadel, job: "shramadana", temp: true, gx: S.citadel.gx + 1, gy: S.citadel.gy + 2.2, tx: 0, ty: 0, phase: "plan", timer: 0, carry: null, target: null, siltTarget: b };
+      S.workers.push(w); have++;
+      goTo(w, b.gx + 1, b.gy + 2.25, "toSilt");
+    }
+  }
+  if (!S.warnedSilt && S.buildings.some(b => b.id === "wewa" && b.silt >= 20)) {
+    S.warnedSilt = true;
+    say("Monsoon rain washes silt into the wewas, and they hold less. In Yala, idle villagers gather for shramadana to dig it out and manure the paddies.");
+  }
+}
+const endParty = w => { S.workers = S.workers.filter(x => x !== w); };
+
 // ==================== VILLAGERS & JOBS ====================
 function staff() {
   while (S.workers.length > S.villagers) releaseWorker(S.workers.pop());
   for (const b of S.buildings) {
     if (!b.def.worker || b.worker) continue;
-    if (S.workers.length >= S.villagers) break;
+    if (S.workers.length >= S.villagers) {
+      const party = S.workers.findIndex(w => w.job === "shramadana" && !w.fireTarget);
+      if (party < 0) break;
+      S.workers.splice(party, 1); // a real job beats a work party
+    }
     const w = { b, job: b.def.worker, gx: S.citadel.gx + 1, gy: S.citadel.gy + 2.2, tx: 0, ty: 0, phase: "plan", timer: 0, carry: null, target: null };
     b.worker = w;
     S.workers.push(w);
@@ -702,6 +731,22 @@ function updateWorker(w, dt) {
       w.timer -= dt * workMult();
       if (w.timer <= 0) planJob(w);
       break;
+    case "toSilt":
+      if (walk(w, dt)) {
+        const b = w.siltTarget;
+        if (!b || !S.buildings.includes(b) || b.silt < 2 || S.season === "maha") { endParty(w); break; }
+        w.phase = "work"; w.timer = 5;
+      }
+      break;
+    case "toField":
+      if (walk(w, dt)) {
+        if (w.field && S.buildings.includes(w.field)) { w.field.growth = Math.min(100, w.field.growth + 12); spawnFloat("🌱", w.gx, w.gy, "#bff0a8"); }
+        w.carry = null;
+        const b = w.siltTarget;
+        if (b && S.buildings.includes(b) && b.silt >= 4 && S.season !== "maha") goTo(w, b.gx + 1, b.gy + 2.25, "toSilt");
+        else endParty(w);
+      }
+      break;
     case "toWater":
       if (walk(w, dt)) {
         const src = w.waterSrc || {};
@@ -744,6 +789,17 @@ function updateWorker(w, dt) {
     case "work":
       w.timer -= dt * workMult();
       if (w.timer > 0) break;
+      if (w.job === "shramadana") {
+        const b = w.siltTarget;
+        if (b && S.buildings.includes(b)) b.silt = Math.max(0, b.silt - 6);
+        w.carry = { key: "silt", n: 1 };
+        let best = null, bd = 8;
+        for (const p of S.buildings) if (p.id === "paddy") { const d = Math.hypot(p.gx + 1 - w.gx, p.gy + 1 - w.gy); if (d < bd) { bd = d; best = p; } }
+        w.field = best;
+        if (best) goTo(w, best.gx + 1, best.gy + 2.2, "toField");
+        else goTo(w, w.gx + 1, w.gy + 0.8, "toField");
+        break;
+      }
       if (w.job === "woodcutter") {
         const t = w.target;
         w.target = null;
@@ -1115,9 +1171,13 @@ function tickFire() {
 // first (temporary "bucket" workers), then nearby workers drop their jobs.
 function assignFirefighters() {
   for (const w of S.workers) {
-    if (w.fireTarget && !(w.fireTarget.fire > 0 && S.buildings.includes(w.fireTarget))) { w.fireTarget = null; w.carry = null; if (!w.temp) planJob(w); }
+    if (w.fireTarget && !(w.fireTarget.fire > 0 && S.buildings.includes(w.fireTarget))) {
+      w.fireTarget = null; w.carry = null;
+      if (w.job === "shramadana" && w.siltTarget) goTo(w, w.siltTarget.gx + 1, w.siltTarget.gy + 2.25, "toSilt");
+      else if (!w.temp) planJob(w);
+    }
   }
-  S.workers = S.workers.filter(w => !w.temp || w.fireTarget);
+  S.workers = S.workers.filter(w => w.job !== "bucket" || w.fireTarget); // water carriers go home when the fire is out
   for (const b of S.buildings) {
     if (!(b.fire > 0)) continue;
     let have = S.workers.filter(w => w.fireTarget === b).length;
@@ -1245,6 +1305,7 @@ function tick() {
 
   tickWater();
   tickFire();
+  assignShramadana();
   updateCover();
 
   for (const u of S.units) {
@@ -1688,7 +1749,7 @@ function describe(b) {
   if (b.fire > 0) lines.push(`🔥 On fire (${b.fire >= 2 ? "raging" : "burning"}). Villagers are carrying water.`);
   if (b.def.worker) lines.push(b.worker ? (b.id === "pansala" ? (b.worker.alms ? "The monk is on his alms round" : "The monk is in meditation") : "Staffed") : "💤 No villager free. Build houses.");
   if (b.id === "wewa") {
-    lines.push(`Water ${Math.round(b.water)}/${WEWA_CAP}${riverBeside(b) ? " · river-fed" : ""}`);
+    lines.push(`Water ${Math.round(b.water)}/${Math.round(wewaCap(b))}${riverBeside(b) ? " · river-fed" : ""}${b.silt >= 1 ? ` · silt ${Math.round(b.silt)} (idle villagers dig it out in Yala)` : ""}`);
     const id = S.netOf[b.gy][b.gx], linked = id !== -1 ? S.nets[id].wewas.size - 1 : 0;
     lines.push(linked ? `Spills into ${linked} linked wewa${linked > 1 ? "s" : ""} when full` : "When full, rain runs off. Link another wewa by canal.");
   }

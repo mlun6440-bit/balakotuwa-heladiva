@@ -28,7 +28,7 @@ const BUILDINGS = {
                 tower: { range: 4.5, dmg: 8, cd: 1.3 } },
 
   wewa:       { name: "Wewa (Tank)", cat: "water", icon: "💧", w: 2, h: 2, hp: 700, cost: { timber: 10, stone: 6 }, solid: true, water: true, z: 5,
-                desc: "Stores up to 100 water from Maha rain, or all year beside a river." },
+                desc: "Stores water from Maha rain (or a river); silt builds up, and idle villagers dig it out in Yala." },
   canal:      { name: "Ela (Canal)", cat: "water", icon: "〰️", w: 1, h: 1, hp: 150, cost: { stone: 1 }, ground: true, water: true, paint: true,
                 desc: "Carries wewa water to paddies; drag to paint." },
   sluice:     { name: "Sorowwa (Sluice)", cat: "water", icon: "🚪", w: 1, h: 1, hp: 400, cost: { timber: 6, stone: 8 }, ground: true, water: true,

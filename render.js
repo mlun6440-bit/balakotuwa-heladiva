@@ -823,6 +823,10 @@ function drawPaddy(b, now) {
 function drawWewaSprite(b, now) {
   const { gx, gy } = b;
   drawSprite("wewa.base", gx, gy);
+  if (b.silt > 1) {
+    const sk = Math.min(1, b.silt / 60), ins = 0.56 - 0.12 * sk;
+    diamond(gx + ins, gy + ins, 2 - ins * 2, 2 - ins * 2, 0.4 + sk * 2.4, `rgba(112,86,52,${0.35 + 0.45 * sk})`);
+  }
   const k = b.water / WEWA_CAP;
   if (k > 0.01) {
     const z = 0.6 + 5.6 * k, inset = 0.56 - 0.2 * (z / 7);
@@ -1414,7 +1418,7 @@ function stride(o) {
   return g;
 }
 function drawWorkerSprite(w, now) {
-  const base = `u.v.${w.job === "bucket" ? "farmer" : w.job}`;
+  const base = `u.v.${w.job === "bucket" || w.job === "shramadana" ? "farmer" : w.job}`;
   if (!hasSprite(`${base}.f.i0`)) return false;
   const g = stride(w);
   const f = g.back ? "b" : "f";
@@ -1425,7 +1429,7 @@ function drawWorkerSprite(w, now) {
   else if (working) fr = `a${Math.floor(now / (w.job === "farmer" || w.job === "trader" ? 260 : 150) + w.b.uid) % 3}`;
   else fr = "i0";
   drawSprite(`${base}.${f}.${fr}`, w.gx, w.gy, 0, { flip: g.flip });
-  if (w.carry && moving) drawSprite(`load.${w.carry.key}.${f}.${fr}`, w.gx, w.gy, 0, { flip: g.flip });
+  if (w.carry && moving) drawSprite(`load.${w.carry.key === "silt" ? "stone" : w.carry.key}.${f}.${fr}`, w.gx, w.gy, 0, { flip: g.flip });
   if (w.phase === "work" && Math.floor(now / 150) % 3 === 2 && hash(now | 0, 1) > 0.6) {
     const p = iso(w.gx, w.gy, 0);
     ctx.fillStyle = w.job === "mason" ? "#ddd" : "#d9b27a";
