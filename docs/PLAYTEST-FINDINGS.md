@@ -37,15 +37,12 @@ to hunger), and loses the finale.
    fields plus soldier upkeep starve a careless kingdom. *Direction:* an
    advisor warning when raiders head for the fields, and/or upkeep only in
    Yala.
-1. **Most villagers are idle (still ~50% after R1).** Population grows
-   faster than jobs; idle people only fight fires. *Direction:* give idle
-   villagers a water-loop role, e.g. a "shramadana" pool that desilts wewas
-   and repairs bunds (ties to the roadmap's siltation idea), or cap growth
-   by land and water rather than houses alone.
-2. **Early raids have no tension.** Both bots finish L1–2 with the citadel at
-   97–100%. *Direction:* raids that threaten the economy rather than the
-   citadel: raiders that trample paddies, breach a bund or steal from the
-   granary, so defending fields matters (water-first, not citadel-first).
+1. **Most villagers are idle (still ~50% after R1).** Shramadana gives them
+   work in Yala only, three per silted wewa. *Direction:* a Maha job (bund
+   repair, hauling), or growth capped by land and water rather than houses.
+2. **Early raids:** now threaten the fields (R2), but the citadel itself is
+   still untouched on L1–2 for both bots. Probably fine for the opening
+   levels; revisit after a human playtest.
 3. **Level 5 is a cliff.** The hint-following novice loses Hill Kingdom
    (harmony 38/60, rice 1/150, undefended north and east, 7 buildings burnt)
    while the learner wins. *Direction:* a mid-level hint when a second raid
