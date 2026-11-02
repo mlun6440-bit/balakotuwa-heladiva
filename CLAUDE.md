@@ -64,6 +64,6 @@ train a soldier, zoom and pan.
 
 ## When a stronger model picks this up
 
-Work from `ROADMAP.md` top-down. Before large changes, re-read this file and
+Work from `ROADMAP.md` top-down, using `docs/GENRE-NOTES.md` for genre expectations (ideas only, never copied content). Before large changes, re-read this file and
 keep the invariants. Prefer data rows over new branches, keep `game.js` free
 of drawing code, and keep each commit to one roadmap item.
