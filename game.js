@@ -277,7 +277,8 @@ function startLevel(idx, mode = "brief", custom = null) {
     tool: null, demolish: false, cat: "water",
     paused: true, speed: 1, mode, growAcc: 0, starveAcc: 0, tutorialStep: 0, warnedWave: -1, uid: 0,
     seasonNo: 0, edictEnd: {}, edictUsed: {}, rain: { caught: 0, lost: 0, spilled: 0 },
-    stats: { starved: 0, starveSeason: null, lost: {}, burned: 0, trained: 0, tributes: 0, lastFrom: [], lastSize: 0, hungry: 0 }
+    stats: { starved: 0, starveSeason: null, lost: {}, burned: 0, trained: 0, tributes: 0, lastFrom: [], lastSize: 0, hungry: 0 },
+    dam: L.rival ? makeDam(tiles, L.rivers[0]) : null
   };
   const [cx, cy] = L.citadel;
   S.citadel = addBuilding("citadel", cx, cy);
@@ -562,7 +563,37 @@ function edgeTiles(b) {
   return out.filter(([x, y]) => inb(x, y));
 }
 
-const riverBeside = b => edgeTiles(b).some(([x, y]) => S.tiles[y][x].t === "river");
+const riverBeside = b => !riverDry() && edgeTiles(b).some(([x, y]) => S.tiles[y][x].t === "river");
+
+// ==================== THE DISAWA'S DAM ====================
+// On levels with `rival`, a rival lord's dam stands where the river enters the
+// map. Every Yala he shuts it and the river runs dry, unless the dam is broken
+// (soldiers standing at it hack it down, and his raid comes early and stronger)
+// or a 🎁 gift decree is in force. He rebuilds it every Maha.
+const DAM_HP = 900, REVENGE = ["raider", "raider", "raider", "raider", "brute"];
+function makeDam(tiles, r) {
+  const along = r.edge === "west" || r.edge === "east"; // the river runs along y; upstream is its y = 1 end
+  const cells = [];
+  for (let k = 0; k < MAP; k++) { const [x, y] = along ? [k, 1] : [1, k]; if (tiles[y][x].t === "river") cells.push(k); }
+  const a = Math.min(...cells), b = Math.max(...cells);
+  return along ? { gx: a, gy: 1, w: b - a + 1, h: 1, hp: DAM_HP, maxHp: DAM_HP } : { gx: 1, gy: a, w: 1, h: b - a + 1, hp: DAM_HP, maxHp: DAM_HP };
+}
+const riverDry = () => !!(S.dam && S.dam.hp > 0 && S.season === "yala" && !edictOn("gift"));
+function hitDam(u) {
+  if (S.time - u.last < 1.2) return;
+  u.last = S.time;
+  const d = S.dam;
+  d.hp -= u.def.dmg * (u.rank ? RANKS[u.rank].dmg : 1);
+  puff(d.gx + d.w / 2, d.gy + d.h / 2, 3, "#9a9080");
+  if (d.hp > 0) return;
+  d.hp = 0;
+  S.stats.damBroken = true;
+  const w = S.L.waves[S.nextWave];
+  if (w) S.waveClock = Math.max(S.waveClock, w.t - 20);
+  S.revenge = true;
+  say("The disawa's dam is broken and the river runs free! His men are coming for revenge, in 20 seconds, and in strength.", true);
+  sfx("conch");
+}
 
 // Returns "river", a network object, or null.
 function waterSource(b) {
@@ -1267,6 +1298,7 @@ function updateSoldier(u, dt) {
     moveToward(u, foe.gx, foe.gy, dt);
     return;
   }
+  if (S.dam && S.dam.hp > 0 && rectDist(u, S.dam) <= 1) hitDam(u);
   if (toPost > 0.15) moveToward(u, u.tx, u.ty, dt);
 }
 
@@ -1413,7 +1445,7 @@ function nearestWater(w) {
     if (b.id === "wewa" && b.water >= 2) consider(b.gx + 1, b.gy + 2.25, { wewa: b });
     else if (b.def.water && b.id !== "wewa") { const id = S.netOf[b.gy][b.gx]; if (id !== -1 && S.nets[id].water >= 2) consider(b.gx + 0.5, b.gy + 0.5, { net: S.nets[id] }); }
   }
-  for (let y = 0; y < MAP; y++) for (let x = 0; x < MAP; x++) {
+  if (!riverDry()) for (let y = 0; y < MAP; y++) for (let x = 0; x < MAP; x++) {
     if (S.tiles[y][x].t !== "river") continue;
     for (const [dx, dy] of DIRS4) if (inb(x + dx, y + dy) && S.tiles[y + dy][x + dx].t !== "river") { consider(x + 0.5 + dx * 0.45, y + 0.5 + dy * 0.45, {}); break; }
   }
@@ -1440,6 +1472,7 @@ function launchWave() {
   }
   const list = [];
   for (const type of Object.keys(FOES)) for (let i = 0; i < (w[type] || 0); i++) list.push(type);
+  if (S.revenge) { list.push(...REVENGE); S.revenge = false; } // the disawa's men, after his dam was broken
   S.stats.lastFrom = w.from;
   S.stats.lastSize = 0;
   const party = S.nextWave;
@@ -1514,9 +1547,12 @@ function tick() {
     S.season = SEASONS[S.season].next;
     S.seasonLeft = SEASONS[S.season].len;
     S.seasonNo++;
-    say(S.season === "maha"
-      ? "The Maha monsoon breaks! The wewas fill and every paddy drinks."
-      : "Yala, the dry season. Only paddies beside water will grow now.");
+    if (S.dam && S.season === "maha" && S.dam.hp < S.dam.maxHp) { S.dam.hp = S.dam.maxHp; say("Over the monsoon the disawa has rebuilt his dam. He will shut it again in Yala."); }
+    else say(riverDry()
+      ? "Yala, and the disawa upstream has shut his dam: the river runs dry. Live on your wewas, send soldiers to break the dam, or send him a 🎁 gift (👑 tab)."
+      : S.season === "maha"
+        ? "The Maha monsoon breaks! The wewas fill and every paddy drinks."
+        : "Yala, the dry season. Only paddies beside water will grow now.", S.season === "yala" && riverDry());
   }
 
   S.waveClock++;
@@ -1646,6 +1682,7 @@ function defeatCauses() {
   const st = S.stats, out = [];
   if (st.starved >= 2) out.push([5, `🍚 The granary ran dry${st.starveSeason ? ` in ${st.starveSeason === "yala" ? "the Yala dry season" : "the Maha monsoon"}` : ""} and ${st.starved} famil${st.starved === 1 ? "y" : "ies"} left. Keep about one watered paddy per house.`]);
   else if (st.hungry >= 20) out.push([3, "🍚 The granary was empty for long stretches, so few new families came to work and fight."]);
+  if (S.dam && S.dam.hp > 0 && st.starved >= 2) out.push([4, "🌊 The disawa's dam kept the river dry every Yala. Fill wewas in Maha, break the dam with soldiers, or send him a gift."]);
   if ((st.eaten || 0) >= 3) out.push([3, `🐘 Wild elephants ate ${st.eaten} paddies. A staffed pela by the fields keeps them off.`]);
   for (const e of st.lastFrom || []) {
     const { towers, archers, walls } = edgeDefence(e);
@@ -1879,6 +1916,7 @@ function edictBlocked(id) {
   const e = EDICTS[id];
   if (edictOn(id)) return `In force for ${Math.ceil(S.edictEnd[id] - S.time)}s`;
   if (e.once === "maha" && S.season !== "maha") return "Only in the Maha monsoon";
+  if (e.once === "yala" && S.season !== "yala") return "Only in the Yala dry season";
   if (S.edictUsed[id] === S.seasonNo) return "Already proclaimed this season";
   if (!affordable(e.cost)) return `Needs ${costText(e.cost)}`;
   return null;
@@ -1892,9 +1930,7 @@ function proclaim(id) {
   S.edictEnd[id] = S.time + e.dur;
   S.edictUsed[id] = S.seasonNo;
   S.harmony = clamp(S.harmony + e.harmony, 0, 100);
-  say(id === "rajakariya"
-    ? "Rajakariya is proclaimed. Every family sends a worker for the king's service: build now, it costs less!"
-    : "The Perahera begins! Drums, torches and the tusker's procession lift every heart.");
+  say(e.said);
   spawnFloat(`${e.icon} ${e.name.split(" (")[0]}`, S.citadel.gx + 1, S.citadel.gy, "#e9b949");
   sfx("conch");
   renderPalette();

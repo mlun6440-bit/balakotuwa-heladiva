@@ -28,7 +28,8 @@ const BOT = (() => {
     tribute: [0, 0, 3],               // pay tribute if gold > cost × this (0 = never)
     reserve: [1, 0, 1],               // hold back resources a "store N" objective needs
     decrees: [1, 0, 1],
-    pelas: [1, 0, 3]                  // watch huts among the paddies (levels with wild elephants)
+    pelas: [1, 0, 3],                 // watch huts among the paddies (levels with wild elephants)
+    breakDam: [0.5, 0, 1]             // ≥ 0.5: send melee soldiers to break the disawa's dam; else pay the gift in Yala
   };
   const DEFAULTS = Object.fromEntries(Object.entries(DIALS).map(([k, v]) => [k, v[0]]));
   const log = [];
@@ -276,6 +277,14 @@ const BOT = (() => {
     if (!novice && S.unlocked.buildings.has("pansala") && !count("pansala") && S.gold > 60) near("pansala", "harmony");
     if (!novice && S.unlocked.buildings.has("kammala") && !count("kammala") && count("barracks")) near("kammala", "cheaper soldiers");
 
+    // the disawa's dam: the novice pays the gift the advisor offers; the planner breaks it or pays, by its dial
+    if (S.dam && S.dam.hp > 0) {
+      const breakIt = !novice && P.breakDam >= 0.5;
+      if (breakIt && riverDry() && !raidSoon && !under) S.units.filter(u => u.team === "p" && !u.def.ranged).forEach((u, i) => {
+        u.tx = S.dam.gx + Math.min(S.dam.w - 0.5, 0.5 + (i % 3) * 0.6); u.ty = S.dam.gy + S.dam.h + 0.3 + Math.floor(i / 3) * 0.3; u.ordered = true;
+      });
+      else if (!breakIt && riverDry() && S.unlocked.edicts.has("gift") && !edictBlocked("gift")) { proclaim("gift"); note("gift to the disawa"); }
+    }
     // wild elephants: the novice heeds the advisor, the planner builds by its dial
     if (S.L.wild && count("pela") < (novice ? (S.warnedWild ? 1 : 0) : Math.round(P.pelas ?? 1)) && count("paddy")) pela(novice ? "the advisor said elephants" : "against elephants");
 

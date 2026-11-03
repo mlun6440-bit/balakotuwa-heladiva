@@ -577,7 +577,8 @@ function render(now) {
   ctx.globalAlpha = 1;
   wearPaths();
   ctx.drawImage(paths.canvas, tx, ty, terrain.w, terrain.h);
-  drawWaterShimmer(now);
+  if (!riverDry()) drawWaterShimmer(now);
+  drawDam(now);
 
   for (const b of S.buildings) if (b.def.ground || b.id === "wewa") drawGround(b, now);
 
@@ -679,6 +680,36 @@ function drawWaterShimmer(now) {
 }
 
 const isRiver = (x, y) => inb(x, y) && S.tiles[y][x].t === "river";
+
+// The disawa's dam: a stone weir with timber gates where the river enters.
+// While it is shut (Yala) the riverbed shows dry sand and stones.
+function drawDam(now) {
+  const d = S.dam;
+  if (!d) return;
+  if (riverDry()) for (let y = 0; y < MAP; y++) for (let x = 0; x < MAP; x++) {
+    if (!isRiver(x, y) || !onScreen(x, y)) continue;
+    diamond(x, y, 1, 1, 0.2, hash(x, y, 3) > 0.5 ? "rgba(196,170,122,0.92)" : "rgba(181,154,108,0.92)");
+    if (hash(x, y, 5) > 0.7) box(x + 0.3 + hash(x, y, 6) * 0.3, y + 0.3, 0.18, 0.14, 0.2, 2, "#9a9387");
+  }
+  const broken = d.hp <= 0;
+  const across = d.h === 1;
+  const [x0, y0, w, h] = across ? [d.gx, d.gy + 0.3, d.w, 0.4] : [d.gx + 0.3, d.gy, 0.4, d.h];
+  box(x0, y0, w, h, 0, broken ? 2 : 7, broken ? "#857e72" : "#a39b8c");
+  if (!broken) {
+    const n = Math.max(2, Math.round(across ? d.w : d.h) * 2);
+    for (let i = 0; i < n; i++) {
+      const k = (i + 0.5) / n;
+      const gx = across ? x0 + w * k - 0.06 : x0 + 0.1, gy = across ? y0 + 0.1 : y0 + h * k - 0.06;
+      box(gx, gy, 0.12, 0.12, 7, riverDry() ? 5 : 2, "#6b4426"); // gates down when shut
+    }
+    flag(iso(x0 + w / 2, y0 + h / 2, 12), 14, "#2a2a2a", now);
+    if (d.hp < d.maxHp) {
+      const p = iso(x0 + w / 2, y0 + h / 2, 22);
+      ctx.fillStyle = "rgba(0,0,0,0.75)"; ctx.fillRect(p.x - 16, p.y, 32, 3);
+      ctx.fillStyle = "#ff5a4a"; ctx.fillRect(p.x - 16, p.y, 32 * d.hp / d.maxHp, 3);
+    }
+  }
+}
 
 function drawRock(x, y) {
   diamond(x, y, 1, 1, 0, "#7c766b");

@@ -79,14 +79,19 @@ const BUILDINGS = {
 
 // ==================== ROYAL DECREES ====================
 // Proclaimed from the 👑 tab. once: "season" = once per season, "maha" = once
-// per Maha. dur in simulation seconds. Effects are read by name in game.js.
+// per Maha, "yala" = once per Yala. said: the advisor's line when proclaimed. dur in simulation seconds. Effects are read by name in game.js.
 const EDICTS = {
   rajakariya: { name: "Rajakariya (Royal service)", icon: "🛠️", cost: { rice: 15 }, once: "season", dur: 30, harmony: -8,
                 work: 1.6, buildDiscount: 0.3,
-                desc: "30s of faster work and 30% cheaper building, at −8 harmony." },
+                desc: "30s of faster work and 30% cheaper building, at −8 harmony.",
+                said: "Rajakariya is proclaimed. Every family sends a worker for the king's service: build now, it costs less!" },
   perahera:   { name: "Perahera (Festival)", icon: "🐘", cost: { rice: 40, gold: 30 }, once: "maha", dur: 60, harmony: 6,
                 harmonyTarget: 25,
-                desc: "Once per Maha, a 60s procession lifts harmony towards +25." }
+                desc: "Once per Maha, a 60s procession lifts harmony towards +25.",
+                said: "The Perahera begins! Drums, torches and the tusker's procession lift every heart." },
+  gift:       { name: "Gift to the Disawa", icon: "🎁", cost: { gold: 60, rice: 20 }, once: "yala", dur: 60, harmony: -3,
+                desc: "In Yala, buys the rival disawa's goodwill: he opens his dam and the river runs for this dry season.",
+                said: "The disawa takes your gift and opens his dam. The river runs again, for this dry season." }
 };
 
 const CATS = [
@@ -205,6 +210,25 @@ const LEVELS = [
     ],
     hpScale: 1.2,
     objectives: [{ type: "build", id: "rampart", n: 10 }, { type: "build", id: "market", n: 1 }, { type: "res", key: "gold", n: 250 }, { type: "waves" }]
+  },
+  {
+    id: "dakkhina", name: "The Disawa's Dam", era: "Dakkhinadesa", seed: 47,
+    intro: "Upstream, a rival disawa shuts his dam every dry season and your river runs dry. Fill your wewas in the monsoon, and when Yala comes, break his dam with soldiers (his men will come for it) or send him a gift from the 👑 tab.",
+    citadel: [13, 12], season: "maha",
+    start: { timber: 130, stone: 60, rice: 80, gold: 120, villagers: 12 },
+    army: { spearman: 3, archer: 3, angampora: 1 },
+    rivers: [{ edge: "west", at: 2, width: 2, wobble: 1.2 }],
+    rocks: [[18, 18, 22, 21], [16, 3, 19, 6]],
+    forests: [[7, 18, 12, 24, 0.45], [19, 8, 24, 14, 0.4]],
+    unlocks: { buildings: [], edicts: ["gift"] }, rival: true, fireArrows: true,
+    waves: [
+      { t: 170, from: ["east"], raider: 6, bowman: 2 },
+      { t: 290, from: ["north"], raider: 6, bowman: 3 },
+      { t: 410, from: ["east", "north"], raider: 8, bowman: 3, brute: 1 },
+      { t: 530, from: ["north", "south"], raider: 9, bowman: 4, brute: 1 }
+    ],
+    hpScale: 1.2,
+    objectives: [{ type: "res", key: "rice", n: 150 }, { type: "water", n: 200 }, { type: "waves" }]
   },
   {
     id: "parakrama", name: "Sea of Parakrama", era: "Polonnaruwa", seed: 53,
