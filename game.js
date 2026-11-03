@@ -1427,6 +1427,17 @@ function payTribute() {
   syncHud();
 }
 
+// "north", or "N+E" when a raid comes from several sides (keeps the HUD row short).
+const raidFromText = from => from.length === 1 ? from[0] : from.map(e => e[0].toUpperCase()).join("+");
+// Where raiders from an edge can enter, in grid space: the strip edgeSpawn draws from.
+function edgeStrip(edge) {
+  const a = 6, b = MAP - 6;
+  return edge === "east" ? [[MAP - 1, a], [MAP, a], [MAP, b], [MAP - 1, b]]
+    : edge === "west" ? [[0, a], [1, a], [1, b], [0, b]]
+    : edge === "north" ? [[a, 0], [b, 0], [b, 1], [a, 1]]
+    : [[a, MAP - 1], [b, MAP - 1], [b, MAP], [a, MAP]];
+}
+
 function callRaidEarly() {
   if (!S || S.mode !== "play" || S.nextWave >= S.L.waves.length) return;
   S.waveClock = S.L.waves[S.nextWave].t;
@@ -1863,7 +1874,7 @@ function syncHud() {
   const n = nextWaveIn();
   document.getElementById("raidVal").textContent = n === Infinity
     ? (foesAlive() || S.spawnQueue.length ? "Under attack!" : "None left")
-    : `${String(Math.floor(n / 60)).padStart(2, "0")}:${String(n % 60).padStart(2, "0")}`;
+    : `${String(Math.floor(n / 60)).padStart(2, "0")}:${String(n % 60).padStart(2, "0")} · ${raidFromText(S.L.waves[S.nextWave].from)}`;
   document.getElementById("conchBtn").disabled = n === Infinity || S.mode !== "play";
   const tb = document.getElementById("tributeBtn"), open = tributeOpen();
   tb.hidden = !open;

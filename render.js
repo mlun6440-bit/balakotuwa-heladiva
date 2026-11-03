@@ -1702,13 +1702,28 @@ function drawGhost() {
   }
 }
 
+// The last minute before a raid: the stretch of each edge where raiders will
+// enter glows red, with arrows pointing in; the flag and countdown sit mid-edge.
+const RAID_SHOW = 60;
 function drawWaveMarkers(now) {
   const soon = nextWaveIn();
-  if (soon > 25) return;
+  if (soon > RAID_SHOW) return;
   const w = S.L.waves[S.nextWave];
-  const pulse = 0.5 + 0.5 * Math.sin(now * 0.008);
+  const urgent = soon <= 20;
+  const pulse = 0.5 + 0.5 * Math.sin(now * (urgent ? 0.012 : 0.004));
   const m = MAP / 2;
   for (const edge of w.from) {
+    const q = edgeStrip(edge).map(([x, y]) => iso(x, y, 0));
+    ctx.fillStyle = `rgba(220,50,30,${(urgent ? 0.22 : 0.1) + pulse * 0.14})`;
+    ctx.beginPath(); q.forEach((p, i) => (i ? ctx.lineTo(p.x, p.y) : ctx.moveTo(p.x, p.y))); ctx.closePath(); ctx.fill();
+    const [ix, iy] = edge === "east" ? [-1, 0] : edge === "west" ? [1, 0] : edge === "north" ? [0, 1] : [0, -1];
+    ctx.fillStyle = `rgba(255,120,90,${0.45 + pulse * 0.4})`;
+    for (const k of [0.25, 0.5, 0.75]) {
+      const along = 6 + k * (MAP - 12), ox = ix ? (ix > 0 ? 1.2 : MAP - 1.2) : along, oy = iy ? (iy > 0 ? 1.2 : MAP - 1.2) : along;
+      const tip = iso(ox + ix * 0.9, oy + iy * 0.9, 0), l = iso(ox + iy * 0.45, oy + ix * 0.45, 0), r = iso(ox - iy * 0.45, oy - ix * 0.45, 0);
+      ctx.beginPath(); ctx.moveTo(tip.x, tip.y); ctx.lineTo(l.x, l.y); ctx.lineTo(r.x, r.y); ctx.closePath(); ctx.fill();
+    }
+    if (soon > 25) continue;
     const [x, y] = edge === "east" ? [MAP - 0.5, m] : edge === "west" ? [0.5, m] : edge === "north" ? [m, 0.5] : [m, MAP - 0.5];
     const c = iso(x, y, 0);
     const g = ctx.createRadialGradient(c.x, c.y, 2, c.x, c.y, 60);
@@ -1940,6 +1955,15 @@ function renderMinimap() {
     const [a, c] = px(u.gx, u.gy);
     mctx.fillStyle = u.team === "p" ? "#6cc070" : "#ff4a3a";
     mctx.fillRect(a - 1, c - 1, 2.5, 2.5);
+  }
+  const soon = nextWaveIn();
+  if (soon <= RAID_SHOW && (soon > 20 || Math.floor(performance.now() / 300) % 2)) {
+    mctx.strokeStyle = "#ff4a3a"; mctx.lineWidth = 3;
+    for (const edge of S.L.waves[S.nextWave].from) {
+      const q = edgeStrip(edge), [i, j] = { east: [1, 2], west: [0, 3], north: [0, 1], south: [2, 3] }[edge];
+      const [a0, b0] = px(...q[i]), [a1, b1] = px(...q[j]);
+      mctx.beginPath(); mctx.moveTo(a0, b0); mctx.lineTo(a1, b1); mctx.stroke();
+    }
   }
   const W2 = view.w / view.zoom, H2 = view.h / view.zoom;
   const corners = [screenToGrid(0, 0), screenToGrid(W2, 0), screenToGrid(W2, H2), screenToGrid(0, H2)];
