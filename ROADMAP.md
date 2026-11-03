@@ -73,7 +73,8 @@ system, not a copy of any other game's mechanic.
       screen lists the 2–3 most telling reasons with what to do next time.
 - [ ] Notes #15 (raiders strengthen while you wait), #16 (home-ground bonus),
       #17 (hidden forest paths), #18 (buried coin hoards).
-- [ ] Minimap arrows for incoming raids (notes #4); wall stairs (notes #7);
+- [x] Minimap arrows for incoming raids (notes #4, R18).
+- [ ] Wall stairs (notes #7);
       merit currency for elite units (notes #10); sealed-citadel pathing test (notes #12).
 
 ## Simplify round 1 (cut or merged, per docs/ITERATION-GUARDRAILS.md)
@@ -102,6 +103,22 @@ Recorded so these are not re-added without a strong reason:
 - [x] R8 Diya agala (moat) fed by the canal network.
 - [x] R9 Simplify round 3 (below).
 
+## Loop batch 5 (R18–R21)
+
+- [x] R18 Where the next raid comes from: the Next raid row names the edge;
+      in the last minute that edge's entry stretch glows with arrows, and the
+      minimap marks it (notes #4).
+- [x] R19 The scouts (45s before a raid) name sides with no archers or towers.
+- [x] R20 The market trader keeps two rice per villager (Lion Rock's required
+      market was selling the harvest while families starved).
+- [x] R21 Simplify round 6 (below).
+
+## Simplify round 6 (R21)
+
+- **Cut:** the mid-edge glow, flag and countdown of the old raid marker; the
+  R18 band says where and the HUD says when.
+- **Merged (code):** the defeat screen and the scouts share one `edgeDefence`.
+
 ## Loop batch 4 (R14–R17)
 
 - [x] R14 Attam: in Maha, idle villagers join the farmer on watered paddies.
@@ -110,8 +127,7 @@ Recorded so these are not re-added without a strong reason:
 - [x] R16 Soldier ranks (asked for by the player): drill by the Angam Maduwa
       and fight to become ★ veteran / ★★ champion.
 - [x] R17 Simplify round 5 (below).
-- [ ] Deferred: show where the next raid comes from (notes #4), the novice's
-      Hill Kingdom losses name undefended edges.
+- [x] Deferred to batch 5: show where the next raid comes from (R18).
 
 ## Simplify round 5 (R17)
 

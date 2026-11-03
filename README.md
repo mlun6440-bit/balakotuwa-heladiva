@@ -26,7 +26,7 @@ and baked into `assets/` (regenerate with `cd tools && npm install` once, then
 - **Two seasons.** In the 🌧️ Maha monsoon, rain fills every wewa and every paddy grows. In the ☀️ Yala dry season, a paddy grows only beside a watered canal, a wewa or the river.
 - **Water network.** Wewas store up to 100 water and fill all year when they sit beside the river. Canals join on four sides; each watered paddy drinks from its network.
 - **Sluice gates.** Click a sluice to flood its canal network. Raiders wading through floodwater slow down and drown, but the water comes out of your wewas.
-- **Villagers.** They staff farms, woodcutters, quarries and markets. Every soldier you train costs one villager. Houses raise the population cap.
+- **Villagers.** They staff farms, woodcutters, quarries and markets (a market never sells the last two rice per villager). Every soldier you train costs one villager. Houses raise the population cap.
 - **Harmony.** It rises with a full granary and dagobas, and falls with hunger and destruction. New families settle only at 45 or above.
 - **Cascading tanks.** A full wewa spills its rain into the other wewas on its canal network. On Sea of Parakrama, keep 70% of the rain for three stars: "let not one drop reach the sea unused".
 - **Royal decrees (👑).** *Rajakariya*, the king's labour service, speeds up work and makes building cheaper for a harmony cost. A *Perahera* festival in Maha lifts harmony with a procession of tuskers and torch-bearers.
@@ -43,6 +43,7 @@ and baked into `assets/` (regenerate with `cd tools && npm install` once, then
 - **Siege (Hill Kingdom).** Stone throwers outrange watchtowers. Bolt towers and archers on the walls can reach them. Melee raiders can't reach soldiers standing on walls or towers.
 - **Tribute (from level 2).** In the 30 seconds before a raid you can pay rice and gold to turn it back. It costs more each time and shames your people.
 - **Defeat is explained.** If the Maligawa falls, the end screen names the two or three main reasons and what to try next.
+- **Scouts.** The Next raid row names the edge raiders will come from; in the last minute that edge glows on the map and minimap, and the scouts warn if no archers or towers guard it.
 - **Raiders.** They follow the cheapest path to the citadel. They walk around walls when there is a gap and break through when there isn't.
 
 ## Campaign
