@@ -60,7 +60,7 @@ Key invariants:
 
 - **New building:** add a row to `BUILDINGS` (flags: `solid`, `ground`, `wall`,
   `water`, `worker`, `store`, `pop`, `harmony`, `tower`, `paint`, `needsRock`,
-  `flammable`, `thorn`, `upgrade: { to, cost }`),
+  `flammable`, `moat`, `upgrade: { to, cost }`),
   unlock it in a level's `unlocks.buildings`, and add a `case` in
   `drawBuilding` (or let the generic `hall()` draw it). A new `worker` job also
   needs a branch in `planJob`/`updateWorker`.

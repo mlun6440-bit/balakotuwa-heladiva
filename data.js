@@ -21,7 +21,6 @@ const RES = { timber: "🪵", stone: "🪨", rice: "🍚", gold: "🪙" };
 // solid: blocks raiders (they must break it). ground: flat, walkable.
 // flammable: thatch or timber that raider fire arrows can set alight.
 // upgrade: { to, cost } lets the ⬆️ Upgrade tool rebuild it in place.
-// thorn: walkable, but slows and scratches raiders; raiders path around it.
 // moat: a canal tile that slows raiders to a crawl while its network holds water.
 // worker: job type staffed by one villager. store: drop-off for those resources.
 const BUILDINGS = {
@@ -64,8 +63,6 @@ const BUILDINGS = {
 
   palisade:   { name: "Palisade", cat: "defence", icon: "🪵", w: 1, h: 1, hp: 320, cost: { timber: 3 }, solid: true, flammable: true, wall: true, z: 20, paint: true, upgrade: { to: "rampart", cost: { stone: 4 } },
                 desc: "Cheap wall; archers on it are safe from swords." },
-  thorn:      { name: "Katu Wetiya (Thorn barrier)", cat: "defence", icon: "🌿", w: 1, h: 1, hp: 140, cost: { timber: 1 }, ground: true, thorn: true, flammable: true, paint: true,
-                desc: "Slows and scratches raiders pushing through; burns easily." },
   rampart:    { name: "Gal Bamma (Rampart)", cat: "defence", icon: "🧱", w: 1, h: 1, hp: 950, cost: { stone: 5 }, solid: true, wall: true, z: 26, paint: true,
                 desc: "Stone wall; archers on it are safe from swords and shoot farther." },
   gate:       { name: "Vahalkada (Gate)", cat: "defence", icon: "⛩️", w: 1, h: 1, hp: 900, cost: { timber: 8, stone: 6 }, solid: true, wall: true, z: 30,
@@ -170,7 +167,7 @@ const LEVELS = [
     rivers: [{ edge: "west", at: 0, width: 2, wobble: 1.5 }],
     rocks: [[15, 6, 19, 9], [5, 16, 8, 19]],
     forests: [[3, 3, 10, 8, 0.45], [18, 17, 25, 24, 0.4], [3, 21, 8, 25, 0.4]],
-    unlocks: { buildings: ["rampart", "gate", "market", "walawwa", "thorn", "kammala"], troops: ["angampora"] }, fireArrows: true,
+    unlocks: { buildings: ["rampart", "gate", "market", "walawwa", "kammala"], troops: ["angampora"] }, fireArrows: true,
     waves: [
       { t: 150, from: ["east"], raider: 5, bowman: 2 },
       { t: 260, from: ["south"], raider: 6, bowman: 2 },

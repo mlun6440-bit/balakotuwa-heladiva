@@ -33,7 +33,7 @@ The sprite art is original, modelled in code under `tools/art/` and baked into
 - **Smithy.** A staffed Kammala forges timber into arms, making soldiers 30% cheaper in gold.
 - **Fire (from Lion Rock).** Raider bowmen shoot fire arrows at thatch and timber. Fire spreads in the dry season and dies in the monsoon. Villagers run with water pots from the nearest wewa, canal or river.
 - **Morale.** A raid party that loses most of its strength breaks and flees (no gold for those who escape).
-- **Defences.** Thorn barriers slow and scratch raiders. The 🔨 Improve tool repairs damage, or upgrades palisades to ramparts and houses to walawwas.
+- **Defences.** A moat (diya agala) on your canal network slows raiders to a crawl while it holds water. The 🔨 Improve tool repairs damage, or upgrades palisades to ramparts and houses to walawwas.
 - **Silt and shramadana.** Monsoon rain washes silt into the wewas and they hold less. In the dry season idle villagers form work parties to dig it out and carry it to the paddies as manure.
 - **Raids on the fields.** Raiders break off to trample ripening paddies and rob granaries on their way in, so guard the harvest, not just the citadel.
 - **Siege (Hill Kingdom).** Stone throwers outrange watchtowers. Bolt towers and archers on the walls can reach them. Melee raiders can't reach soldiers standing on walls or towers.
@@ -47,7 +47,7 @@ The sprite art is original, modelled in code under `tools/art/` and baked into
 |---|-------|-----|-----|
 | 1 | Dawn at Anuradhapura | Early kingdom | Core economy, palisades, archers, spearmen |
 | 2 | The Dry Zone | Rajarata | **Sluice flooding**; watchtowers, pansala |
-| 3 | Lion Rock | Sigiriya | **Fire arrows and water carriers**; ramparts, gates, thorn barriers, upgrades, market, smithy, Angampora fighters |
+| 3 | Lion Rock | Sigiriya | **Fire arrows and water carriers**; ramparts, gates, upgrades, market, smithy, Angampora fighters |
 | 4 | Sea of Parakrama | Polonnaruwa | **Cascading tanks and the rain-catch goal**; dagoba, war elephants, ram bearers |
 | 5 | Hill Kingdom | Senkadagala | **The great siege** (stone throwers, bolt towers) and **royal decrees**; raids from three sides |
 

@@ -95,6 +95,21 @@ Recorded so these are not re-added without a strong reason:
   hint ("keep about one watered paddy for each house") fixes it; following it,
   the scripted player wins at ~350s.
 
+## Loop batch 2 (R6–R9)
+
+- [x] R6 Fields: warning before raiders reach them, half-crop trampling, Maha rations.
+- [x] R7 Monsoon deadwood gathering by idle villagers (late timber fixed).
+- [x] R8 Diya agala (moat) fed by the canal network.
+- [x] R9 Simplify round 3 (below).
+
+## Simplify round 3 (R9)
+
+- **Cut: the thorn barrier (katu wetiya).** It did the same job as the moat
+  (a tile that slows raiders crossing it) without touching water, so it
+  would work the same in any castle game. The moat stays. Old saves load:
+  buildings of a removed type are dropped.
+- **Polish:** the resource bar never wraps; moat water is one channel.
+
 ## Simplify round 2 (R5)
 
 - **Merged:** the ⬆️ Upgrade and 🔧 Repair tools into one 🔨 Improve tool

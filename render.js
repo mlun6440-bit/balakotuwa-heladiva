@@ -710,13 +710,6 @@ function drawHoverTile() {
 // ==================== GROUND-LEVEL STRUCTURES ====================
 function drawGround(b, now) {
   const { gx, gy, w, h } = b;
-  if (b.id === "thorn") {
-    if (!drawSprite(`thorn.${b.uid % 2}`, gx, gy)) {
-      ctx.strokeStyle = "#6b5a3a"; ctx.lineWidth = 0.8;
-      for (let i = 0; i < 18; i++) { const p = iso(gx + 0.15 + hash(b.uid, i) * 0.7, gy + 0.15 + hash(i, b.uid) * 0.7, 0); ctx.beginPath(); ctx.moveTo(p.x, p.y); ctx.lineTo(p.x + (hash(i, 3) - 0.5) * 8, p.y - 3 - hash(i, 4) * 6); ctx.stroke(); }
-    }
-    return;
-  }
   if (hasSprite("wewa.base")) {
     if (b.id === "wewa") return drawWewaSprite(b, now);
     if (b.id === "canal" || b.id === "sluice" || b.id === "moat") return drawCanalSprite(b, now);
@@ -882,7 +875,7 @@ function drawCanalSprite(b, now) {
   if (m & 2) r.push([0, 0.33, 0.33, 0.34]);
   if (m & 4) r.push([0.33, 0.67, 0.34, 0.33]);
   if (m & 8) r.push([0.33, 0, 0.34, 0.33]);
-  if (moat) { diamond(gx + 0.12, gy + 0.12, 0.76, 0.76, z, col); }
+  if (moat) diamond(gx + 0.06, gy + 0.06, 0.88, 0.88, z, col);
   for (const [x, y, w, h] of r) diamond(gx + x, gy + y, w, h, z, col);
   // flowing glints
   const t = (now * 0.0006 + gx * 0.3 + gy * 0.2) % 1;

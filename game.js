@@ -111,7 +111,7 @@ function continueRun() {
   startLevel(d.idx, "idle", custom);
   Object.assign(S, d.st);
   S.trees = d.trees.map(([gx, gy, stage]) => ({ gx, gy, stage, reserved: false }));
-  S.buildings = d.buildings.map(o => {
+  S.buildings = d.buildings.filter(o => BUILDINGS[o.id]).map(o => {
     const def = BUILDINGS[o.id];
     return { ...o, def, w: def.w, h: def.h, maxHp: o.maxHp || def.hp, worker: null, fire: o.fire || 0 };
   });
@@ -457,7 +457,7 @@ function enterCost(x, y) {
   const t = S.tiles[y][x].t;
   let c = t === "river" ? 6 : t === "rock" ? 1.6 : 1;
   const b = S.occ[y][x];
-  if (b && b !== S.citadel) c += b.def.solid ? 3 + b.maxHp / 90 : b.def.thorn ? 4 : b.def.moat ? 4 : 0.3;
+  if (b && b !== S.citadel) c += b.def.solid ? 3 + b.maxHp / 90 : b.def.moat ? 4 : 0.3;
   return c;
 }
 
@@ -946,7 +946,6 @@ function terrainMult(u) {
   const x = Math.floor(u.gx), y = Math.floor(u.gy);
   if (!inb(x, y)) return 1;
   if (u.team === "e" && S.flooded.has(y * MAP + x)) return 0.4;
-  if (u.team === "e" && S.occ[y][x] && S.occ[y][x].def.thorn) return 0.45; // pushing through thorns
   if (u.team === "e" && S.occ[y][x] && S.occ[y][x].def.moat) return moatWet(S.occ[y][x]) ? 0.3 : 0.75; // wading a moat
   if (u.team === "e" && coverAt(u.gx, u.gy) >= 3) return 0.7; // thick jungle
   const t = S.tiles[y][x].t;
@@ -1434,8 +1433,6 @@ function tick() {
   for (const u of S.units) {
     if (u.team !== "e") continue;
     if (S.flooded.has(Math.floor(u.gy) * MAP + Math.floor(u.gx))) u.hp -= 4;
-    const tb = buildingAt(Math.floor(u.gx), Math.floor(u.gy));
-    if (tb && tb.def.thorn) { u.hp -= 3; damageBuilding(tb, 4); } // scratched, and the hedge is trampled
   }
 
   // Economy & harmony
@@ -1815,8 +1812,8 @@ function syncHud() {
     return `<li class="${r.cur >= r.n ? "done" : ""}">${r.label}${r.n === Infinity ? "" : ` ${Math.min(r.cur, r.n)}/${r.n}`}</li>`;
   }).join("");
   document.getElementById("resources").innerHTML = Object.entries(RES)
-    .map(([k, ic]) => `<span>${ic} ${k}: <strong>${Math.floor(S[k])}</strong></span>`).join("") +
-    `<span>💧 water: <strong>${Math.floor(totalWater())}</strong></span>`;
+    .map(([k, ic]) => `<span title="${k}">${ic} <strong>${Math.floor(S[k])}</strong></span>`).join("") +
+    `<span title="water held in wewas">💧 <strong>${Math.floor(totalWater())}</strong></span>`;
   const hv = Math.round(S.harmony);
   document.getElementById("harmonyVal").textContent = hv;
   const fill = document.getElementById("harmonyFill");
