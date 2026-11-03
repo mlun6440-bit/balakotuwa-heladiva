@@ -32,7 +32,7 @@ const BUILDINGS = {
   canal:      { name: "Ela (Canal)", cat: "water", icon: "〰️", w: 1, h: 1, hp: 150, cost: { stone: 1 }, ground: true, water: true, paint: true,
                 desc: "Carries wewa water to paddies; drag to paint." },
   moat:       { name: "Diya Agala (Moat)", cat: "water", icon: "🌊", w: 1, h: 1, hp: 300, cost: { stone: 2, timber: 1 }, ground: true, water: true, moat: true, paint: true,
-                desc: "A ditch on your canal network; when it holds water, raiders wade through at a crawl." },
+                desc: "Canal ditch: while it holds water, raiders wade at a crawl." },
   sluice:     { name: "Sorowwa (Sluice)", cat: "water", icon: "🚪", w: 1, h: 1, hp: 400, cost: { timber: 6, stone: 8 }, ground: true, water: true,
                 desc: "Click to flood its canals, slowing and drowning raiders." },
 

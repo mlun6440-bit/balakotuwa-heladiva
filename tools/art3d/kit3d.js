@@ -87,7 +87,18 @@ export function render3d(build, { k, SZ, oy, reach = 3, shadowOnly = false }) {
   const out = document.createElement("canvas");
   out.width = out.height = W;
   out.getContext("2d").drawImage(r.domElement, 0, 0);
-  scene.traverse(o => { if (o.isMesh) o.geometry.dispose(); });
+  // free GPU memory: hundreds of models are rendered in one bake
+  const cached = new Set([...texCache.values()]);
+  scene.traverse(o => {
+    if (!o.isMesh) return;
+    o.geometry.dispose();
+    for (const m of Array.isArray(o.material) ? o.material : [o.material]) {
+      if (m.userData.cached) continue;
+      for (const t of Object.values(m)) if (t && t.isTexture && !cached.has(t)) t.dispose();
+      m.dispose();
+    }
+  });
+  r.renderLists.dispose();
   return out;
 }
 
@@ -114,9 +125,20 @@ export function paintedTexture(mat, U = 64, V = 64, key = "") {
   return t;
 }
 export function material(mat, U, V, extra = {}) {
-  return new THREE.MeshStandardMaterial({ map: mat.tex ? paintedTexture(mat, U, V) : null, color: mat.tex ? 0xffffff : new THREE.Color(css(mat.col)), roughness: 0.92, metalness: 0, ...extra });
+  const id = `${mat.col}|${U}|${V}|${JSON.stringify(extra)}`;
+  if (matCache.has(id)) return matCache.get(id);
+  const made = new THREE.MeshStandardMaterial({ map: mat.tex ? paintedTexture(mat, U, V) : null, color: mat.tex ? 0xffffff : new THREE.Color(css(mat.col)), roughness: 0.92, metalness: 0, ...extra });
+  made.userData.cached = true;
+  matCache.set(id, made);
+  return made;
 }
-export const flat = (hex, extra = {}) => new THREE.MeshStandardMaterial({ color: new THREE.Color(hex), roughness: 0.85, metalness: 0, ...extra });
+// Materials are cached and shared, so shader programs compile once per bake.
+const matCache = new Map();
+export const flat = (hex, extra = {}) => {
+  const id = hex + JSON.stringify(extra);
+  if (!matCache.has(id)) { const m = new THREE.MeshStandardMaterial({ color: new THREE.Color(hex), roughness: 0.85, metalness: 0, ...extra }); m.userData.cached = true; matCache.set(id, m); }
+  return matCache.get(id);
+};
 
 // ---------- geometry helpers ----------
 // A box from (x0, y0px, z0) with size (w, hpx, d), texture repeats per tile.
@@ -226,8 +248,12 @@ export function figure(look, pose) {
     body.add(sh);
     arms[side > 0 ? "R" : "L"] = sh;
   }
-  if (pose.act >= 0) {
-    const a = pose.act < 0.5 ? -1.9 + pose.act * 0.8 : -1.5 + (pose.act - 0.5) * 3.2; // raise then thrust
+  if (pose.act >= 0 && pose.actKind === "shoot") {
+    // bow arm straight out in front, string hand drawn back to the chest, then released
+    arms.L.rotation.z = 1.45;
+    arms.R.rotation.z = pose.act < 0.67 ? 1.2 : 0.6;
+  } else if (pose.act >= 0) {
+    const a = pose.act < 0.5 ? -1.9 + pose.act * 0.8 : -1.5 + (pose.act - 0.5) * 3.2; // raise then strike
     arms.R.rotation.z = a;
   }
   return { root, body, arms, h, s };
