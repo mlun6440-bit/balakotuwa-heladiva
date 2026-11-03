@@ -43,19 +43,32 @@ to hunger), and loses the finale.
 Curve now: the planner wins every level (three stars on 1, 2, 3 and 5; two on
 4). The novice wins 1–4 (3–4 only just) and loses the finale.
 
+## Loop batch 4 (R14–R17)
+
+| Round | Change | Bot evidence |
+|---|---|---|
+| R14 | Attam: idle villagers join the farmer on watered paddies in Maha | Planner idle share 39–52% → 30–42%, novice 61–72% → 52–66%; no level reports the idle finding any more |
+| R15 | A building counts as burnt only if fire brings it down | Instrumented Hill Kingdom: buildings caught fire at 11–134 hp and fell within seconds, with all three carriers already on the fire; raiders did the damage. Planner fire losses 4 → 0–2 |
+| R16 | Soldier ranks from drill by the barracks and from battle | Soldiers by the hall reach veteran at 90s and champion at 300s; the one posted away does not. No regressions |
+| R17 | One `SEASON_WORK` table for the three seasonal work parties | Same numbers as R16 |
+
+Curve after retraining: the planner wins every level (three stars on 1, 2, 3
+and 5; two on 4). The novice wins 1–4 and loses the finale, now to stone
+throwers and undefended north and south edges rather than hunger.
+
 ## Open findings, ranked by evidence
 
 0. **Mid-campaign is on a knife-edge for weak play** (L3–L4 above): trampled
    fields plus soldier upkeep starve a careless kingdom. *Direction:* an
    advisor warning when raiders head for the fields, and/or upkeep only in
    Yala.
-1. **Most villagers are idle (still ~50% after R1).** Shramadana gives them
+1. ✅ *Mostly fixed in R14 (attam): planner 30–42% idle.* **Most villagers are idle (still ~50% after R1).** Shramadana gives them
    work in Yala only, three per silted wewa. *Direction:* a Maha job (bund
    repair, hauling), or growth capped by land and water rather than houses.
 2. **Early raids:** now threaten the fields (R2), but the citadel itself is
    still untouched on L1–2 for both bots. Probably fine for the opening
    levels; revisit after a human playtest.
-3. **Level 5 is a cliff.** The hint-following novice loses Hill Kingdom
+3. **Level 5 is a cliff** (still true after batch 4: the novice now loses to stone throwers and undefended north/south edges; next step, show where the next raid comes from). The hint-following novice loses Hill Kingdom
    (harmony 38/60, rice 1/150, undefended north and east, 7 buildings burnt)
    while the learner wins. *Direction:* a mid-level hint when a second raid
    edge opens, and a softer first Hill Kingdom raid.
@@ -65,7 +78,7 @@ Curve now: the planner wins every level (three stars on 1, 2, 3 and 5; two on
    capacity.
 5. **Timber starves late.** Screens show timber at 5 while 50+ villagers idle.
    *Direction:* tie to (1): idle villagers could gather deadwood slowly.
-6. **Fire still takes buildings even for a careful player on L5** (2) and
+6. ✅ *Explained in R15: it was raiders finishing damaged buildings; the count now only credits fire.* **Fire still takes buildings even for a careful player on L5** (2) and
    many for novices (4–7). Check water-carrier throughput and whether the
    advisor warns early enough.
 7. ✅ *Fixed in R3.* **UI:** building cards clipped their third line; the victory screen shows
