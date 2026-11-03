@@ -56,6 +56,25 @@ Curve after retraining: the planner wins every level (three stars on 1, 2, 3
 and 5; two on 4). The novice wins 1–4 and loses the finale, now to stone
 throwers and undefended north and south edges rather than hunger.
 
+## Loop batch 5 (R18–R21)
+
+| Round | Change | Bot evidence |
+|---|---|---|
+| R18 | The Next raid row names the edge; its entry stretch glows in the last minute; minimap marks it | Readability only; smoke test clean |
+| R19 | Scouts warn 45s ahead when an incoming side has no archers or towers (the novice follows it) | Lion Rock novice 3 stars in both runs (was 1–2, sometimes lost) |
+| R20 | The market never sells the last two rice per villager | Lion Rock families lost: novice 6–9 → 0, planner 8 → 0 after retraining; the planner now grows towns to ~100 |
+| R21 | Cut the old mid-edge raid flag (the band and HUD say it) | No regressions |
+
+Also fixed in the bot: the novice now follows the advisor's siege hint (sally out at
+stone throwers). Without it Hill Kingdom stalled at the time limit with throwers
+grinding rebuilt houses. The novice now wins Hill Kingdom about half the time.
+
+Curve now: the planner wins every level with no families lost anywhere
+(three stars on 1, 2 and 5; two on 3 and 4, both capped by paying tribute). The
+novice wins 1–4 and the finale about half the time. Open: bigger towns bring
+the idle share back (planner 45–49% on L3 and L5); early raids still don't
+touch the citadel on L1 and L3.
+
 ## Open findings, ranked by evidence
 
 0. **Mid-campaign is on a knife-edge for weak play** (L3–L4 above): trampled
