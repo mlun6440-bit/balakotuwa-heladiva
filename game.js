@@ -436,13 +436,13 @@ function demolishAt(gx, gy) {
   syncHud();
 }
 
-function damageBuilding(b, amt) {
+function damageBuilding(b, amt, byFire = false) {
   if (!S.buildings.includes(b)) return;
   b.hp -= amt;
   if (b.hp > 0) return;
   if (b === S.citadel) { endLevel(false); return; }
   S.stats.lost[b.id] = (S.stats.lost[b.id] || 0) + 1;
-  if (b.fire > 0) S.stats.burned++;
+  if (byFire) S.stats.burned++; // only when the fire itself brought it down
   puff(b.gx + b.w / 2, b.gy + b.h / 2, 14, "#7a6a58");
   spawnFloat(`${b.def.name} destroyed!`, b.gx + b.w / 2, b.gy + b.h / 2, "#ff6b5b");
   S.fear = Math.min(30, S.fear + 6);
@@ -1302,7 +1302,7 @@ function tickFire() {
         if (nb && nb !== b && nb.def.flammable && !(nb.fire > 0) && Math.random() < 0.05 * b.fire) ignite(nb);
       }
     }
-    damageBuilding(b, 6 * b.fire);
+    damageBuilding(b, 6 * b.fire, true);
   }
   assignFirefighters();
 }
