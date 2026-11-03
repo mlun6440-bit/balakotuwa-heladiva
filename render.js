@@ -1424,7 +1424,7 @@ function stride(o) {
   return g;
 }
 function drawWorkerSprite(w, now) {
-  const job = w.job === "bucket" || w.job === "shramadana" ? "farmer" : w.job === "gatherer" ? "woodcutter" : w.job;
+  const job = w.job === "bucket" || w.job === "shramadana" || w.job === "attam" ? "farmer" : w.job === "gatherer" ? "woodcutter" : w.job;
   if (hasSprite(`u3d.v.${job}.d0.i0`)) {
     // pre-rendered 3D villager: 8 directions; carried loads are baked in
     const g = stride(w);
