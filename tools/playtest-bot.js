@@ -283,7 +283,8 @@ const BOT = (() => {
     // the novice follows the scouts' warning: a tower and an archer for each side left open
     if (novice && raidSoon && S.scoutOpen && S.scoutOpen.length) heedScouts(S.scoutOpen);
     // sally out: melee soldiers go after siege engines that outrange the walls
-    const engine = !novice && S.units.find(u => u.team === "e" && u.def.siege && u.hp > 0);
+    // (the novice does it too once the advisor has said so)
+    const engine = (!novice || S.warnedSiege) && S.units.find(u => u.team === "e" && u.def.siege && u.hp > 0);
     if (engine) S.units.filter(u => u.team === "p" && !u.def.ranged).forEach((u, i) => {
       u.tx = clamp(engine.gx + (i % 3 - 1) * 0.3, 0.3, MAP - 0.3); u.ty = clamp(engine.gy + 0.3, 0.3, MAP - 0.3); u.ordered = true;
     });
