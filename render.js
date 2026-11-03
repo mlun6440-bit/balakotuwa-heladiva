@@ -1703,7 +1703,7 @@ function drawGhost() {
 }
 
 // The last minute before a raid: the stretch of each edge where raiders will
-// enter glows red, with arrows pointing in; the flag and countdown sit mid-edge.
+// enter glows red, with arrows pointing in (the countdown is in the HUD).
 const RAID_SHOW = 60;
 function drawWaveMarkers(now) {
   const soon = nextWaveIn();
@@ -1711,28 +1711,17 @@ function drawWaveMarkers(now) {
   const w = S.L.waves[S.nextWave];
   const urgent = soon <= 20;
   const pulse = 0.5 + 0.5 * Math.sin(now * (urgent ? 0.012 : 0.004));
-  const m = MAP / 2;
   for (const edge of w.from) {
     const q = edgeStrip(edge).map(([x, y]) => iso(x, y, 0));
-    ctx.fillStyle = `rgba(220,50,30,${(urgent ? 0.22 : 0.1) + pulse * 0.14})`;
+    ctx.fillStyle = `rgba(220,50,30,${(urgent ? 0.32 : 0.16) + pulse * 0.2})`;
     ctx.beginPath(); q.forEach((p, i) => (i ? ctx.lineTo(p.x, p.y) : ctx.moveTo(p.x, p.y))); ctx.closePath(); ctx.fill();
     const [ix, iy] = edge === "east" ? [-1, 0] : edge === "west" ? [1, 0] : edge === "north" ? [0, 1] : [0, -1];
-    ctx.fillStyle = `rgba(255,120,90,${0.45 + pulse * 0.4})`;
+    ctx.fillStyle = `rgba(255,110,80,${0.6 + pulse * 0.4})`;
     for (const k of [0.25, 0.5, 0.75]) {
       const along = 6 + k * (MAP - 12), ox = ix ? (ix > 0 ? 1.2 : MAP - 1.2) : along, oy = iy ? (iy > 0 ? 1.2 : MAP - 1.2) : along;
       const tip = iso(ox + ix * 0.9, oy + iy * 0.9, 0), l = iso(ox + iy * 0.45, oy + ix * 0.45, 0), r = iso(ox - iy * 0.45, oy - ix * 0.45, 0);
       ctx.beginPath(); ctx.moveTo(tip.x, tip.y); ctx.lineTo(l.x, l.y); ctx.lineTo(r.x, r.y); ctx.closePath(); ctx.fill();
     }
-    if (soon > 25) continue;
-    const [x, y] = edge === "east" ? [MAP - 0.5, m] : edge === "west" ? [0.5, m] : edge === "north" ? [m, 0.5] : [m, MAP - 0.5];
-    const c = iso(x, y, 0);
-    const g = ctx.createRadialGradient(c.x, c.y, 2, c.x, c.y, 60);
-    g.addColorStop(0, `rgba(220,50,30,${0.35 + pulse * 0.25})`);
-    g.addColorStop(1, "rgba(220,50,30,0)");
-    ctx.fillStyle = g;
-    ctx.beginPath(); ctx.ellipse(c.x, c.y, 60, 30, 0, 0, Math.PI * 2); ctx.fill();
-    flag(c, 30, "#2a2a2a", now);
-    label(`${soon}s`, x, y, -10, "bold 12px sans-serif", "#ff8a7a");
   }
 }
 
