@@ -72,7 +72,7 @@ const BUILDINGS = {
   bolt:       { name: "Yantra Atuwa (Bolt tower)", cat: "defence", icon: "🎯", w: 1, h: 1, hp: 800, cost: { timber: 20, stone: 16, gold: 20 }, solid: true, z: 44,
                 tower: { range: 8, dmg: 45, cd: 3.2, siege: true }, desc: "A great bolt-thrower that outranges stone throwers and hunts them first." },
   barracks:   { name: "Angam Maduwa (Barracks)", cat: "defence", icon: "⚔️", w: 2, h: 2, hp: 700, cost: { timber: 18, stone: 8 }, solid: true, z: 22,
-                desc: "Needed to train soldiers in the Army tab." }
+                desc: "Trains soldiers; those resting nearby drill and rise to ★ veteran, then ★★ champion." }
 };
 
 // ==================== ROYAL DECREES ====================
@@ -109,6 +109,15 @@ const TROOPS = {
   elephant:  { name: "Kandula (War Elephant)", icon: "🐘", cost: { gold: 70, rice: 25 }, hp: 560, dmg: 38, range: 1.2, speed: 1.4, heavy: true, splash: 1.3, color: "#6e6e74",
                desc: "Tramples every raider near its target." }
 };
+
+// Ranks: soldiers resting within 3 tiles of a barracks drill (1 xp/s while no
+// raider is near), and every raider killed close by teaches them (KILL_XP).
+const RANKS = [
+  { name: "Recruit", xp: 0, hp: 1, dmg: 1 },
+  { name: "Veteran", xp: 90, hp: 1.25, dmg: 1.2 },
+  { name: "Champion", xp: 300, hp: 1.5, dmg: 1.4 }
+];
+const KILL_XP = 6;
 
 const FOES = {
   raider: { name: "Raider", hp: 90, dmg: 12, bdmg: 12, range: 0.9, speed: 1.5, gold: 6, morale: 0.35, loot: true },

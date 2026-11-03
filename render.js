@@ -1550,6 +1550,19 @@ function drawUnit(u, now) {
     ctx.fillStyle = u.team === "p" ? "#6cc070" : "#ff5a4a";
     ctx.fillRect(p.x - 9, p.y - top, 18 * k, 3);
   }
+  if (u.rank) drawRank(p.x, p.y - (u.type === "elephant" ? 40 : heavy ? 34 : 26) - 3, u.rank);
+}
+// Rank pips above a soldier: one gold star per rank, always shown.
+function drawRank(x, y, n) {
+  ctx.save();
+  ctx.fillStyle = "#ffd27a"; ctx.strokeStyle = "rgba(40,24,6,0.85)"; ctx.lineWidth = 1;
+  for (let i = 0; i < n; i++) {
+    const cx = x + (i - (n - 1) / 2) * 6;
+    ctx.beginPath();
+    for (let j = 0; j < 10; j++) { const a = -Math.PI / 2 + j * Math.PI / 5, r = j % 2 ? 1.2 : 2.8; ctx.lineTo(cx + Math.cos(a) * r, y + Math.sin(a) * r); }
+    ctx.closePath(); ctx.stroke(); ctx.fill();
+  }
+  ctx.restore();
 }
 
 // ==================== PROJECTILES, FX & OVERLAYS ====================

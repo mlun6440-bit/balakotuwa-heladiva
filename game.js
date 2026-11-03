@@ -93,7 +93,7 @@ function saveRun() {
     buildings: S.buildings.map(b => ({ uid: b.uid, id: b.id, gx: b.gx, gy: b.gy, hp: b.hp, maxHp: b.maxHp, water: b.water, growth: b.growth,
       open: b.open, next: b.next, at: b.at, fire: b.fire, silt: b.silt, irrigated: b.irrigated })),
     units: S.units.map(u => ({ uid: u.uid, team: u.team, type: u.type, gx: r3(u.gx), gy: r3(u.gy), tx: u.tx, ty: u.ty, hp: u.hp, maxHp: u.maxHp,
-      last: u.last, z: u.z, ordered: u.ordered, lastFire: u.lastFire, party: u.party, hx: u.hx, hy: u.hy, flee: u.flee, looted: u.looted }))
+      last: u.last, z: u.z, ordered: u.ordered, lastFire: u.lastFire, party: u.party, hx: u.hx, hy: u.hy, flee: u.flee, looted: u.looted, rank: u.rank, xp: u.xp }))
   };
   try { localStorage.setItem(RUN_KEY, JSON.stringify(data)); } catch (e) { /* storage full or blocked */ }
   S.lastSave = S.time;
@@ -930,6 +930,26 @@ function spawnSoldier(type, gx, gy) {
   S.units.push({ uid: ++S.uid, team: "p", type, def: d, gx, gy, tx: gx, ty: gy, hp: d.hp, maxHp: d.hp, last: -9, z: 0, sel: false, ordered: false });
 }
 
+// Drill and battle make veterans (RANKS in data.js): tougher and harder-hitting.
+function gainXp(u, n) {
+  u.xp = (u.xp || 0) + n;
+  const r = u.rank || 0, next = RANKS[r + 1];
+  if (!next || u.xp < next.xp) return;
+  u.rank = r + 1;
+  const hp = Math.round(u.def.hp * next.hp);
+  u.hp += hp - u.maxHp; u.maxHp = hp;
+  spawnFloat(`${"★".repeat(u.rank)} ${next.name}!`, u.gx, u.gy, "#ffd27a");
+  if (!S.warnedRank) { S.warnedRank = true; say("A soldier has risen in rank. Soldiers resting by the Angam Maduwa drill between raids, and every fight teaches them."); }
+}
+function drillSoldiers() {
+  const halls = S.buildings.filter(b => b.id === "barracks");
+  if (!halls.length) return;
+  for (const u of S.units) {
+    if (u.team !== "p" || nearestFoe(u, 6)) continue;
+    if (halls.some(b => rectDist(u, b) <= 3)) gainXp(u, 1);
+  }
+}
+
 function spawnFoe(type, edge, party = null) {
   const d = FOES[type];
   const hp = Math.round(d.hp * S.L.hpScale);
@@ -1044,6 +1064,7 @@ function attack(u, target, dmg) {
     spawnFloat("Ambush!", u.gx, u.gy, "#bff0a8");
     if (!S.warnedAmbush) { S.warnedAmbush = true; say("Ambush! Soldiers hidden in the forest strike first for double damage, and raiders can't see them from afar."); }
   }
+  if (u.rank) dmg *= RANKS[u.rank].dmg;
   u.last = S.time;
   if (u.def.ranged) fireShot(u.gx, u.gy, u.z + 12, target, dmg);
   else hitUnit(target, dmg, u.def.splash);
@@ -1250,6 +1271,7 @@ function updateCombat(dt) {
     if (u.gone) { S.units.splice(i, 1); continue; } // fled off the map: no gold
     if (u.hp > 0) continue;
     if (u.team === "e") {
+      for (const v of unitsNear(u.gx, u.gy, 4)) if (v.team === "p" && v.hp > 0) gainXp(v, KILL_XP);
       S.gold += u.def.gold;
       spawnFloat(`+${u.def.gold}🪙`, u.gx, u.gy, "#e9b949");
     }
@@ -1455,6 +1477,7 @@ function tick() {
   assignShramadana();
   assignGatherers();
   assignAttam();
+  drillSoldiers();
   updateCover();
 
   for (const u of S.units) {
