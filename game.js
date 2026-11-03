@@ -1537,6 +1537,14 @@ function callRaidEarly() {
 }
 
 const DROUGHT_CHANCE = 1 / 3;
+// What the advisor says when the season turns: the first row that applies.
+const SEASON_NEWS = [
+  [rebuilt => rebuilt, "Over the monsoon the disawa has rebuilt his dam. He will shut it again in Yala.", false],
+  [() => S.drought, () => `A drought year: the monsoon is late, and this Yala will last ${S.seasonLeft} seconds. Make the wewas last.`, true],
+  [() => riverDry(), "Yala, and the disawa upstream has shut his dam: the river runs dry. Live on your wewas, send soldiers to break the dam, or send him a 🎁 gift (👑 tab).", true],
+  [() => S.season === "maha", "The Maha monsoon breaks! The wewas fill and every paddy drinks.", false],
+  [() => true, "Yala, the dry season. Only paddies beside water will grow now.", false]
+];
 
 // Soldiers eat more than villagers: a standing army has a real cost.
 // Rations are dearer in the dry season, when the granary is under pressure.
@@ -1552,13 +1560,10 @@ function tick() {
     // Skirmish: one Yala in three (seeded by the map) is a drought year, half as long again.
     S.drought = S.season === "yala" && !!S.L.skirmish && mulberry32(S.L.seed * 31 + S.seasonNo)() < DROUGHT_CHANCE;
     if (S.drought) S.seasonLeft = Math.round(S.seasonLeft * 1.5);
-    if (S.dam && S.season === "maha" && S.dam.hp < S.dam.maxHp) { S.dam.hp = S.dam.maxHp; say("Over the monsoon the disawa has rebuilt his dam. He will shut it again in Yala."); }
-    else if (S.drought) say(`A drought year: the monsoon is late, and this Yala will last ${S.seasonLeft} seconds. Make the wewas last.`, true);
-    else say(riverDry()
-      ? "Yala, and the disawa upstream has shut his dam: the river runs dry. Live on your wewas, send soldiers to break the dam, or send him a 🎁 gift (👑 tab)."
-      : S.season === "maha"
-        ? "The Maha monsoon breaks! The wewas fill and every paddy drinks."
-        : "Yala, the dry season. Only paddies beside water will grow now.", S.season === "yala" && riverDry());
+    const rebuilt = S.dam && S.season === "maha" && S.dam.hp < S.dam.maxHp;
+    if (rebuilt) S.dam.hp = S.dam.maxHp;
+    const [text, warn] = SEASON_NEWS.find(([when]) => when(rebuilt)).slice(1);
+    say(typeof text === "function" ? text() : text, warn);
   }
 
   S.waveClock++;
