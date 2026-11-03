@@ -587,9 +587,11 @@
     "moat": 0,
     "tribute": 0.38,
     "reserve": 0,
-    "decrees": 0.96
+    "decrees": 0.96,
+    "pelas": 1,
+    "breakDam": 0.5
    },
-   "sigma": 0.5,
+   "sigma": 0.27568399999999993,
    "history": [
     {
      "at": "2026-11-02T11:26",
@@ -745,29 +747,46 @@
      "at": "2026-11-03T20:05",
      "gen": 31,
      "score": 1275
+    },
+    {
+     "at": "2026-11-03T21:38",
+     "gen": 32,
+     "score": 1275
+    },
+    {
+     "at": "2026-11-03T21:38",
+     "gen": 33,
+     "score": 1275
+    },
+    {
+     "at": "2026-11-03T21:38",
+     "gen": 34,
+     "score": 1275
     }
    ],
    "score": 1275
   },
   "senkadagala": {
    "P": {
-    "paddyPerHouse": 1.19,
-    "houseRice": 2.74,
+    "paddyPerHouse": 1.34,
+    "houseRice": 3.81,
     "maxHouses": 3,
     "woodcutters": 1,
-    "barracksAt": 246.48,
+    "barracksAt": 191.96,
     "armyBase": 6.8,
     "armyPerRaid": 4.52,
-    "towersPerEdge": 2.14,
-    "towerAt": 0,
+    "towersPerEdge": 2.77,
+    "towerAt": 3.09,
     "walls": 12,
-    "boltTowers": 3,
-    "moat": 3.58,
+    "boltTowers": 2.6,
+    "moat": 3.44,
     "tribute": 0,
     "reserve": 0,
-    "decrees": 0.2
+    "decrees": 0.14,
+    "pelas": 1.55,
+    "breakDam": 0.75
    },
-   "sigma": 0.2825760999999999,
+   "sigma": 0.3620506281249999,
    "history": [
     {
      "at": "2026-11-02T11:26",
@@ -973,9 +992,24 @@
      "at": "2026-11-03T20:05",
      "gen": 41,
      "score": 1362
+    },
+    {
+     "at": "2026-11-03T21:39",
+     "gen": 42,
+     "score": 1362
+    },
+    {
+     "at": "2026-11-03T21:39",
+     "gen": 43,
+     "score": 1362
+    },
+    {
+     "at": "2026-11-03T21:39",
+     "gen": 44,
+     "score": 1364
     }
    ],
-   "score": 1362
+   "score": 1364
   },
   "ruhuna": {
    "P": {

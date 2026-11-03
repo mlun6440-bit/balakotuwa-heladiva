@@ -1,26 +1,31 @@
 # Automated playtest report
 
-Generated 2026-11-03 20:05 by `node tools/playtest.mjs learn`. Two bots per level: a **novice** that follows the tutorial and advisor hints, and a **learned planner** whose dials have been tuned by trial and error (see `tools/playtest-brain.json`). Bots only use player actions. They show what is *possible* and where play *stalls*; they cannot judge fun or clarity — that still needs people.
+Generated 2026-11-03 21:39 by `node tools/playtest.mjs learn`. Two bots per level: a **novice** that follows the tutorial and advisor hints, and a **learned planner** whose dials have been tuned by trial and error (see `tools/playtest-brain.json`). Bots only use player actions. They show what is *possible* and where play *stalls*; they cannot judge fun or clarity — that still needs people.
 
 | Level | Novice | Learned planner | Planner time | Citadel | Stars | Families lost (novice / planner) | Burned |
 |---|---|---|---|---|---|---|---|
-| 1. Dawn at Anuradhapura | won | won | 299s | 100% | ★★★ | 0 / 0 | 0 |
-| 2. The Dry Zone | won | won | 410s | 100% | ★★★ | 2 / 0 | 0 |
-| 3. Lion Rock | won | won | 414s | 100% | ★★ | 0 / 0 | 1 |
-| 4. Sea of Parakrama | won | won | 491s | 100% | ★★ | 0 / 0 | 0 |
-| 5. Hill Kingdom | lost | won | 731s | 97% | ★★★ | 0 / 0 | 2 |
+| 1. Dawn at Anuradhapura | won | won | 297s | 100% | ★★★ | 0 / 0 | 0 |
+| 2. Elephants of Ruhuna | won | won | 319s | 97% | ★★★ | 0 / 0 | 0 |
+| 3. The Dry Zone | won | won | 409s | 100% | ★★★ | 2 / 1 | 0 |
+| 4. Lion Rock | won | won | 412s | 100% | ★★ | 0 / 0 | 0 |
+| 5. The Disawa's Dam | won | won | 430s | 94% | ★★★ | 0 / 0 | 2 |
+| 6. Sea of Parakrama | won | won | 495s | 100% | ★★ | 0 / 0 | 0 |
+| 7. Hill Kingdom | unfinished | won | 724s | 99% | ★★★ | 3 / 0 | 1 |
 
 ## Findings
 
 - **L1 Dawn at Anuradhapura:** both bots won with the citadel almost untouched (100% / 100%). Raids may be too weak to create tension here.
-- **L3 Lion Rock:** both bots won with the citadel almost untouched (99% / 100%). Raids may be too weak to create tension here.
-- **L3 Lion Rock:** on average 49% of villagers were idle (no job). Idle people have nothing to do; consider jobs that use them (hauling, festival crowds, militia) or a cost to idleness.
-- **L5 Hill Kingdom:** a hint-following novice lost — the defeat screen said: 🏹 The east side had no archers or watchtowers to meet the last raid. 🔥 Fire took 3 buildings. Keep wewas full so villagers can carry water, and keep archers near the thatch. 🧱 No walls stood on the south side, so the raiders walked straight in.. Unmet: 😊 Harmony 60+ 33/60, 🍚 rice 33/150, 🛡️ raids 6/7. Consider a clearer hint or a gentler first raid here.
-- **L5 Hill Kingdom:** on average 45% of villagers were idle (no job). Idle people have nothing to do; consider jobs that use them (hauling, festival crowds, militia) or a cost to idleness.
-- **L5 Hill Kingdom:** fire destroyed 2 buildings even for the planner. Check that water carriers can keep up.
-- **Tribute:** the learner pays it (dial 0.41), so it is a real option.
-- **Defence the learner relies on:** 2.4 towers per raid edge, 6.4 wall tiles, an army of 7.3 + 3.6 per raid. 
-- **Economy the learner prefers:** 1.49 paddies per house, at most 13 houses, 2.6 woodcutters.
+- **L2 Elephants of Ruhuna:** both bots won with the citadel almost untouched (98% / 97%). Raids may be too weak to create tension here.
+- **L2 Elephants of Ruhuna:** on average 56% of villagers were idle (no job). Idle people have nothing to do; consider jobs that use them (hauling, festival crowds, militia) or a cost to idleness.
+- **L3 The Dry Zone:** both bots won with the citadel almost untouched (95% / 100%). Raids may be too weak to create tension here.
+- **L4 Lion Rock:** both bots won with the citadel almost untouched (98% / 100%). Raids may be too weak to create tension here.
+- **L4 Lion Rock:** on average 48% of villagers were idle (no job). Idle people have nothing to do; consider jobs that use them (hauling, festival crowds, militia) or a cost to idleness.
+- **L5 The Disawa's Dam:** on average 48% of villagers were idle (no job). Idle people have nothing to do; consider jobs that use them (hauling, festival crowds, militia) or a cost to idleness.
+- **L5 The Disawa's Dam:** fire destroyed 2 buildings even for the planner. Check that water carriers can keep up.
+- **L7 Hill Kingdom:** a hint-following novice did not finish. Unmet: 😊 Harmony 60+ 58/60, 🍚 rice 36/150. Consider a clearer hint or a gentler first raid here.
+- **Tribute:** the learner almost never pays it (dial 0.29). Either it is priced too high or fighting is too easy.
+- **Defence the learner relies on:** 2.0 towers per raid edge, 4.6 wall tiles, an army of 6.7 + 3.3 per raid. 
+- **Economy the learner prefers:** 1.23 paddies per house, at most 14 houses, 2.4 woodcutters.
 
 ## Bot limits (so findings aren't over-read)
 
@@ -30,11 +35,13 @@ Generated 2026-11-03 20:05 by `node tools/playtest.mjs learn`. Two bots per leve
 
 ## Learning history
 
-- L1: 28 generations, best score 1385; recent 1385 → 1385 → 1385 → 1385 → 1385
-- L2: 31 generations, best score 1380; recent 1380 → 1380 → 1380 → 1380 → 1380
-- L3: 31 generations, best score 1279; recent 1375 → 1375 → 1279 → 1279 → 1279
-- L4: 31 generations, best score 1275; recent 1275 → 1275 → 1275 → 1275 → 1275
-- L5: 41 generations, best score 1362; recent 1362 → 1362 → 1362 → 1362 → 1362
+- L1: 31 generations, best score 1385; recent 1385 → 1385 → 1385 → 1385 → 1385
+- L2: 3 generations, best score 1383; recent 1383 → 1383 → 1383
+- L3: 34 generations, best score 1380; recent 1380 → 1380 → 1380 → 1380 → 1380
+- L4: 34 generations, best score 1279; recent 1279 → 1279 → 1279 → 1279 → 1279
+- L5: 3 generations, best score 1376; recent 1376 → 1376 → 1376
+- L6: 34 generations, best score 1275; recent 1275 → 1275 → 1275 → 1275 → 1275
+- L7: 44 generations, best score 1364; recent 1362 → 1362 → 1362 → 1362 → 1364
 
 ## Screens (learned planner)
 
@@ -48,3 +55,7 @@ Generated 2026-11-03 20:05 by `node tools/playtest.mjs learn`. Two bots per leve
 ![L4](L4-end.jpg)
 ![L5](L5-4min.jpg)
 ![L5](L5-end.jpg)
+![L6](L6-4min.jpg)
+![L6](L6-end.jpg)
+![L7](L7-4min.jpg)
+![L7](L7-end.jpg)

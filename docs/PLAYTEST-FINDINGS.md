@@ -56,6 +56,21 @@ Curve after retraining: the planner wins every level (three stars on 1, 2, 3
 and 5; two on 4). The novice wins 1–4 and loses the finale, now to stone
 throwers and undefended north and south edges rather than hunger.
 
+## Loop batch 6 (R22–R25): a seven-level campaign
+
+| Round | Change | Bot evidence |
+|---|---|---|
+| R22 | Wild elephants and the pela; new level 2 *Elephants of Ruhuna* | Targeted test: no pela, the elephant eats a field; staffed pela, it turns back. Both bots build a pela and win with three stars |
+| R23 | The disawa's dam; new level 5 *The Disawa's Dam* | First version: the planner broke the dam in the first 20s for free. After a stronger revenge raid and a yearly rebuild, breaking cost the planner citadel (78–89%) and a star in default play, while the novice paying the gift kept 87–100%. After retraining the learner still breaks it (dial at its 0.5 default) and won three stars: the choice is close, which is what we want |
+| R24 | Drought years in skirmish | Seeded test: Yala at 90s in drought years, badge and warning shown |
+| R25 | Season-change news as one table | No regressions |
+
+Curve after retraining: the planner wins all seven levels (two stars on Lion
+Rock and Sea of Parakrama, both capped by tribute; three elsewhere). The novice
+wins 1–6; on Hill Kingdom it survives every raid but misses its rice goal.
+Open: the idle share is back near 50% on Ruhuna, Lion Rock and the dam level
+as towns grow; early raids still don't reach the citadel on levels 1–4.
+
 ## Loop batch 5 (R18–R21)
 
 | Round | Change | Bot evidence |
