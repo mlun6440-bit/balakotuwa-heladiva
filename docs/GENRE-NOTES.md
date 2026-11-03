@@ -35,6 +35,18 @@ Second source: a solo developer's month-long AI-assisted RTS build (a unit-focus
 | 18 | **Random finds on the map** that reward exploring. | Buried coin hoards (*nidhana*) that a villager can dig up for gold, sometimes with a harmony bonus. | Low |
 | 19 | **Hard but fair, and readable**: tough fights are fine if the player can see why they lost. | Every defeat screen names the cause (for example "the east wall had no archers", or "the rice ran out in Yala"). Ask fresh players whether the goal is clear. | **High** |
 
+Third source: well-known castle-builder conventions in general (no single
+title), restated for Balakotuwa in batch 6. Ideas only.
+
+| # | Genre convention | Balakotuwa version | Status |
+|---|------------------|--------------------|--------|
+| 20 | Hazards between raids | **Wild elephants** raid ripe paddies; a *pela* (watch hut) turns them back | Done (R22, level 2) |
+| 21 | A rival lord who acts by his own plan | **The disawa's dam**: shut every Yala; break it (revenge raid) or pay a gift | Done (R23, level 5) |
+| 22 | Droughts and floods | **Drought years** (one Yala in three runs long) in skirmish; bund breaches still open | Drought done (R24) |
+| 23 | Different mission types | A peaceful tank-builder level; a siege level starting with a built fort | Open |
+| 24 | Arms supply chain | Forged arms stocked at the barracks gate elite troops | Open |
+| 25 | Tax lever | A harvest share (*bhaga*): more rice to the citadel for gold, at a harmony cost | Open |
+
 ## Visual targets for the graphics pass
 
 - **Mass battles stay readable**: clear team colours, health bars only when hurt, and selection rings.

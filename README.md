@@ -43,6 +43,8 @@ and baked into `assets/` (regenerate with `cd tools && npm install` once, then
 - **Siege (Hill Kingdom).** Stone throwers outrange watchtowers. Bolt towers and archers on the walls can reach them. Melee raiders can't reach soldiers standing on walls or towers.
 - **Tribute (from level 2).** In the 30 seconds before a raid you can pay rice and gold to turn it back. It costs more each time and shames your people.
 - **Defeat is explained.** If the Maligawa falls, the end screen names the two or three main reasons and what to try next.
+- **Wild elephants (Ruhuna on).** Elephants come out of the jungle for ripening rice. Nobody fights them: a staffed pela (watch hut) within 5 tiles turns them back.
+- **The disawa's dam.** On one level a rival lord shuts his dam upstream every Yala and the river runs dry. Break it with soldiers (his revenge raid comes early and stronger) or send a 🎁 gift. He rebuilds it every Maha.
 - **Scouts.** The Next raid row names the edge raiders will come from; in the last minute that edge glows on the map and minimap, and the scouts warn if no archers or towers guard it.
 - **Raiders.** They follow the cheapest path to the citadel. They walk around walls when there is a gap and break through when there isn't.
 
@@ -51,13 +53,15 @@ and baked into `assets/` (regenerate with `cd tools && npm install` once, then
 | # | Level | Era | New |
 |---|-------|-----|-----|
 | 1 | Dawn at Anuradhapura | Early kingdom | Core economy, palisades, archers, spearmen |
-| 2 | The Dry Zone | Rajarata | **Sluice flooding**; watchtowers, pansala |
-| 3 | Lion Rock | Sigiriya | **Fire arrows and water carriers**; ramparts, gates, upgrades, market, smithy, Angampora fighters |
-| 4 | Sea of Parakrama | Polonnaruwa | **Cascading tanks and the rain-catch goal**; dagoba, war elephants, ram bearers |
-| 5 | Hill Kingdom | Senkadagala | **The great siege** (stone throwers, bolt towers) and **royal decrees**; raids from three sides |
+| 2 | Elephants of Ruhuna | Magama | **Wild elephants and the pela** (watch hut) |
+| 3 | The Dry Zone | Rajarata | **Sluice flooding**; watchtowers, pansala |
+| 4 | Lion Rock | Sigiriya | **Fire arrows and water carriers**; ramparts, gates, upgrades, market, smithy, Angampora fighters |
+| 5 | The Disawa's Dam | Dakkhinadesa | **A rival dams your river every Yala**: break it or send a gift |
+| 6 | Sea of Parakrama | Polonnaruwa | **Cascading tanks and the rain-catch goal**; dagoba, war elephants, ram bearers |
+| 7 | Hill Kingdom | Senkadagala | **The great siege** (stone throwers, bolt towers) and **royal decrees**; raids from three sides |
 
 Each level introduces one headline mechanic (in bold); the finale brings two. The rest are buildings and units that use ideas you already know.
-| ∞ | Skirmish | Random map | Endless escalating raids; best score saved |
+| ∞ | Skirmish | Random map | Endless escalating raids, wild elephants and drought years; best score saved |
 | ∞ | Sandbox | Random map | Full stores; send raids of any size yourself |
 
 Progress, star ratings, the skirmish best and the level in progress are saved in the browser; "Continue" on the menu resumes a level.

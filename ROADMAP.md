@@ -103,6 +103,19 @@ Recorded so these are not re-added without a strong reason:
 - [x] R8 Diya agala (moat) fed by the canal network.
 - [x] R9 Simplify round 3 (below).
 
+## Loop batch 6 (R22–R25)
+
+- [x] R22 Wild elephants and the pela; new level 2, Elephants of Ruhuna.
+      Progress and the playtest brain are now keyed by level id.
+- [x] R23 The disawa's dam; new level 5, The Disawa's Dam (break it or gift).
+- [x] R24 Drought years in skirmish.
+- [x] R25 Simplify round 7 (below).
+
+## Simplify round 7 (R25)
+
+- **Merged (code):** the season-change messages are one `SEASON_NEWS` table;
+  decree proclamations are data (`said`) instead of a branch per decree.
+
 ## Loop batch 5 (R18–R21)
 
 - [x] R18 Where the next raid comes from: the Next raid row names the edge;

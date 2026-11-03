@@ -68,16 +68,19 @@ Key invariants:
   `drawBuilding` (or let the generic `hall()` draw it). A new `worker` job also
   needs a branch in `planJob`/`updateWorker`.
 - **New troop or raider:** add a row to `TROOPS`/`FOES` (`FOES` take `morale`,
-  `fire`), and a `UNITS3D` entry in `tools/art3d/models3d.js` (look + gear).
+  `fire`, `loot`, `siege`, `wild`; wild animals are team `"w"`, which nobody fights), and a `UNITS3D` entry in `tools/art3d/models3d.js` (look + gear).
   Waves reference raider ids by key (`{ raider: 4, bowman: 1 }`).
 - **New seasonal work for idle villagers:** add a row to `SEASON_WORK` in
   `game.js` (season, where hands are wanted, how a helper sets out) and the
   helper's phases in `updateWorker`; map its job to a look in `drawWorkerSprite`.
-- **New level:** append to `LEVELS`. Objective types: `res`, `build`, `water`,
+- **New level:** add to `LEVELS` (inserting is safe: progress and the playtest
+  brain are keyed by level id). Objective types: `res`, `build`, `water`,
   `catch` (rain caught; three stars then need 70% kept), `harmony`, `pop`,
   `waves` (always include `waves`). Unlock decrees with `unlocks.edicts`.
-- **New decree:** add a row to `EDICTS` (`cost`, `once: "season" | "maha"`,
-  `dur`, `harmony`), unlock it in a level, and read its effect where it
+  Level flags: `fireArrows`, `wild: { first, every }` (wild elephants),
+  `rival: true` (the disawa's dam on the first river), `tutorial`.
+- **New decree:** add a row to `EDICTS` (`cost`, `once: "season" | "maha" | "yala"`,
+  `dur`, `harmony`, `said`), unlock it in a level, and read its effect where it
   applies with `edictOn(id)` (see `workMult`, `buildCost`, the harmony target).
 - **Painted art:** add an `ART.add(key, draw, opts)` model in `tools/art/`
   (origin = footprint top corner for buildings, ground point for units and
