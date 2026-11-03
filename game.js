@@ -1047,13 +1047,18 @@ function lootRaid(u, dt) {
     for (const b of S.buildings) if (LOOTABLE(b)) { const d = rectDist(u, b); if (d < bd) { bd = d; best = b; } }
     if (!best) return false;
     u.lootTarget = best;
+    if ((S.lootWarnAt ?? -99) < S.time - 30) {
+      S.lootWarnAt = S.time;
+      spawnFloat("⚠ Raiders!", best.gx + best.w / 2, best.gy + best.h / 2, "#ffb04a");
+      say(`Raiders are turning toward the ${best.id === "paddy" ? "paddies" : best.def.name.split(" (")[0]}! Send soldiers there, or post archers by the fields next time.`, true);
+    }
   }
   const b = u.lootTarget;
   if (rectDist(u, b) > 0.35) { moveToward(u, b.gx + b.w / 2, b.gy + b.h / 2, dt); return true; }
   u.looted = true; u.lootTarget = null;
   if (b.id === "paddy") {
     S.stats.trampled = (S.stats.trampled || 0) + 1;
-    b.growth = 0;
+    b.growth = Math.floor(b.growth / 2); // half the crop is lost, not all of it
     spawnFloat("Trampled!", b.gx + 1, b.gy + 1, "#ff9a7a");
   } else {
     const key = b.id === "bissa" ? "rice" : S.timber >= S.stone ? "timber" : "stone";
@@ -1062,7 +1067,7 @@ function lootRaid(u, dt) {
     S.stats.looted = (S.stats.looted || 0) + n;
     spawnFloat(`−${n}${RES[key]} looted`, b.gx + b.w / 2, b.gy + b.h / 2, "#ff9a7a");
   }
-  if (!S.warnedLoot) { S.warnedLoot = true; say("Raiders are trampling the paddies and robbing the stores! Post archers or a tower by the fields on the raid side.", true); }
+  S.warnedLoot = true;
   return true;
 }
 
@@ -1358,7 +1363,8 @@ function callRaidEarly() {
 }
 
 // Soldiers eat more than villagers: a standing army has a real cost.
-const SOLDIER_RICE = 0.06;
+// Rations are dearer in the dry season, when the granary is under pressure.
+const SOLDIER_RICE = { maha: 0.03, yala: 0.06 };
 
 // ==================== ONE-SECOND TICK ====================
 function tick() {
@@ -1397,7 +1403,7 @@ function tick() {
 
   // Economy & harmony
   const soldiers = S.units.filter(u => u.team === "p").length;
-  S.rice = Math.max(0, S.rice - S.villagers * 0.04 - soldiers * SOLDIER_RICE);
+  S.rice = Math.max(0, S.rice - S.villagers * 0.04 - soldiers * SOLDIER_RICE[S.season]);
   S.gold += S.villagers * 0.02 * (S.harmony / 60);
   S.fear = Math.max(0, S.fear - 0.5);
 
