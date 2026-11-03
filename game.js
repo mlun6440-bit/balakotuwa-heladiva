@@ -620,18 +620,33 @@ function tickWater() {
   updateNetWater();
 }
 
-// ==================== SHRAMADANA (communal work) ====================
-// Outside the monsoon, idle villagers gather in work parties to dig silt out
-// of the wewas, and carry it to the paddies, where tank silt is good manure.
-function assignShramadana() {
-  if (S.season === "maha") { S.workers = S.workers.filter(w => w.job !== "shramadana" || w.fireTarget); return; }
-  for (const b of S.buildings) {
-    if (b.id !== "wewa" || (b.silt || 0) < 8) continue;
-    let have = S.workers.filter(w => w.job === "shramadana" && w.siltTarget === b).length;
-    while (have < 3 && idleVillagers() > 0) {
-      goTo(helper("shramadana", { siltTarget: b }), b.gx + 1, b.gy + 2.25, "toSilt");
-      have++;
+// ==================== SEASONAL WORK (idle villagers) ====================
+// Idle villagers join seasonal work parties as temporary helpers. A real job
+// always takes them first (staff), and a fire can borrow them. Each row says
+// when the work runs, where it wants hands, and how a helper sets out.
+//   shramadana (Yala): dig silt out of the wewas and carry it to the paddies as manure.
+//   gatherer (Maha): fetch fallen deadwood from the forest edge (never felling trees).
+//   attam (Maha): exchange labour beside the farmer on watered paddies; rice grows faster.
+const GATHERERS = 4, GATHER_CAP = 150;
+const ATTAM_HANDS = 2, ATTAM_GROWTH = 4, ATTAM_TIME = 5;
+const SEASON_WORK = [
+  { job: "shramadana", season: "yala", spots: () => S.buildings.filter(b => b.id === "wewa" && (b.silt || 0) >= 8)
+      .map(b => ({ n: 3, mine: w => w.siltTarget === b, send: w => { w.siltTarget = b; goTo(w, b.gx + 1, b.gy + 2.25, "toSilt"); } })) },
+  { job: "gatherer", season: "maha", tip: "In the monsoon, idle villagers gather fallen wood from the forest for the stores.",
+    spots: () => S.timber >= GATHER_CAP ? [] : [{ n: GATHERERS, mine: () => true, send: sendGatherer }] },
+  { job: "attam", season: "maha", tip: "In the monsoon, idle neighbours join attam work on watered paddies, and the rice grows faster.",
+    spots: () => S.buildings.filter(p => p.id === "paddy" && p.irrigated && p.worker)
+      .map(p => ({ n: ATTAM_HANDS, mine: w => w.field === p, send: (w, i) => { w.field = p; goTo(w, p.gx + 0.6 + i * 0.8, p.gy + 1.3 + i * 0.3, "toPaddy"); } })) }
+];
+function assignSeasonWork() {
+  for (const row of SEASON_WORK) {
+    if (S.season !== row.season) { S.workers = S.workers.filter(w => w.job !== row.job || w.fireTarget); continue; }
+    const crew = S.workers.filter(w => w.job === row.job);
+    for (const spot of row.spots()) {
+      for (let have = crew.filter(spot.mine).length; have < spot.n && idleVillagers() > 0; have++) spot.send(helper(row.job, {}), have);
     }
+    S.warnedWork = S.warnedWork || {};
+    if (row.tip && !S.warnedWork[row.job] && S.workers.some(w => w.job === row.job)) { S.warnedWork[row.job] = true; say(row.tip); }
   }
   if (!S.warnedSilt && S.buildings.some(b => b.id === "wewa" && b.silt >= 20)) {
     S.warnedSilt = true;
@@ -645,9 +660,6 @@ function helper(job, extra) {
   S.workers.push(w);
   return w;
 }
-// Monsoon work: idle villagers gather fallen deadwood at the forest edge
-// (they never fell a tree) and carry it to a timber store.
-const GATHERERS = 4, GATHER_CAP = 150;
 function woodSpot(w) {
   let best = null, bd = Infinity;
   for (const t of S.trees) {
@@ -661,28 +673,6 @@ function sendGatherer(w) {
   const t = woodSpot(w);
   if (!t) { endParty(w); return; }
   goTo(w, t.gx + 0.35, t.gy + 0.35, "toWood");
-}
-function assignGatherers() {
-  const mine = S.workers.filter(w => w.job === "gatherer");
-  if (S.season !== "maha" || S.timber >= GATHER_CAP) return;
-  for (let n = mine.length; n < GATHERERS && idleVillagers() > 0; n++) sendGatherer(helper("gatherer", {}));
-  if (!S.warnedGather && S.workers.some(w => w.job === "gatherer")) { S.warnedGather = true; say("In the monsoon, idle villagers gather fallen wood from the forest for the stores."); }
-}
-
-// Attam (exchange labour): in the monsoon, idle neighbours join the farmer on
-// each watered paddy, transplanting and weeding, so the rice grows faster.
-const ATTAM_HANDS = 2, ATTAM_GROWTH = 4, ATTAM_TIME = 5;
-function assignAttam() {
-  if (S.season !== "maha") { S.workers = S.workers.filter(w => w.job !== "attam" || w.fireTarget); return; }
-  for (const p of S.buildings) {
-    if (p.id !== "paddy" || !p.irrigated || !p.worker) continue;
-    let have = S.workers.filter(w => w.job === "attam" && w.field === p).length;
-    while (have < ATTAM_HANDS && idleVillagers() > 0) {
-      goTo(helper("attam", { field: p }), p.gx + 0.6 + have * 0.8, p.gy + 1.3 + have * 0.3, "toPaddy");
-      have++;
-    }
-  }
-  if (!S.warnedAttam && S.workers.some(w => w.job === "attam")) { S.warnedAttam = true; say("In the monsoon, idle neighbours join attam work on watered paddies, and the rice grows faster."); }
 }
 
 // Send a helper (or a worker borrowed for a fire) home: helpers leave, workers go back to their job.
@@ -1474,9 +1464,7 @@ function tick() {
 
   tickWater();
   tickFire();
-  assignShramadana();
-  assignGatherers();
-  assignAttam();
+  assignSeasonWork();
   drillSoldiers();
   updateCover();
 
