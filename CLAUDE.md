@@ -17,7 +17,7 @@ Read this before changing the game. It is written so that any future model
 
 Four classic scripts sharing globals, loaded in this order:
 
-1. `data.js`: pure data tables (`BUILDINGS`, `TROOPS`, `FOES`, `EDICTS`, `LEVELS`, `TUTORIAL`, `SEASONS`).
+1. `data.js`: pure data tables (`BUILDINGS`, `TROOPS`, `RANKS`, `FOES`, `EDICTS`, `LEVELS`, `TUTORIAL`, `SEASONS`).
 2. `game.js`: state `S`, simulation, pathfinding, water, HUD, input, boot.
    Boot waits for `DOMContentLoaded` so `render.js` is present.
 3. `audio.js`: synthesised sound (`SOUND.play(kind)`, `SOUND.update()`); reads `S`, never writes it.
@@ -70,6 +70,9 @@ Key invariants:
 - **New troop or raider:** add a row to `TROOPS`/`FOES` (`FOES` take `morale`,
   `fire`), and a `UNITS3D` entry in `tools/art3d/models3d.js` (look + gear).
   Waves reference raider ids by key (`{ raider: 4, bowman: 1 }`).
+- **New seasonal work for idle villagers:** add a row to `SEASON_WORK` in
+  `game.js` (season, where hands are wanted, how a helper sets out) and the
+  helper's phases in `updateWorker`; map its job to a look in `drawWorkerSprite`.
 - **New level:** append to `LEVELS`. Objective types: `res`, `build`, `water`,
   `catch` (rain caught; three stars then need 70% kept), `harmony`, `pop`,
   `waves` (always include `waves`). Unlock decrees with `unlocks.edicts`.

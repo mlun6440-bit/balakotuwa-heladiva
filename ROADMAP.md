@@ -102,6 +102,23 @@ Recorded so these are not re-added without a strong reason:
 - [x] R8 Diya agala (moat) fed by the canal network.
 - [x] R9 Simplify round 3 (below).
 
+## Loop batch 4 (R14–R17)
+
+- [x] R14 Attam: in Maha, idle villagers join the farmer on watered paddies.
+- [x] R15 Fire losses are counted only when fire brings a building down (the
+      Hill Kingdom "fire" finding was mostly raiders finishing damaged buildings).
+- [x] R16 Soldier ranks (asked for by the player): drill by the Angam Maduwa
+      and fight to become ★ veteran / ★★ champion.
+- [x] R17 Simplify round 5 (below).
+- [ ] Deferred: show where the next raid comes from (notes #4), the novice's
+      Hill Kingdom losses name undefended edges.
+
+## Simplify round 5 (R17)
+
+- **Merged (code):** shramadana, deadwood gathering and attam are rows in one
+  `SEASON_WORK` table with one dispatcher, instead of three assign functions
+  that each did their own season cleanup.
+
 ## Loop batch 3 (R10–R13): pre-rendered 3D figures
 
 - [x] R10 3D pipeline: three.js models rendered by the bake (orthographic
