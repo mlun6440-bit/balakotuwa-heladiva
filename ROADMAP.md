@@ -102,6 +102,26 @@ Recorded so these are not re-added without a strong reason:
 - [x] R8 Diya agala (moat) fed by the canal network.
 - [x] R9 Simplify round 3 (below).
 
+## Loop batch 3 (R10–R13): pre-rendered 3D figures
+
+- [x] R10 3D pipeline: three.js models rendered by the bake (orthographic
+      camera matching `iso()`, one sun, soft shadows), spearman first. A 3D
+      house was tried and dropped: the hand-modelled 2D houses read better.
+- [x] R11 Every combat unit in 3D: 8 directions, 8-frame walk, 3-frame attack.
+- [x] R12 Villagers in 3D with their job tools; carried rice, water, stone,
+      timber and arms are baked into the walk frames.
+- [x] R13 Simplify round 4 (below).
+
+Before/after: `docs/screens/batch3-units.png`.
+
+## Simplify round 4 (R13)
+
+- **Cut:** the 2D villager, soldier and raider frames and the separate load
+  overlays (about 300 sprites). Only the elephant and stone thrower stay 2D.
+  The festival procession uses the 3D dancers and torch-bearers.
+- **Cost:** the atlas is 6.1 MB in four pages (was 4.6 MB); 3D figures are
+  most of it. Next lever if it matters: fewer attack frames, or k=3 figures.
+
 ## Simplify round 3 (R9)
 
 - **Cut: the thorn barrier (katu wetiya).** It did the same job as the moat

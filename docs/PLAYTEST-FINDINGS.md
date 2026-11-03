@@ -90,3 +90,10 @@ In order of value for this game's pillars:
 Keep the guardrails: one item per round, a simplify round after every three,
 and re-run `node tools/playtest.mjs learn` after each balance change. The
 learner tells us within minutes whether a change created a new exploit.
+
+## Loop batch 3 (R10–R13): graphics only
+
+No balance changes, so no retraining. Every level and the skirmish still run
+to an end in the smoke test with no errors; render time is unchanged (about
+19 ms/frame headless). Figures now face 8 ways with 8-frame walks; see
+`docs/screens/batch3-units.png`. The cost is atlas size (4.6 → 6.1 MB).

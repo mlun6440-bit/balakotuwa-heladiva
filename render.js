@@ -1439,24 +1439,7 @@ function drawWorkerSprite(w, now) {
     drawSprite(key, w.gx, w.gy);
     return true;
   }
-  const base = `u.v.${job}`;
-  if (!hasSprite(`${base}.f.i0`)) return false;
-  const g = stride(w);
-  const f = g.back ? "b" : "f";
-  const moving = g.moving;
-  const working = w.phase === "work" || (w.phase === "tend" && w.job !== "trader") || (w.job === "trader" && w.phase === "tend");
-  let fr;
-  if (moving) fr = `w${Math.floor(g.d * 7) % 6}`;
-  else if (working) fr = `a${Math.floor(now / (w.job === "farmer" || w.job === "trader" ? 260 : 150) + w.b.uid) % 3}`;
-  else fr = "i0";
-  drawSprite(`${base}.${f}.${fr}`, w.gx, w.gy, 0, { flip: g.flip });
-  if (w.carry && moving) drawSprite(`load.${w.carry.key === "silt" ? "stone" : w.carry.key}.${f}.${fr}`, w.gx, w.gy, 0, { flip: g.flip });
-  if (w.phase === "work" && Math.floor(now / 150) % 3 === 2 && hash(now | 0, 1) > 0.6) {
-    const p = iso(w.gx, w.gy, 0);
-    ctx.fillStyle = w.job === "mason" ? "#ddd" : "#d9b27a";
-    ctx.fillRect(p.x + (g.flip ? -9 : 7), p.y - 6, 1.5, 1.5);
-  }
-  return true;
+  return false;
 }
 
 function drawWorker(w, now) {
@@ -1884,9 +1867,9 @@ function drawBirds(now) {
 // While the festival decree is in force, a procession circles the citadel:
 // tuskers, Kandyan dancers and torch-bearers. Positions follow S.time so the
 // parade halts when the game is paused.
-const PERAHERA = ["u.v.farmer", "u.angampora", "u.angampora", "u.elephant", "u.v.trader", "u.v.farmer", "u.angampora", "u.elephant", "u.v.farmer"];
+const PERAHERA = ["u3d.v.farmer", "u3d.angampora", "u3d.angampora", "u.elephant", "u3d.v.trader", "u3d.v.farmer", "u3d.angampora", "u.elephant", "u3d.v.farmer"];
 function peraheraMembers() {
-  if (typeof edictOn !== "function" || !edictOn("perahera") || !hasSprite("u.elephant.f.i0")) return [];
+  if (typeof edictOn !== "function" || !edictOn("perahera") || !hasSprite("u.elephant.f.i0") || !hasSprite("u3d.angampora.d0.i0")) return [];
   const c = S.citadel, x0 = c.gx - 1.4, y0 = c.gy - 1.4, x1 = c.gx + c.w + 1.4, y1 = c.gy + c.h + 1.4;
   const W = x1 - x0, H = y1 - y0, per = 2 * (W + H);
   const at = d => {
@@ -1900,14 +1883,15 @@ function peraheraMembers() {
   return PERAHERA.map((key, i) => {
     const d = head - i * (key === "u.elephant" || PERAHERA[i - 1] === "u.elephant" ? 0.75 : 0.5);
     const [gx, gy, dx, dy] = at(d);
-    return { key, gx, gy, sx: dx - dy, sy: dx + dy, d, torch: key === "u.v.farmer" };
+    return { key, gx, gy, ang: Math.atan2(dy, dx), flip: dx - dy < 0, d, torch: key === "u3d.v.farmer" };
   });
 }
 function drawPeraheraMember(m, now) {
-  const back = m.sy < 0, flip = m.sx < 0;
-  const elephant = m.key === "u.elephant";
-  const fr = `w${Math.floor(m.d * (elephant ? 4 : 7)) % 6}`;
-  drawSprite(`${m.key}.${elephant || !back ? "f" : "b"}.${fr}`, m.gx, m.gy, 0, { flip });
+  if (m.key === "u.elephant") drawSprite(`u.elephant.f.w${Math.floor(m.d * 4) % 6}`, m.gx, m.gy, 0, { flip: m.flip });
+  else {
+    const d = ((Math.round(m.ang / (Math.PI / 4)) % 8) + 8) % 8;
+    drawSprite(`${m.key}.d${d}.w${Math.floor(m.d * 9.3) % 8}`, m.gx, m.gy);
+  }
   if (m.torch) {
     const p = iso(m.gx, m.gy, 26);
     const r = 5 + Math.sin(now * 0.02 + m.d * 9) * 1.2;
