@@ -31,6 +31,18 @@ Current curve (latest evaluation plus reruns): the planner wins every level
 **scrapes L3–L4** (won 3 of 4 each, citadel 2–50%, L3 losing 12–15 families
 to hunger), and loses the finale.
 
+## Loop batch 2 (R6–R9)
+
+| Round | Change | Bot evidence |
+|---|---|---|
+| R6 | Warn before raiders reach fields; half-crop trampling; Maha rations | Hill Kingdom novice starvation 6–13 → 2–4 families; planner unaffected |
+| R7 | Monsoon deadwood gathering | Planner's late-game timber 168–228 (was ~5); idle share unchanged |
+| R8 | Diya agala (canal-fed moat) | Wet moat 0.3× raider speed, dry 0.75×; learner digs it on Hill Kingdom only |
+| R9 | Cut the thorn barrier; one-line resource bar | No regressions |
+
+Curve now: the planner wins every level (three stars on 1, 2, 3 and 5; two on
+4). The novice wins 1–4 (3–4 only just) and loses the finale.
+
 ## Open findings, ranked by evidence
 
 0. **Mid-campaign is on a knife-edge for weak play** (L3–L4 above): trampled
