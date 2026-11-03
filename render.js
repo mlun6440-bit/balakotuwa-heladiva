@@ -1418,7 +1418,7 @@ function stride(o) {
   return g;
 }
 function drawWorkerSprite(w, now) {
-  const base = `u.v.${w.job === "bucket" || w.job === "shramadana" ? "farmer" : w.job}`;
+  const base = `u.v.${w.job === "bucket" || w.job === "shramadana" ? "farmer" : w.job === "gatherer" ? "woodcutter" : w.job}`;
   if (!hasSprite(`${base}.f.i0`)) return false;
   const g = stride(w);
   const f = g.back ? "b" : "f";

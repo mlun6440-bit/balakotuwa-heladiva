@@ -643,6 +643,30 @@ function helper(job, extra) {
   S.workers.push(w);
   return w;
 }
+// Monsoon work: idle villagers gather fallen deadwood at the forest edge
+// (they never fell a tree) and carry it to a timber store.
+const GATHERERS = 4, GATHER_CAP = 150;
+function woodSpot(w) {
+  let best = null, bd = Infinity;
+  for (const t of S.trees) {
+    if (t.stage < 100) continue;
+    const d = Math.hypot(t.gx - w.gx, t.gy - w.gy);
+    if (d < bd) { bd = d; best = t; }
+  }
+  return best;
+}
+function sendGatherer(w) {
+  const t = woodSpot(w);
+  if (!t) { endParty(w); return; }
+  goTo(w, t.gx + 0.35, t.gy + 0.35, "toWood");
+}
+function assignGatherers() {
+  const mine = S.workers.filter(w => w.job === "gatherer");
+  if (S.season !== "maha" || S.timber >= GATHER_CAP) return;
+  for (let n = mine.length; n < GATHERERS && idleVillagers() > 0; n++) sendGatherer(helper("gatherer", {}));
+  if (!S.warnedGather && S.workers.some(w => w.job === "gatherer")) { S.warnedGather = true; say("In the monsoon, idle villagers gather fallen wood from the forest for the stores."); }
+}
+
 // Send a helper (or a worker borrowed for a fire) home: helpers leave, workers go back to their job.
 function dismiss(w) { if (w.temp) endParty(w); else planJob(w); }
 
@@ -652,7 +676,7 @@ function staff() {
   for (const b of S.buildings) {
     if (!b.def.worker || b.worker) continue;
     if (S.workers.length >= S.villagers) {
-      const party = S.workers.findIndex(w => w.job === "shramadana" && !w.fireTarget);
+      const party = S.workers.findIndex(w => (w.job === "shramadana" || w.job === "gatherer") && !w.fireTarget);
       if (party < 0) break;
       S.workers.splice(party, 1); // a real job beats a work party
     }
@@ -745,6 +769,9 @@ function updateWorker(w, dt) {
       w.timer -= dt * workMult();
       if (w.timer <= 0) planJob(w);
       break;
+    case "toWood":
+      if (walk(w, dt)) { w.phase = "work"; w.timer = 6; }
+      break;
     case "toSilt":
       if (walk(w, dt)) {
         const b = w.siltTarget;
@@ -803,6 +830,7 @@ function updateWorker(w, dt) {
     case "work":
       w.timer -= dt * workMult();
       if (w.timer > 0) break;
+      if (w.job === "gatherer") { carryHome(w, "timber", 2); break; }
       if (w.job === "shramadana") {
         const b = w.siltTarget;
         if (b && S.buildings.includes(b)) b.silt = Math.max(0, b.silt - 6);
@@ -856,6 +884,11 @@ function updateWorker(w, dt) {
           spawnFloat(`+${w.carry.n} ${RES[w.carry.key]}`, w.gx, w.gy, "#bff0a8");
         }
         if (w.carry.key === "rice") sfx("harvest");
+        if (w.job === "gatherer") {
+          w.carry = null;
+          if (S.season === "maha" && S.timber < GATHER_CAP) sendGatherer(w); else endParty(w);
+          break;
+        }
         w.carry = null;
         planJob(w);
       }
@@ -1392,6 +1425,7 @@ function tick() {
   tickWater();
   tickFire();
   assignShramadana();
+  assignGatherers();
   updateCover();
 
   for (const u of S.units) {
