@@ -18,6 +18,7 @@ export const Hpx = px => px / (PX_PER_UNIT * Math.cos(ELEV)); // game z px → w
 
 let renderer = null;
 function getRenderer(w, h) {
+  if (renderer && renderer.getContext().isContextLost()) { renderer.dispose(); renderer = null; rig = null; }
   if (!renderer) {
     renderer = new THREE.WebGLRenderer({ alpha: true, antialias: true, preserveDrawingBuffer: true });
     renderer.shadowMap.enabled = true;
@@ -34,22 +35,34 @@ function getRenderer(w, h) {
 
 // Light from the upper left of the screen, as in the 2D kit: lit left faces,
 // shaded right faces, shadows falling to the right.
+// One light rig for the whole bake: every DirectionalLight that casts shadows
+// owns a 2048² shadow map, and making one per model leaked GPU memory until
+// the context was lost.
+let rig = null;
 function lights(scene, reach) {
-  scene.add(new THREE.HemisphereLight(0xfff1dc, 0x6f7a48, 1.15));
+  if (!rig) rig = makeRig();
+  const r = reach + 2;
+  Object.assign(rig.sun.shadow.camera, { left: -r, right: r, top: r, bottom: -r });
+  rig.sun.shadow.camera.updateProjectionMatrix();
+  scene.add(rig.group);
+}
+function makeRig() {
+  const group = new THREE.Group();
+  group.add(new THREE.HemisphereLight(0xfff1dc, 0x6f7a48, 1.15));
   const fill = new THREE.DirectionalLight(0xbfd2ff, 0.35);
   fill.position.set(6, 3, 2);
-  scene.add(fill);
+  group.add(fill);
   const sun = new THREE.DirectionalLight(0xfff0d8, 2.6);
   sun.position.set(-0.45 * 30, 0.77 * 30, 0.45 * 30);
   sun.target.position.set(0, 0, 0);
   sun.castShadow = true;
   sun.shadow.mapSize.set(2048, 2048);
-  const r = reach + 2;
-  Object.assign(sun.shadow.camera, { left: -r, right: r, top: r, bottom: -r, near: 1, far: 80 });
+  Object.assign(sun.shadow.camera, { near: 1, far: 80 });
   sun.shadow.bias = -0.0006;
   sun.shadow.normalBias = 0.02;
   sun.shadow.radius = 4;
-  scene.add(sun, sun.target);
+  group.add(sun, sun.target);
+  return { group, sun };
 }
 
 // Render `build(group)` into a 2D canvas of SZ×SZ world px at scale k, with the
@@ -235,6 +248,8 @@ export function figure(look, pose) {
   const H = look.head || {};
   if (H.kind === "turban") { const t = new THREE.Mesh(new THREE.TorusGeometry(0.03 * s, 0.017 * s, 8, 16), flat(H.col || "#f2efe6")); t.rotation.x = Math.PI / 2; t.position.y = h(19.2); body.add(t); const top = new THREE.Mesh(new THREE.SphereGeometry(0.03 * s, 10, 8), flat(H.col || "#f2efe6")); top.position.y = h(19.6); top.scale.y = 0.6; body.add(top); }
   else if (H.kind === "helm") { const t = new THREE.Mesh(new THREE.SphereGeometry(0.044 * s, 14, 8, 0, Math.PI * 2, 0, Math.PI / 2), flat(H.col || "#55504a", { metalness: 0.5, roughness: 0.45 })); t.position.y = h(18); body.add(t); }
+  else if (H.kind === "shaved") { /* bare scalp */ }
+  else if (H.kind === "none") { const hair = new THREE.Mesh(new THREE.SphereGeometry(0.041 * s, 12, 8, 0, Math.PI * 2, 0, Math.PI / 2.2), dark); hair.position.y = h(17.8); body.add(hair); }
   else { const hair = new THREE.Mesh(new THREE.SphereGeometry(0.041 * s, 12, 8, 0, Math.PI * 2, 0, Math.PI / 2.2), dark); hair.position.y = h(17.8); body.add(hair); }
   // arms: shoulder pivots; the right arm can raise a weapon for the attack
   const arms = {};

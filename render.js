@@ -1424,7 +1424,22 @@ function stride(o) {
   return g;
 }
 function drawWorkerSprite(w, now) {
-  const base = `u.v.${w.job === "bucket" || w.job === "shramadana" ? "farmer" : w.job === "gatherer" ? "woodcutter" : w.job}`;
+  const job = w.job === "bucket" || w.job === "shramadana" ? "farmer" : w.job === "gatherer" ? "woodcutter" : w.job;
+  if (hasSprite(`u3d.v.${job}.d0.i0`)) {
+    // pre-rendered 3D villager: 8 directions; carried loads are baked in
+    const g = stride(w);
+    const d = (((Math.round((g.ang ?? Math.PI / 4) / (Math.PI / 4))) % 8) + 8) % 8;
+    const working = w.phase === "work" || w.phase === "tend";
+    const load = w.carry ? (w.carry.key === "silt" ? "stone" : w.carry.key) : null;
+    let key;
+    if (g.moving) {
+      const fr = `w${Math.floor(g.d * 9.3) % 8}`;
+      key = load && hasSprite(`u3d.v.${job}+${load}.d${d}.${fr}`) ? `u3d.v.${job}+${load}.d${d}.${fr}` : `u3d.v.${job}.d${d}.${fr}`;
+    } else key = `u3d.v.${job}.d${d}.${working ? `a${Math.floor(now / (job === "farmer" || job === "trader" || job === "monk" ? 260 : 150) + w.b.uid) % 3}` : "i0"}`;
+    drawSprite(key, w.gx, w.gy);
+    return true;
+  }
+  const base = `u.v.${job}`;
   if (!hasSprite(`${base}.f.i0`)) return false;
   const g = stride(w);
   const f = g.back ? "b" : "f";

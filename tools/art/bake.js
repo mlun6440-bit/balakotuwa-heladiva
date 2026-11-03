@@ -75,12 +75,13 @@ function trim(c, k, SZ, oy, key) {
   for (let y = 0; y < H; y++) for (let i = 0; i < W; i++) {
     if (d[(y * W + i) * 4 + 3] > 2) { if (i < x0) x0 = i; if (i > x1) x1 = i; if (y < y0) y0 = y; if (y > y1) y1 = y; }
   }
-  if (x1 < 0) { x0 = y0 = 0; x1 = y1 = 0; }
+  if (x1 < 0) { x0 = y0 = 0; x1 = y1 = 0; console.warn("sprite is empty: " + key); }
   x0 = Math.max(0, x0 - 1); y0 = Math.max(0, y0 - 1); x1 = Math.min(W - 1, x1 + 1); y1 = Math.min(H - 1, y1 + 1);
   const w = x1 - x0 + 1, h = y1 - y0 + 1;
   const o = document.createElement("canvas"); o.width = w; o.height = h;
   o.getContext("2d").drawImage(c, x0, y0, w, h, 0, 0, w, h);
-  if (x0 === 0 || y0 === 0 || x1 === W - 1 || y1 === H - 1) console.warn("sprite touches canvas edge: " + key);
+  if (x1 <= 1 && y1 <= 1) console.warn("sprite is empty: " + key);
+  else if (x0 === 0 || y0 === 0 || x1 === W - 1 || y1 === H - 1) console.warn("sprite touches canvas edge: " + key);
   return { canvas: o, w, h, ax: W / 2 - x0, ay: H * oy - y0 };
 }
 

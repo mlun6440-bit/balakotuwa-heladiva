@@ -167,4 +167,48 @@ for (const type of Object.keys(UNITS3D)) for (let d = 0; d < 8; d++) {
   ART3D(`u3d.${type}.d${d}.i0`, g => unit3d(g, type, d, { walk: false, ph: 0, act: -1 }), o);
   for (let i = 0; i < 3; i++) ART3D(`u3d.${type}.d${d}.a${i}`, g => unit3d(g, type, d, { walk: false, ph: 0, act: (i + 0.5) / 3 }), o);
 }
+// ---------- villagers: six jobs, tools, and carried loads ----------
+const TOOL = {
+  hoe(f, p) { const t = new THREE.Group(); const sh = new THREE.Mesh(new THREE.CylinderGeometry(0.006, 0.006, f.h(12), 6), flat("#8a6a40")); sh.position.y = f.h(1); const bl = new THREE.Mesh(new THREE.BoxGeometry(0.05, f.h(0.6), 0.03), metal()); bl.position.set(0.02, f.h(7), 0); t.add(sh, bl); t.position.y = -f.h(6.4); t.rotation.z = p.act >= 0 ? -0.4 : -0.5; f.arms.R.add(t); },
+  axe(f, p) { const t = new THREE.Group(); const sh = new THREE.Mesh(new THREE.CylinderGeometry(0.006, 0.006, f.h(9), 6), flat("#7a5530")); sh.position.y = f.h(2.5); const hd = new THREE.Mesh(new THREE.BoxGeometry(0.035, f.h(2.2), 0.008), metal()); hd.position.set(0.02, f.h(6.4), 0); t.add(sh, hd); t.position.y = -f.h(6.4); t.rotation.z = p.act >= 0 ? -0.3 : -1.0; f.arms.R.add(t); },
+  hammer(f, p) { const t = new THREE.Group(); const sh = new THREE.Mesh(new THREE.CylinderGeometry(0.005, 0.005, f.h(6), 6), flat("#7a5530")); sh.position.y = f.h(1.8); const hd = new THREE.Mesh(new THREE.BoxGeometry(0.02, f.h(1.5), 0.035), flat("#8a8e92", { metalness: 0.5, roughness: 0.45 })); hd.position.y = f.h(4.6); t.add(sh, hd); t.position.y = -f.h(6.4); t.rotation.z = p.act >= 0 ? -0.3 : -1.0; f.arms.R.add(t); },
+  scales(f) { const t = new THREE.Group(); const beam = new THREE.Mesh(new THREE.CylinderGeometry(0.003, 0.003, 0.09, 4), flat("#c9a24a", { metalness: 0.5 })); beam.rotation.x = Math.PI / 2; for (const zz of [-0.045, 0.045]) { const pan = new THREE.Mesh(new THREE.CylinderGeometry(0.014, 0.01, 0.004, 10), flat("#c9a24a", { metalness: 0.5 })); pan.position.set(0, -f.h(2), zz); t.add(pan); } t.add(beam); t.position.y = -f.h(6.6); f.arms.R.add(t); f.arms.R.rotation.z = 0.9; },
+  bowl(f, p) { const b = new THREE.Mesh(new THREE.SphereGeometry(0.025, 12, 8, 0, Math.PI * 2, Math.PI / 2, Math.PI / 2), flat("#1e1a18", { roughness: 0.4, side: THREE.DoubleSide })); b.position.y = -f.h(6.8); f.arms.R.add(b); f.arms.R.rotation.z = p.act >= 0 ? 1.1 : 0.8; },
+  talapata(f) { const t = new THREE.Group(); const st = new THREE.Mesh(new THREE.CylinderGeometry(0.004, 0.004, f.h(13), 5), flat("#6b4426")); st.position.y = f.h(4); const fan = new THREE.Mesh(new THREE.CircleGeometry(0.07, 16, 0, Math.PI), flat("#d8c48a", { side: THREE.DoubleSide })); fan.position.y = f.h(10); fan.rotation.y = Math.PI / 2; t.add(st, fan); t.position.y = -f.h(6.4); t.rotation.z = 0.5; f.arms.L.add(t); }
+};
+const LOAD = {
+  rice(f) { const b = new THREE.Mesh(new THREE.CylinderGeometry(0.045, 0.035, f.h(2.4), 12), flat("#c9a86a")); b.position.y = f.h(21.2); const r = new THREE.Mesh(new THREE.SphereGeometry(0.044, 12, 6, 0, Math.PI * 2, 0, Math.PI / 2), flat("#efe2b0")); r.position.y = f.h(22.3); f.body.add(b, r); },
+  stone(f) { const b = new THREE.Mesh(new THREE.CylinderGeometry(0.045, 0.035, f.h(2), 12), flat("#8a6a3a")); b.position.y = f.h(21); f.body.add(b); for (const [x, z] of [[0.01, 0.01], [-0.015, -0.01], [0.012, -0.02]]) { const st = new THREE.Mesh(new THREE.BoxGeometry(0.024, f.h(1.5), 0.02), flat("#b8b2a6")); st.position.set(x, f.h(22.4), z); f.body.add(st); } },
+  water(f) { const pot = new THREE.Mesh(new THREE.SphereGeometry(0.04, 12, 10), flat("#b05a32", { roughness: 0.7 })); pot.position.y = f.h(22); pot.scale.y = 0.85; const neck = new THREE.Mesh(new THREE.CylinderGeometry(0.014, 0.018, f.h(1.6), 10), flat("#8a4422")); neck.position.y = f.h(24.3); f.body.add(pot, neck); },
+  timber(f) { for (let i = 0; i < 3; i++) { const l = new THREE.Mesh(new THREE.CylinderGeometry(0.014, 0.014, 0.26, 8), flat(i % 2 ? "#8c5828" : "#7a4c22")); l.rotation.z = Math.PI / 2 - 0.12; l.position.set(-0.02, f.h(15.6 + i * 1.3), 0.05 - i * 0.012); f.body.add(l); } },
+  arms(f) { for (let i = 0; i < 4; i++) { const sp = new THREE.Mesh(new THREE.CylinderGeometry(0.005, 0.005, 0.32, 5), flat("#7a5530")); sp.rotation.z = Math.PI / 2 - 0.55; sp.position.set(-0.01, f.h(15 + i * 0.6), 0.05 - i * 0.01); f.body.add(sp); } }
+};
+const VILLAGERS = {
+  farmer: { look: { skin: "#8a5a36", upper: "#f2efe6", lower: "#3d6fa8", head: { kind: "turban", col: "#f4f1e8" } }, tool: f => TOOL.hoe, loads: ["rice", "water", "stone"] },
+  woodcutter: { look: { skin: "#8a5a36", bare: true, lower: "#a8321e", head: { kind: "none" }, short: true, sash: "#e9b949" }, tool: () => TOOL.axe, loads: ["timber"] },
+  mason: { look: { skin: "#8a5a36", upper: "#e8e0d0", lower: "#6b4a2a", head: { kind: "turban", col: "#c9b48a" }, short: true }, tool: () => TOOL.hammer, loads: ["stone"] },
+  trader: { look: { skin: "#8a5a36", upper: "#e9b949", lower: "#f2efe6", head: { kind: "turban", col: "#a8321e" }, sleeves: true, sash: "#a8321e" }, tool: () => TOOL.scales, loads: [] },
+  monk: { look: { skin: "#8a5a36", upper: "#d9822b", lower: "#d9822b", head: { kind: "shaved" }, sleeves: true, sash: "#b8641c" }, tool: () => TOOL.bowl, extra: TOOL.talapata, loads: [] },
+  smith: { look: { skin: "#8a5a36", bare: true, lower: "#3a3028", head: { kind: "turban", col: "#8a6a4a" }, short: true, sash: "#5a3a22" }, tool: () => TOOL.hammer, loads: ["timber", "arms"], beard: "#2a1a10" }
+};
+function villager3d(g, job, d, pose, load) {
+  const V = VILLAGERS[job];
+  const f = figure(V.look, pose);
+  if (!(load && (load === "timber" || load === "arms"))) V.tool()(f, pose); // logs and spears are carried two-handed on the shoulder
+  if (V.extra) V.extra(f, pose);
+  if (V.beard) GEAR.beard(f, V.beard);
+  if (load) LOAD[load](f);
+  if (load && load !== "timber" && load !== "arms") { f.arms.R.rotation.z = 2.55; f.arms.R.rotation.x = -0.35; } // a hand steadying the load on the head
+  f.root.rotation.y = -d * Math.PI / 4;
+  const blob = new THREE.Mesh(new THREE.CircleGeometry(0.085, 20), BLOB);
+  blob.rotation.x = -Math.PI / 2; blob.position.y = 0.002; blob.scale.set(1.2, 0.8, 1);
+  g.add(blob, f.root);
+}
+for (const job of Object.keys(VILLAGERS)) for (let d = 0; d < 8; d++) {
+  const o = { k: 4, size: 60, shadow: false, reach: 1 };
+  for (let i = 0; i < 8; i++) ART3D(`u3d.v.${job}.d${d}.w${i}`, g => villager3d(g, job, d, { walk: true, ph: (i / 8) * Math.PI * 2, act: -1 }), o);
+  ART3D(`u3d.v.${job}.d${d}.i0`, g => villager3d(g, job, d, { walk: false, ph: 0, act: -1 }), o);
+  for (let i = 0; i < 3; i++) ART3D(`u3d.v.${job}.d${d}.a${i}`, g => villager3d(g, job, d, { walk: false, ph: 0, act: (i + 0.5) / 3 }), o);
+  for (const load of VILLAGERS[job].loads) for (let i = 0; i < 8; i++) ART3D(`u3d.v.${job}+${load}.d${d}.w${i}`, g => villager3d(g, job, d, { walk: true, ph: (i / 8) * Math.PI * 2, act: -1 }, load), o);
+}
 window.ART3D_READY = true;
