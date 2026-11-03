@@ -40,6 +40,8 @@ const BUILDINGS = {
                 desc: "Grows rice; in Yala only beside a watered canal, wewa or river." },
   bissa:      { name: "Vee Bissa (Granary)", cat: "food", icon: "🏺", w: 1, h: 1, hp: 350, cost: { timber: 12 }, solid: true, flammable: true, z: 26, store: ["rice"],
                 desc: "Farmers drop rice here instead of walking to the citadel." },
+  pela:       { name: "Pela (Watch hut)", cat: "food", icon: "🛖", w: 1, h: 1, hp: 120, cost: { timber: 5 }, solid: true, flammable: true, z: 22, worker: "watchman",
+                desc: "Its watchman scares wild elephants away from everything within 5 tiles." },
   market:     { name: "Pola (Market)", cat: "food", icon: "⚖️", w: 2, h: 2, hp: 320, cost: { timber: 14, stone: 4 }, solid: true, flammable: true, z: 16, worker: "trader",
                 desc: "A trader sells spare rice for gold (set limits in the 👑 tab)." },
 
@@ -123,13 +125,16 @@ const FOES = {
   raider: { name: "Raider", hp: 90, dmg: 12, bdmg: 12, range: 0.9, speed: 1.5, gold: 6, morale: 0.35, loot: true },
   bowman: { name: "Raider bowman", hp: 60, dmg: 9, bdmg: 4, range: 4.2, speed: 1.5, ranged: true, gold: 6, fire: true, morale: 0.45 },
   brute:  { name: "Ram bearer", hp: 280, dmg: 10, bdmg: 48, range: 0.9, speed: 1.0, heavy: true, gold: 15, morale: 0 },
-  thrower: { name: "Stone thrower", hp: 240, dmg: 0, bdmg: 70, range: 6.8, speed: 0.7, ranged: true, siege: true, cd: 4.5, heavy: true, gold: 25, morale: 0 }
+  thrower: { name: "Stone thrower", hp: 240, dmg: 0, bdmg: 70, range: 6.8, speed: 0.7, ranged: true, siege: true, cd: 4.5, heavy: true, gold: 25, morale: 0 },
+  aliya: { name: "Wild elephant", hp: 900, dmg: 0, bdmg: 0, range: 0.6, speed: 0.9, heavy: true, gold: 0, morale: 0, wild: true }
 };
 
 // siege: stops at range and lobs stones at walls and towers (outranges watchtowers).
 // fire: shoots fire arrows at flammable buildings when no soldier is in range
 // (only on levels with fireArrows: true).
 // loot: on the way in, breaks off to trample a ripening paddy or rob a granary.
+// wild: not a raider (team "w"): comes out of the jungle for ripe rice on levels
+// with `wild: { first, every }`, and turns back from a staffed pela. Nobody fights it.
 // morale: when its raid party falls below this share of its strength, the
 // raider flees back to its edge (0 = never). Fleeing raiders give no gold.
 
@@ -152,6 +157,21 @@ const LEVELS = [
     hpScale: 1.0,
     objectives: [{ type: "res", key: "timber", n: 100 }, { type: "build", id: "wewa", n: 1 }, { type: "res", key: "rice", n: 80 }, { type: "waves" }],
     tutorial: true
+  },
+  {
+    id: "ruhuna", name: "Elephants of Ruhuna", era: "Magama", seed: 29,
+    intro: "In the southern kingdom of Ruhuna, wild elephants come out of the jungle when the rice ripens. Raise a pela (watch hut) beside your paddies: its watchman scares them away. Feed a growing village and hold off the raiders.",
+    citadel: [12, 12], season: "maha",
+    start: { timber: 90, stone: 30, rice: 60, gold: 70, villagers: 9 },
+    army: { spearman: 2, archer: 2 },
+    rivers: [{ edge: "south", at: 0, width: 2, wobble: 1.4 }],
+    rocks: [[18, 4, 21, 7]],
+    forests: [[2, 2, 10, 9, 0.6], [17, 13, 24, 20, 0.5], [2, 15, 7, 21, 0.45]],
+    unlocks: { buildings: ["pela"] },
+    wild: { first: 70, every: 65 },
+    waves: [{ t: 180, from: ["east"], raider: 4 }, { t: 300, from: ["north"], raider: 4, bowman: 2 }],
+    hpScale: 1.0,
+    objectives: [{ type: "res", key: "rice", n: 120 }, { type: "pop", n: 20 }, { type: "waves" }]
   },
   {
     id: "dryzone", name: "The Dry Zone", era: "Rajarata", seed: 23,

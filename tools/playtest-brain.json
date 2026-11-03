@@ -1,7 +1,7 @@
 {
- "version": 1,
+ "version": 2,
  "levels": {
-  "1": {
+  "anuradhapura": {
    "P": {
     "paddyPerHouse": 1.31,
     "houseRice": 4.11,
@@ -164,7 +164,7 @@
    ],
    "score": 1385
   },
-  "2": {
+  "dryzone": {
    "P": {
     "paddyPerHouse": 2,
     "houseRice": 0.5,
@@ -342,7 +342,7 @@
    ],
    "score": 1380
   },
-  "3": {
+  "lionrock": {
    "P": {
     "paddyPerHouse": 0.97,
     "houseRice": 0.89,
@@ -520,7 +520,7 @@
    ],
    "score": 1279
   },
-  "4": {
+  "parakrama": {
    "P": {
     "paddyPerHouse": 2,
     "houseRice": 0.5,
@@ -698,7 +698,7 @@
    ],
    "score": 1275
   },
-  "5": {
+  "senkadagala": {
    "P": {
     "paddyPerHouse": 1.19,
     "houseRice": 2.74,

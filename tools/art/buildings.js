@@ -231,6 +231,26 @@ ART.add("bissa", () => {
   for (let i = 1; i < 5; i++) gline([0.86 - i * 0.012, 0.72 - i * 0.012, i * 2.5], [0.92 - i * 0.012, 0.62 - i * 0.012, i * 2.5], "#8a6a40", 0.5);
 }, { size: 140 });
 
+// Pela: a farmer's watch hut on tall stilts above the paddies, reached by a
+// ladder, with a fire pot below for the night watch against wild elephants.
+ART.add("pela", () => {
+  box(0.22, 0.22, 0, 0.56, 0.56, 0.4, M.earth, { edges: false });
+  for (const [x, y] of [[0.32, 0.32], [0.68, 0.32], [0.32, 0.68], [0.68, 0.68]]) post(x, y, 0.025, 0.4, 17, M.timber, 6);
+  gline([0.32, 0.32, 6], [0.68, 0.68, 12], "#6b4426", 0.5); gline([0.68, 0.32, 6], [0.32, 0.68, 12], "#6b4426", 0.5);
+  box(0.26, 0.26, 16, 0.48, 0.48, 1.2, M.timberH, { edges: false });
+  box(0.3, 0.3, 17.2, 0.4, 0.4, 4, { top: M.mud, left: M.mud, right: M.mud }, { top: false });
+  hipRoof(0.18, 0.18, 0.64, 0.64, 21, 8, M.thatchOld, { thick: 1.4, capCol: shadeC(COL.thatch, 0.7) });
+  // ladder
+  gline([0.86, 0.74, 0], [0.74, 0.62, 16], "#6b4426", 0.6); gline([0.94, 0.66, 0], [0.82, 0.54, 16], "#6b4426", 0.6);
+  for (let i = 1; i < 7; i++) gline([0.86 - i * 0.017, 0.74 - i * 0.017, i * 2.3], [0.94 - i * 0.017, 0.66 - i * 0.017, i * 2.3], "#8a6a40", 0.45);
+  // fire pot for the night watch
+  lathe(0.16, 0.84, [[0.06, 0.4], [0.07, 1.6], [0.05, 2.6]], { col: "#9a4a26" }, { seg: 12 });
+  at(0.16, 0.84, 2.8, c => {
+    const gr = c.createRadialGradient(0, 0, 0, 0, 0, 3); gr.addColorStop(0, "#fff0a0"); gr.addColorStop(0.4, "#ff9a28"); gr.addColorStop(1, "rgba(140,30,0,0)");
+    c.fillStyle = gr; c.beginPath(); c.ellipse(0, 0, 3, 1.8, 0, 0, 7); c.fill();
+  });
+}, { size: 140 });
+
 // Pola (market): an open bazaar of four stalls with cadjan and cloth roofs.
 function stall(x, y, roof, goods) {
   for (const [px, py] of [[0, 0], [0.6, 0], [0, 0.5], [0.6, 0.5]]) post(x + px, y + py, 0.02, 2, 13, M.timber, 6);

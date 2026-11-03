@@ -63,12 +63,17 @@ function costText(cost) {
 function loadProgress() {
   try {
     const p = JSON.parse(localStorage.getItem(SAVE_KEY));
-    if (p && typeof p.unlocked === "number") return { unlocked: p.unlocked, stars: p.stars || {}, skirmishBest: p.skirmishBest || 0 };
+    if (p && typeof p.unlocked === "number") {
+      // unlocked is stored by id too, so inserting a level never shifts it; old saves used the first five levels' order
+      const id = p.unlockedId || ["anuradhapura", "dryzone", "lionrock", "parakrama", "senkadagala"][p.unlocked];
+      const i = LEVELS.findIndex(L => L.id === id);
+      return { unlocked: i >= 0 ? i : p.unlocked, stars: p.stars || {}, skirmishBest: p.skirmishBest || 0 };
+    }
   } catch (e) { /* storage blocked or corrupt: start fresh */ }
   return { unlocked: 0, stars: {}, skirmishBest: 0 };
 }
 function saveProgress() {
-  try { localStorage.setItem(SAVE_KEY, JSON.stringify(progress)); } catch (e) { /* ignore */ }
+  try { localStorage.setItem(SAVE_KEY, JSON.stringify({ ...progress, unlockedId: LEVELS[progress.unlocked].id })); } catch (e) { /* ignore */ }
 }
 
 // ==================== SAVE A RUN ====================
@@ -222,7 +227,7 @@ function makeSkirmish(seed, sandbox = false) {
     forests: Array.from({ length: ri(3, 5) }, () => [...rect(ri(4, 7), ri(4, 7)), 0.35 + r() * 0.2]),
     unlocks: {}, all,
     waves: sandbox ? [] : [0, 1, 2].map(k => skirmishWave(k, seed, riverEdge)),
-    hpScale: 1, objectives: [{ type: sandbox ? "sandbox" : "endless" }],
+    hpScale: 1, objectives: [{ type: sandbox ? "sandbox" : "endless" }], wild: { first: 150, every: 110 },
     ...(sandbox ? {
       id: `sandbox-${seed}`, name: "Sandbox", sandbox: true, endless: false, era: `Royal sandbox · seed ${seed}`,
       intro: "A peaceful valley with full stores. Build anything; open 👑 Decrees to send raids of any size from any edge and test your defences.",
@@ -940,6 +945,58 @@ function drillSoldiers() {
   }
 }
 
+// ==================== WILD ELEPHANTS ====================
+// On levels with `wild`, an elephant leaves a far stretch of jungle whenever a
+// paddy is ripening, walks to it and eats the crop, then goes home. A staffed
+// pela within PELA_RANGE turns it back. Nobody fights it (team "w").
+const PELA_RANGE = 5;
+function spawnWild() {
+  const W = S.L.wild;
+  if (!W) return;
+  if (S.nextWild == null) S.nextWild = W.first;
+  if (S.time < S.nextWild) return;
+  if (!S.buildings.some(b => b.id === "paddy" && b.growth >= 50)) { S.nextWild = S.time + 10; return; }
+  S.nextWild = S.time + W.every;
+  const c = S.citadel, far = S.trees.filter(t => t.stage >= 100 && Math.hypot(t.gx - c.gx, t.gy - c.gy) > 9);
+  const t = far.length ? far[Math.floor(Math.random() * far.length)] : null;
+  const [x, y] = t ? [t.gx, t.gy] : edgeSpawn(["east", "west", "north", "south"][Math.floor(Math.random() * 4)]);
+  const d = FOES.aliya;
+  S.units.push({ uid: ++S.uid, team: "w", type: "aliya", def: d, gx: x, gy: y, tx: x, ty: y, hp: d.hp, maxHp: d.hp, last: -9, z: 0, hx: x, hy: y });
+  if (!S.warnedWild) {
+    S.warnedWild = true;
+    say(`A wild elephant is coming out of the jungle for your ripening rice!${S.unlocked.buildings.has("pela") ? " A pela (watch hut) by the paddies scares elephants away." : ""}`, true);
+  }
+}
+function updateWild(u, dt) {
+  if (u.flee) {
+    moveToward(u, u.hx, u.hy, dt);
+    if (Math.hypot(u.hx - u.gx, u.hy - u.gy) < 0.4) u.gone = true;
+    return;
+  }
+  const pela = S.buildings.find(b => b.id === "pela" && b.worker && rectDist(u, b) <= PELA_RANGE);
+  if (pela) {
+    u.flee = true;
+    S.stats.scared = (S.stats.scared || 0) + 1;
+    spawnFloat("Hoo! Hoo! 🔥", pela.gx + 0.5, pela.gy + 0.5, "#ffd27a");
+    return;
+  }
+  let p = u.lootTarget;
+  if (!p || !S.buildings.includes(p) || p.growth < 30) {
+    p = null; let bd = Infinity;
+    for (const b of S.buildings) if (b.id === "paddy" && b.growth >= 50) { const d = rectDist(u, b); if (d < bd) { bd = d; p = b; } }
+    u.lootTarget = p;
+    if (!p) { u.flee = true; return; }
+  }
+  if (rectDist(u, p) > 0.3) { moveToward(u, p.gx + 1, p.gy + 1, dt); return; }
+  u.eat = (u.eat || 0) + dt;
+  if (S.time - u.last >= 1) u.last = S.time; // eating: the trunk works
+  if (u.eat < 3) return;
+  p.growth = 0;
+  S.stats.eaten = (S.stats.eaten || 0) + 1;
+  spawnFloat("🐘 The rice is eaten!", p.gx + 1, p.gy + 1, "#ff9a7a");
+  u.flee = true;
+}
+
 function spawnFoe(type, edge, party = null) {
   const d = FOES[type];
   const hp = Math.round(d.hp * S.L.hpScale);
@@ -1024,7 +1081,7 @@ function unitsNear(x, y, r) {
 function nearestFoe(u, radius, from = u) {
   let best = null, bd = radius;
   for (const v of unitsNear(from.gx, from.gy, radius)) {
-    if (v.team === u.team || v.hp <= 0) continue;
+    if (v.team === u.team || v.team === "w" || v.hp <= 0) continue; // nobody fights wild elephants
     const d = Math.hypot(v.gx - from.gx, v.gy - from.gy);
     if (u.team === "e" && d > 1.5 && inCover(v)) continue; // hidden in the forest
     if (u.team === "e" && !u.def.ranged && v.z > 0) continue; // out of reach up on a wall or tower
@@ -1038,7 +1095,7 @@ function nearestFoe(u, radius, from = u) {
 function volleyTarget(u, range, from = u) {
   const near = [];
   for (const v of unitsNear(from.gx, from.gy, range)) {
-    if (v.team === u.team || v.hp <= 0 || v.flee) continue;
+    if (v.team === u.team || v.team === "w" || v.hp <= 0 || v.flee) continue;
     const d = Math.hypot(v.gx - from.gx, v.gy - from.gy);
     if (d <= range && !(u.team === "e" && d > 1.5 && inCover(v))) near.push([d, v]);
   }
@@ -1231,7 +1288,7 @@ function updateCombat(dt) {
   buildUnitGrid();
   for (const u of S.units) {
     if (u.hp <= 0) continue;
-    if (u.team === "p") updateSoldier(u, dt); else updateFoe(u, dt);
+    if (u.team === "p") updateSoldier(u, dt); else if (u.team === "w") updateWild(u, dt); else updateFoe(u, dt);
   }
   buildUnitGrid();
   separate();
@@ -1479,6 +1536,7 @@ function tick() {
   tickFire();
   assignSeasonWork();
   drillSoldiers();
+  spawnWild();
   updateCover();
 
   for (const u of S.units) {
@@ -1588,6 +1646,7 @@ function defeatCauses() {
   const st = S.stats, out = [];
   if (st.starved >= 2) out.push([5, `🍚 The granary ran dry${st.starveSeason ? ` in ${st.starveSeason === "yala" ? "the Yala dry season" : "the Maha monsoon"}` : ""} and ${st.starved} famil${st.starved === 1 ? "y" : "ies"} left. Keep about one watered paddy per house.`]);
   else if (st.hungry >= 20) out.push([3, "🍚 The granary was empty for long stretches, so few new families came to work and fight."]);
+  if ((st.eaten || 0) >= 3) out.push([3, `🐘 Wild elephants ate ${st.eaten} paddies. A staffed pela by the fields keeps them off.`]);
   for (const e of st.lastFrom || []) {
     const { towers, archers, walls } = edgeDefence(e);
     if (!towers && !archers) out.push([4, `🏹 The ${e} side had no archers or watchtowers to meet the last raid.`]);

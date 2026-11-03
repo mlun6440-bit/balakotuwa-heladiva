@@ -21,12 +21,12 @@ const args = process.argv.slice(2);
 const opt = (k, d) => { const i = args.indexOf(k); return i >= 0 ? args[i + 1] : d; };
 const mode = args[0] === "learn" ? "learn" : "evaluate";
 const outDir = path.resolve(root, opt("--out", "docs/playtest"));
-const levels = opt("--levels", "1,2,3,4,5").split(",").map(Number);
+const levelsArg = opt("--levels", null);
 const GENS = Number(opt("--gens", "3")), LAMBDA = Number(opt("--lambda", "6")), REPS = Number(opt("--reps", "2"));
 const PAGES = Number(opt("--pages", "4")), LIMIT = Number(opt("--limit", "1500"));
 const brainFile = path.join(root, "tools/playtest-brain.json");
 fs.mkdirSync(outDir, { recursive: true });
-const brain = fs.existsSync(brainFile) ? JSON.parse(fs.readFileSync(brainFile, "utf8")) : { version: 1, levels: {} };
+const brain = fs.existsSync(brainFile) ? JSON.parse(fs.readFileSync(brainFile, "utf8")) : { version: 2, levels: {} };
 
 // ---------- running games ----------
 const browser = await chromium.launch();
@@ -44,6 +44,15 @@ async function newPage() {
 const pool = [];
 for (let i = 0; i < PAGES; i++) pool.push(await newPage());
 const DIALS = await pool[0].evaluate(() => BOT.DIALS);
+// Learned dials are kept per level id, so inserting a level never shifts them.
+const LEVEL_IDS = await pool[0].evaluate(() => LEVELS.map(L => L.id));
+const levels = levelsArg ? levelsArg.split(",").map(Number) : LEVEL_IDS.map((_, i) => i + 1);
+if ((brain.version || 1) < 2) { // version 1 was keyed 1..5 by the first campaign's order
+  const old = ["anuradhapura", "dryzone", "lionrock", "parakrama", "senkadagala"];
+  brain.levels = Object.fromEntries(Object.entries(brain.levels).map(([k, v]) => [old[Number(k) - 1] || k, v]));
+  brain.version = 2;
+}
+const mind = lv => brain.levels[LEVEL_IDS[lv - 1]];
 const DEFAULTS = await pool[0].evaluate(() => BOT.DEFAULTS);
 
 async function play(page, lv, style, P, shotPrefix = null) {
@@ -121,7 +130,7 @@ function mutate(P, sigma) {
 }
 if (mode === "learn") {
   for (const lv of levels) {
-    const mem = brain.levels[lv] || (brain.levels[lv] = { P: { ...DEFAULTS }, sigma: 0.25, history: [] });
+    const mem = mind(lv) || (brain.levels[LEVEL_IDS[lv - 1]] = { P: { ...DEFAULTS }, sigma: 0.25, history: [] });
     mem.P = { ...DEFAULTS, ...mem.P }; // new dials get their defaults
     // the game may have changed since the last run: score the incumbent again
     let best = mem.P, bestScore = mean((await runAll(Array.from({ length: REPS }, () => ({ lv, style: "planner", P: best })))).map(score));
@@ -148,7 +157,7 @@ if (mode === "learn") {
 const jobs = [];
 for (const lv of levels) {
   jobs.push({ lv, style: "novice", P: DEFAULTS });
-  jobs.push({ lv, style: "planner", P: { ...DEFAULTS, ...(brain.levels[lv]?.P || {}) }, shot: `L${lv}` });
+  jobs.push({ lv, style: "planner", P: { ...DEFAULTS, ...(mind(lv)?.P || {}) }, shot: `L${lv}` });
 }
 const results = await runAll(jobs);
 for (const r of results) console.log(`L${r.level} ${r.style.padEnd(7)} ${r.outcome.padEnd(10)} t=${r.time}s citadel ${r.citadel}% stars ${r.stars} raids ${r.raidsDone}/${r.raids} starved ${r.starved} burned ${r.burned} trampled ${r.trampled} looted ${r.looted} tributes ${r.tributes} errors ${r.errors.length}`);
@@ -190,7 +199,7 @@ function report(results) {
     if (errs.length) F.push(`${tag} **page errors:** ${[...new Set(errs)].join("; ")}`);
   }
   // what the learner chose tells us which systems matter
-  const learned = levels.map(lv => brain.levels[lv]?.P).filter(Boolean);
+  const learned = levels.map(lv => mind(lv)?.P).filter(Boolean);
   if (learned.length) {
     const avg = k => mean(learned.map(P => P[k] ?? DEFAULTS[k]));
     if (avg("tribute") < 0.3) F.push(`**Tribute:** the learner almost never pays it (dial ${avg("tribute").toFixed(2)}). Either it is priced too high or fighting is too easy.`);
@@ -205,7 +214,7 @@ function report(results) {
     "- Raids involve randomness; a single run per bot is a sample, not a verdict. Learning averages several runs per candidate.", "");
   L.push("## Learning history", "");
   for (const lv of levels) {
-    const m = brain.levels[lv];
+    const m = mind(lv);
     L.push(`- L${lv}: ${m ? `${m.history.length} generations, best score ${m.score ?? "?"}; recent ${m.history.slice(-5).map(h => h.score).join(" → ")}` : "not trained yet (default dials)"}`);
   }
   L.push("", "## Screens (learned planner)", "");

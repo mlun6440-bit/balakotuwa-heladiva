@@ -176,7 +176,8 @@ function elephant(c, pose) {
   const act = pose.act;
   const rear = act >= 0 ? Math.sin(act * Math.PI) * 3 : 0;
   c.fillStyle = "rgba(0,0,0,0.3)"; c.beginPath(); c.ellipse(1, 0.5, 17, 5, 0, 0, 7); c.fill();
-  const skin = "#6e6e74";
+  const wild = !!pose.wild; // a wild elephant: dusty red-brown, no caparison, howdah or mahout
+  const skin = wild ? "#7a6458" : "#6e6e74";
   const leg = (x, o, far) => {
     const col = far ? shadeC(skin, 0.72) : skin;
     c.fillStyle = shadeFill(c, x - 2.6, x + 2.6, col);
@@ -188,7 +189,7 @@ function elephant(c, pose) {
   // body
   c.save(); c.translate(0, bob - rear * 0.3); c.rotate(-rear * 0.02);
   const gr = c.createRadialGradient(-5, -22, 3, 0, -16, 18);
-  gr.addColorStop(0, "#9a9aa2"); gr.addColorStop(0.6, skin); gr.addColorStop(1, "#4a4a50");
+  gr.addColorStop(0, wild ? "#a08878" : "#9a9aa2"); gr.addColorStop(0.6, skin); gr.addColorStop(1, wild ? "#4a3a32" : "#4a4a50");
   c.fillStyle = gr;
   c.beginPath(); c.ellipse(-1, -17, 14, 9.5, 0, 0, 7); c.fill();
   // skin wrinkles
@@ -197,19 +198,27 @@ function elephant(c, pose) {
   // head
   c.fillStyle = gr; c.beginPath(); c.ellipse(12, -20, 6.5, 7, 0.2, 0, 7); c.fill();
   // ear
-  c.fillStyle = shadeFill(c, 6, 13, "#7a7a82");
+  c.fillStyle = shadeFill(c, 6, 13, wild ? "#86705f" : "#7a7a82");
   c.beginPath(); c.ellipse(9.4, -19, 4, 5.6, -0.25, 0, 7); c.fill();
   c.strokeStyle = "rgba(40,40,45,0.4)"; c.stroke();
   // trunk
   const tr = act >= 0 ? -act * 8 : Math.sin(ph * 0.5) * 1.5;
-  c.strokeStyle = "#626268"; c.lineWidth = 3.6; c.lineCap = "round";
+  c.strokeStyle = wild ? "#6a564a" : "#626268"; c.lineWidth = 3.6; c.lineCap = "round";
   c.beginPath(); c.moveTo(17, -18); c.quadraticCurveTo(21, -9 + tr * 0.5, 19 + tr * 0.2, -2 + tr); c.stroke();
   c.strokeStyle = "rgba(255,255,255,0.15)"; c.lineWidth = 1; c.beginPath(); c.moveTo(16.4, -18); c.quadraticCurveTo(20, -9 + tr * 0.5, 18.4 + tr * 0.2, -2.5 + tr); c.stroke();
   for (let i = 0; i < 6; i++) { c.strokeStyle = "rgba(40,40,45,0.4)"; c.lineWidth = 0.3; const y = -15 + i * 2.2; c.beginPath(); c.moveTo(18.5, y + tr * i * 0.08); c.lineTo(20.5, y + 0.5 + tr * i * 0.08); c.stroke(); }
   // tusk with brass cap
   c.strokeStyle = "#f4efe2"; c.lineWidth = 1.6; c.beginPath(); c.moveTo(16, -14); c.quadraticCurveTo(20, -12, 23, -15); c.stroke();
-  c.fillStyle = "#c9a24a"; c.fillRect(21.8, -16.2, 1.6, 1.6);
+  if (!wild) { c.fillStyle = "#c9a24a"; c.fillRect(21.8, -16.2, 1.6, 1.6); }
   c.fillStyle = "#1a1a1a"; c.beginPath(); c.arc(14.2, -22, 0.6, 0, 7); c.fill();
+  if (wild) {
+    // dust on the back and mud on the legs, nothing else
+    c.fillStyle = "rgba(170,120,80,0.35)"; c.beginPath(); c.ellipse(-2, -24, 11, 3, 0, 0, 7); c.fill();
+    c.restore();
+    leg(-6, sw * 2.4, false); leg(9, -sw * 2.4, false);
+    c.restore();
+    return;
+  }
   // caparison (headdress plate and body cloth)
   c.fillStyle = "#a8321e";
   c.beginPath(); c.moveTo(-11, -24); c.quadraticCurveTo(-1, -29, 8, -24); c.lineTo(9, -12); c.quadraticCurveTo(-1, -9, -12, -12); c.closePath(); c.fill();
@@ -235,6 +244,10 @@ function elephant(c, pose) {
 for (let i = 0; i < WALK; i++) ART.add(`u.elephant.f.w${i}`, () => { if (!MODE.shadow) elephant(g, { walk: true, ph: (i / WALK) * Math.PI * 2, act: -1 }); }, { k: 4, size: 70, shadow: false });
 ART.add("u.elephant.f.i0", () => { if (!MODE.shadow) elephant(g, { walk: false, ph: 0, act: -1 }); }, { k: 4, size: 70, shadow: false });
 for (let i = 0; i < ACT; i++) ART.add(`u.elephant.f.a${i}`, () => { if (!MODE.shadow) elephant(g, { walk: false, ph: 0, act: (i + 0.5) / ACT }); }, { k: 4, size: 70, shadow: false });
+// wild elephant (aliya): walk, stand, and the act frames are the trunk pulling up rice
+for (let i = 0; i < WALK; i++) ART.add(`u.aliya.f.w${i}`, () => { if (!MODE.shadow) elephant(g, { walk: true, ph: (i / WALK) * Math.PI * 2, act: -1, wild: true }); }, { k: 4, size: 70, shadow: false });
+ART.add("u.aliya.f.i0", () => { if (!MODE.shadow) elephant(g, { walk: false, ph: 0, act: -1, wild: true }); }, { k: 4, size: 70, shadow: false });
+for (let i = 0; i < ACT; i++) ART.add(`u.aliya.f.a${i}`, () => { if (!MODE.shadow) elephant(g, { walk: false, ph: 0, act: (i + 0.5) / ACT, wild: true }); }, { k: 4, size: 70, shadow: false });
 
 // ----- raider stone thrower (side view, mirrored at runtime) -----
 function thrower(c, pose) {

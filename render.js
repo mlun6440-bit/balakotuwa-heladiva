@@ -1424,7 +1424,7 @@ function stride(o) {
   return g;
 }
 function drawWorkerSprite(w, now) {
-  const job = w.job === "bucket" || w.job === "shramadana" || w.job === "attam" ? "farmer" : w.job === "gatherer" ? "woodcutter" : w.job;
+  const job = w.job === "bucket" || w.job === "shramadana" || w.job === "attam" || w.job === "watchman" ? "farmer" : w.job === "gatherer" ? "woodcutter" : w.job;
   if (hasSprite(`u3d.v.${job}.d0.i0`)) {
     // pre-rendered 3D villager: 8 directions; carried loads are baked in
     const g = stride(w);
@@ -1511,16 +1511,17 @@ function drawUnit(u, now) {
   else if (hasSprite(`${base}.f.i0`)) {
     const g = stride(u);
     const since = S.time - u.last;
+    const side = !hasSprite(`${base}.b.i0`); // side-view art (elephants, thrower) is mirrored only
     let fr;
     if (since >= 0 && since < 0.45) fr = `a${Math.min(2, Math.floor(since / 0.15))}`;
-    else if (g.moving) fr = `w${Math.floor(g.d * (u.type === "elephant" ? 4 : 7)) % 6}`;
+    else if (g.moving) fr = `w${Math.floor(g.d * (u.def.heavy && side ? 4 : 7)) % 6}`;
     else fr = "i0";
-    const f = u.type === "elephant" || !g.back ? "f" : "b";
+    const f = side || !g.back ? "f" : "b";
     drawSprite(`${base}.${f}.${fr}`, u.gx, u.gy, u.z, { flip: g.flip });
     // hidden in the forest: foliage in front of the soldier
     if (u.team === "p" && typeof inCover === "function" && inCover(u)) drawSprite(`bush.${S.season}.${u.uid % 3}`, u.gx + 0.08, u.gy + 0.08, 0, { scale: u.type === "elephant" ? 1.4 : 0.85, alpha: 0.9 });
   }
-  else if (u.type === "elephant") drawElephant(p, u, now);
+  else if (u.type === "elephant" || u.type === "aliya") drawElephant(p, u, now);
   else if (u.team === "p") {
     const look = {
       archer: { upper: "#2f8f4e", lower: "#f2efe6", item: "bow", head: "turban", headCol: "#2f8f4e" },
@@ -1942,7 +1943,7 @@ function renderMinimap() {
   }
   for (const u of S.units) {
     const [a, c] = px(u.gx, u.gy);
-    mctx.fillStyle = u.team === "p" ? "#6cc070" : "#ff4a3a";
+    mctx.fillStyle = u.team === "p" ? "#6cc070" : u.team === "w" ? "#c8c4b8" : "#ff4a3a";
     mctx.fillRect(a - 1, c - 1, 2.5, 2.5);
   }
   const soon = nextWaveIn();

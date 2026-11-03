@@ -27,7 +27,8 @@ const BOT = (() => {
     moat: [0, 0, 12],                 // moat tiles dug from the network toward the raid
     tribute: [0, 0, 3],               // pay tribute if gold > cost × this (0 = never)
     reserve: [1, 0, 1],               // hold back resources a "store N" objective needs
-    decrees: [1, 0, 1]
+    decrees: [1, 0, 1],
+    pelas: [1, 0, 3]                  // watch huts among the paddies (levels with wild elephants)
   };
   const DEFAULTS = Object.fromEntries(Object.entries(DIALS).map(([k, v]) => [k, v[0]]));
   const log = [];
@@ -125,6 +126,15 @@ const BOT = (() => {
     const d = BUILDINGS[id];
     const t = best(id, (x, y) => (tooClose(x, y, d.w, d.h) ? 1e9 : 0) + Math.abs(d2c(x, y) - distWant), maxR);
     return t && place(id, t[0], t[1], why);
+  }
+
+  // a watch hut placed where it covers the most paddies within PELA_RANGE
+  function pela(why) {
+    if (!S.unlocked.buildings.has("pela") || !canAfford("pela")) return false;
+    const fields = S.buildings.filter(b => b.id === "paddy" && !S.buildings.some(p => p.id === "pela" && rectDist({ gx: p.gx + 0.5, gy: p.gy + 0.5 }, b) <= PELA_RANGE - 1));
+    if (!fields.length) return false;
+    const t = best("pela", (x, y) => -fields.filter(b => rectDist({ gx: x + 0.5, gy: y + 0.5 }, b) <= PELA_RANGE - 1).length * 5 + d2c(x, y) * 0.2, 11);
+    return t && place("pela", t[0], t[1], why);
   }
 
   // ---------- defence ----------
@@ -265,6 +275,9 @@ const BOT = (() => {
     if (!novice && count("paddy") >= 3 && !count("bissa")) near("bissa", "granary", 3);
     if (!novice && S.unlocked.buildings.has("pansala") && !count("pansala") && S.gold > 60) near("pansala", "harmony");
     if (!novice && S.unlocked.buildings.has("kammala") && !count("kammala") && count("barracks")) near("kammala", "cheaper soldiers");
+
+    // wild elephants: the novice heeds the advisor, the planner builds by its dial
+    if (S.L.wild && count("pela") < (novice ? (S.warnedWild ? 1 : 0) : Math.round(P.pelas ?? 1)) && count("paddy")) pela(novice ? "the advisor said elephants" : "against elephants");
 
     // defence
     const wantBarracks = novice ? S.tutorialStep >= 5 || (S.idx > 0 && nextWaveIn() <= 35) : S.time >= P.barracksAt;
