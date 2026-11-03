@@ -887,7 +887,7 @@ function updateWorker(w, dt) {
           w.timer = 6;
           // Pola orders (👑 tab): sell rice above a level, buy timber/stone below one at a markup
           const m = S.market || (S.market = { sell: 30, buy: 0 });
-          if (S.rice > m.sell + 5) { S.rice -= 5; S.gold += 8; spawnFloat("-5🍚 +8🪙", w.gx, w.gy, "#e9b949"); sfx("coin"); }
+          if (S.rice > sellAbove() + 5) { S.rice -= 5; S.gold += 8; spawnFloat("-5🍚 +8🪙", w.gx, w.gy, "#e9b949"); sfx("coin"); }
           else if (S.gold >= 12 && (S.timber < m.buy || S.stone < m.buy)) {
             const k = S.timber <= S.stone ? "timber" : "stone";
             S.gold -= 12; S[k] += 5; spawnFloat(`-12🪙 +5${RES[k]}`, w.gx, w.gy, "#e9b949"); sfx("coin");
@@ -1727,12 +1727,17 @@ function affordable(cost) {
   return Object.entries(cost).every(([k, v]) => S[k] >= v);
 }
 
+// The trader never sells the families' food: two rice per villager stay in
+// store whatever the 👑 sell limit says.
+const RICE_RESERVE = 2;
+const sellAbove = () => Math.max((S.market || { sell: 30 }).sell, S.villagers * RICE_RESERVE);
+
 // Pola orders: two thresholds the market's trader follows.
 function marketCard(pal) {
   const m = S.market || (S.market = { sell: 30, buy: 0 });
   const c = document.createElement("div");
   c.className = "card wide";
-  c.title = "The market's trader sells 5 rice for 8 gold above the first level, and buys 5 timber or stone for 12 gold below the second.";
+  c.title = `The trader sells 5 rice for 8 gold above the first level (never below ${RICE_RESERVE} per villager, now ${sellAbove()}), and buys 5 timber or stone for 12 gold below the second.`;
   c.innerHTML = `<div class="card-head">⚖️ Pola orders</div><div class="card-desc">
     <span>Sell 🍚 above</span><button class="btn" data-m="sell,-10">−</button><b>${m.sell}</b><button class="btn" data-m="sell,10">+</button>
     <span>Buy 🪵🪨 below</span><button class="btn" data-m="buy,-10">−</button><b>${m.buy}</b><button class="btn" data-m="buy,10">+</button></div>`;
