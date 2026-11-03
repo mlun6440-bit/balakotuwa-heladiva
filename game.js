@@ -1464,13 +1464,15 @@ function tick() {
 
   S.waveClock++;
   while (nextWaveIn() <= 0) launchWave();
-  if (nextWaveIn() === 20 && S.warnedWave !== S.nextWave) {
+  if (nextWaveIn() === SCOUT_AT && S.warnedWave !== S.nextWave) {
     S.warnedWave = S.nextWave;
     const from = S.L.waves[S.nextWave].from;
-    const fresh = from.filter(e => !S.L.waves.slice(0, S.nextWave).some(w => w.from.includes(e)));
-    say(fresh.length && S.nextWave > 0
-      ? `Scouts report raiders coming from the ${fresh.join(" and ")} for the first time, in 20 seconds! That side may have no towers or archers yet.`
-      : `Scouts report raiders from the ${from.join(" and ")} in 20 seconds.`, true);
+    const open = from.filter(e => { const d = edgeDefence(e); return !d.towers && !d.archers; });
+    S.scoutOpen = open; // read by the playtest novice, which follows hints
+    const fix = S.unlocked.buildings.has("tower") ? "Post archers there or raise a watchtower." : "Post archers there (select them, right-click).";
+    say(open.length
+      ? `Scouts report raiders from the ${from.join(" and ")} in ${SCOUT_AT} seconds, and the ${open.join(" and ")} side${open.length > 1 ? "s have" : " has"} no archers or towers! ${fix}`
+      : `Scouts report raiders from the ${from.join(" and ")} in ${SCOUT_AT} seconds.`, true);
   }
 
   tickWater();
@@ -1564,19 +1566,30 @@ function checkVictory() {
   if (S.L.objectives.every(o => { const r = objective(o); return r.cur >= r.n; })) endLevel(true);
 }
 
+// Which side of the citadel a tile is on, and what stands guard there.
+// Shared by the scouts' warning and the defeat screen.
+const SCOUT_AT = 45;
+function sideTest(edge) {
+  const c = S.citadel, cx = c.gx + 1, cy = c.gy + 1;
+  return { east: (x, y) => x > cx + 1, west: (x, y) => x < cx - 1, north: (x, y) => y < cy - 1, south: (x, y) => y > cy + 1 }[edge] || (() => false);
+}
+function edgeDefence(edge) {
+  const inSide = sideTest(edge);
+  return {
+    towers: S.buildings.filter(b => b.def.tower && b !== S.citadel && inSide(b.gx, b.gy)).length,
+    archers: S.units.filter(u => u.team === "p" && u.def.ranged && inSide(u.gx, u.gy)).length,
+    walls: S.buildings.filter(b => b.def.wall && inSide(b.gx, b.gy)).length
+  };
+}
+
 // ==================== WHY THE CITADEL FELL ====================
 // Hard but fair: the defeat screen names the likely causes, most telling first.
 function defeatCauses() {
   const st = S.stats, out = [];
-  const c = S.citadel, cx = c.gx + 1, cy = c.gy + 1;
-  const side = { east: (x, y) => x > cx + 1, west: (x, y) => x < cx - 1, north: (x, y) => y < cy - 1, south: (x, y) => y > cy + 1 };
   if (st.starved >= 2) out.push([5, `🍚 The granary ran dry${st.starveSeason ? ` in ${st.starveSeason === "yala" ? "the Yala dry season" : "the Maha monsoon"}` : ""} and ${st.starved} famil${st.starved === 1 ? "y" : "ies"} left. Keep about one watered paddy per house.`]);
   else if (st.hungry >= 20) out.push([3, "🍚 The granary was empty for long stretches, so few new families came to work and fight."]);
   for (const e of st.lastFrom || []) {
-    const inSide = side[e] || (() => false);
-    const towers = S.buildings.filter(b => b.id === "tower" && inSide(b.gx, b.gy)).length;
-    const archers = S.units.filter(u => u.team === "p" && u.def.ranged && inSide(u.gx, u.gy)).length;
-    const walls = S.buildings.filter(b => b.def.wall && inSide(b.gx, b.gy)).length;
+    const { towers, archers, walls } = edgeDefence(e);
     if (!towers && !archers) out.push([4, `🏹 The ${e} side had no archers or watchtowers to meet the last raid.`]);
     else if (!walls && (st.lastSize || 0) >= 6) out.push([2, `🧱 No walls stood on the ${e} side, so the raiders walked straight in.`]);
   }

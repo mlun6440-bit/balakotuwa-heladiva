@@ -192,6 +192,16 @@ const BOT = (() => {
       if (S.units.length > n0) note(`trained ${id}`); else return;
     }
   }
+  function heedScouts(open) {
+    const c = C();
+    open.forEach((e, i) => {
+      towerFacing(e, 0);
+      const [ex, ey] = EDGE[e];
+      let archer = S.units.find(u => u.team === "p" && u.def.ranged && u.guard === e);
+      if (!archer && affordable(troopCost("archer")) && S.villagers >= 3) { const n0 = S.units.length; recruit("archer"); if (S.units.length > n0) { archer = S.units[S.units.length - 1]; archer.guard = e; note(`archer to guard ${e}`); } }
+      if (archer) { archer.tx = clamp(c.x + ex * 3.2, 0.3, MAP - 0.3); archer.ty = clamp(c.y + ey * 3.2, 0.3, MAP - 0.3); archer.ordered = true; }
+    });
+  }
   // archers go up on towers and on walls facing the raid; the rest form up in front of the citadel
   function rally(edge) {
     const [ex, ey] = EDGE[edge], c = C();
@@ -270,6 +280,8 @@ const BOT = (() => {
     const target = novice ? (raidSoon || under ? 3 : 0) : Math.round(P.armyBase + S.nextWave * P.armyPerRaid);
     army(target, style);
     if (raidSoon || under) rally(nextFrom()[0]);
+    // the novice follows the scouts' warning: a tower and an archer for each side left open
+    if (novice && raidSoon && S.scoutOpen && S.scoutOpen.length) heedScouts(S.scoutOpen);
     // sally out: melee soldiers go after siege engines that outrange the walls
     const engine = !novice && S.units.find(u => u.team === "e" && u.def.siege && u.hp > 0);
     if (engine) S.units.filter(u => u.team === "p" && !u.def.ranged).forEach((u, i) => {
