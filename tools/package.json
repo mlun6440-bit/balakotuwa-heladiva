@@ -1,0 +1,9 @@
+{
+  "name": "balakotuwa-tools",
+  "private": true,
+  "description": "Offline art and test tools. The game itself has no dependencies.",
+  "type": "module",
+  "devDependencies": {
+    "three": "0.187.0"
+  }
+}

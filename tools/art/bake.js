@@ -6,26 +6,36 @@ function renderOne(item) {
   const k = item.opts.k || 3;
   const SZ = Math.max(200, Math.round((item.opts.size || 300) * 1.7)); // world px canvas, generous; trimmed after
   item.opts.oy = 0.5;
-  const c = document.createElement("canvas");
-  c.width = c.height = SZ * k;
-  g = c.getContext("2d");
-  g.setTransform(k, 0, 0, k, (SZ * k) / 2, (SZ * k) * (item.opts.oy ?? 0.72));
-  R = rng(item.key);
-  MODE.shadow = false;
-  item.draw(item.opts.arg);
+  let c;
+  if (item.opts.render3d) {
+    // 3D model (tools/art3d): rendered through the isometric camera
+    c = item.opts.render3d({ k, SZ, oy: item.opts.oy });
+  } else {
+    c = document.createElement("canvas");
+    c.width = c.height = SZ * k;
+    g = c.getContext("2d");
+    g.setTransform(k, 0, 0, k, (SZ * k) / 2, (SZ * k) * (item.opts.oy ?? 0.72));
+    R = rng(item.key);
+    MODE.shadow = false;
+    item.draw(item.opts.arg);
+  }
   if (item.opts.outline !== false) outline(c, item.opts.outlineK ?? 0.62);
   const out = trim(c, k, SZ, item.opts.oy ?? 0.72, item.key);
   out.key = item.key; out.k = k;
   let shadow = null;
   if (item.opts.shadow !== false) {
-    const s = document.createElement("canvas");
-    s.width = s.height = SZ * k;
-    g = s.getContext("2d");
-    g.setTransform(k, 0, 0, k, (SZ * k) / 2, (SZ * k) * (item.opts.oy ?? 0.72));
-    R = rng(item.key);
-    MODE.shadow = true;
-    item.draw(item.opts.arg);
-    MODE.shadow = false;
+    let s;
+    if (item.opts.render3d) s = item.opts.render3d({ k, SZ, oy: item.opts.oy, shadowOnly: true });
+    else {
+      s = document.createElement("canvas");
+      s.width = s.height = SZ * k;
+      g = s.getContext("2d");
+      g.setTransform(k, 0, 0, k, (SZ * k) / 2, (SZ * k) * (item.opts.oy ?? 0.72));
+      R = rng(item.key);
+      MODE.shadow = true;
+      item.draw(item.opts.arg);
+      MODE.shadow = false;
+    }
     // soften
     const b = document.createElement("canvas");
     b.width = b.height = SZ * k;

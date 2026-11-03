@@ -1418,6 +1418,7 @@ function stride(o) {
   if (m > 0.002) {
     const sx = dx - dy, sy = dx + dy;
     g.back = sy < -0.05 * m; g.flip = sx < 0;
+    g.ang = Math.atan2(dy, dx); // world heading, for 8-direction 3D sprites
   }
   g.d += m; g.x = o.gx; g.y = o.gy;
   return g;
@@ -1497,7 +1498,19 @@ function drawUnit(u, now) {
   }
   const moving = u.team === "p" ? Math.hypot(u.tx - u.gx, u.ty - u.gy) > 0.15 : true;
   const base = `u.${u.type}`;
-  if (hasSprite(`${base}.f.i0`)) {
+  if (hasSprite(`u3d.${u.type}.d0.i0`)) {
+    // pre-rendered 3D unit: 8 true directions, 8-frame walk
+    const g = stride(u);
+    const d = (((Math.round((g.ang ?? Math.PI / 4) / (Math.PI / 4))) % 8) + 8) % 8;
+    const since = S.time - u.last;
+    let fr;
+    if (since >= 0 && since < 0.45) fr = `a${Math.min(2, Math.floor(since / 0.15))}`;
+    else if (g.moving) fr = `w${Math.floor(g.d * 9.3) % 8}`;
+    else fr = "i0";
+    drawSprite(`u3d.${u.type}.d${d}.${fr}`, u.gx, u.gy, u.z);
+    if (u.team === "p" && typeof inCover === "function" && inCover(u)) drawSprite(`bush.${S.season}.${u.uid % 3}`, u.gx + 0.08, u.gy + 0.08, 0, { scale: 0.85, alpha: 0.9 });
+  }
+  else if (hasSprite(`${base}.f.i0`)) {
     const g = stride(u);
     const since = S.time - u.last;
     let fr;
