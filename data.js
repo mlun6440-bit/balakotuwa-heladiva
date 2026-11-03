@@ -22,6 +22,7 @@ const RES = { timber: "🪵", stone: "🪨", rice: "🍚", gold: "🪙" };
 // flammable: thatch or timber that raider fire arrows can set alight.
 // upgrade: { to, cost } lets the ⬆️ Upgrade tool rebuild it in place.
 // thorn: walkable, but slows and scratches raiders; raiders path around it.
+// moat: a canal tile that slows raiders to a crawl while its network holds water.
 // worker: job type staffed by one villager. store: drop-off for those resources.
 const BUILDINGS = {
   citadel:    { name: "Maligawa (Citadel)", cat: null, icon: "🏯", w: 2, h: 2, hp: 2500, solid: true, z: 40, store: ["timber", "stone", "rice"],
@@ -31,6 +32,8 @@ const BUILDINGS = {
                 desc: "Stores Maha rain; silt builds up, and idle villagers dig it out in Yala." },
   canal:      { name: "Ela (Canal)", cat: "water", icon: "〰️", w: 1, h: 1, hp: 150, cost: { stone: 1 }, ground: true, water: true, paint: true,
                 desc: "Carries wewa water to paddies; drag to paint." },
+  moat:       { name: "Diya Agala (Moat)", cat: "water", icon: "🌊", w: 1, h: 1, hp: 300, cost: { stone: 2, timber: 1 }, ground: true, water: true, moat: true, paint: true,
+                desc: "A ditch on your canal network; when it holds water, raiders wade through at a crawl." },
   sluice:     { name: "Sorowwa (Sluice)", cat: "water", icon: "🚪", w: 1, h: 1, hp: 400, cost: { timber: 6, stone: 8 }, ground: true, water: true,
                 desc: "Click to flood its canals, slowing and drowning raiders." },
 
@@ -153,7 +156,7 @@ const LEVELS = [
     rivers: [{ edge: "north", at: 0, width: 1, wobble: 1 }],
     rocks: [[3, 18, 7, 23], [20, 4, 23, 7]],
     forests: [[3, 4, 8, 10, 0.4], [17, 18, 23, 24, 0.35]],
-    unlocks: { buildings: ["sluice", "tower", "pansala"] },
+    unlocks: { buildings: ["sluice", "moat", "tower", "pansala"] },
     waves: [{ t: 160, from: ["east"], raider: 4, bowman: 1 }, { t: 280, from: ["south"], raider: 5, bowman: 2 }, { t: 400, from: ["east"], raider: 6, bowman: 2 }],
     hpScale: 1.1,
     objectives: [{ type: "water", n: 150 }, { type: "res", key: "rice", n: 120 }, { type: "waves" }]

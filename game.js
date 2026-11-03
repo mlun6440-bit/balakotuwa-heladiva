@@ -457,7 +457,7 @@ function enterCost(x, y) {
   const t = S.tiles[y][x].t;
   let c = t === "river" ? 6 : t === "rock" ? 1.6 : 1;
   const b = S.occ[y][x];
-  if (b && b !== S.citadel) c += b.def.solid ? 3 + b.maxHp / 90 : b.def.thorn ? 4 : 0.3;
+  if (b && b !== S.citadel) c += b.def.solid ? 3 + b.maxHp / 90 : b.def.thorn ? 4 : b.def.moat ? 4 : 0.3;
   return c;
 }
 
@@ -538,6 +538,8 @@ function updateNetWater() {
     }
   }
 }
+
+const moatWet = b => { const id = S.netOf[b.gy][b.gx]; return id !== -1 && S.nets[id].water >= 1; };
 
 function drainNet(net, amt) {
   const ws = [...net.wewas].sort((a, b) => b.water - a.water);
@@ -945,6 +947,7 @@ function terrainMult(u) {
   if (!inb(x, y)) return 1;
   if (u.team === "e" && S.flooded.has(y * MAP + x)) return 0.4;
   if (u.team === "e" && S.occ[y][x] && S.occ[y][x].def.thorn) return 0.45; // pushing through thorns
+  if (u.team === "e" && S.occ[y][x] && S.occ[y][x].def.moat) return moatWet(S.occ[y][x]) ? 0.3 : 0.75; // wading a moat
   if (u.team === "e" && coverAt(u.gx, u.gy) >= 3) return 0.7; // thick jungle
   const t = S.tiles[y][x].t;
   return t === "river" ? 0.55 : t === "rock" ? 0.85 : 1;
@@ -1870,6 +1873,7 @@ function describe(b) {
   }
   if (b.id === "paddy") lines.push(`Growth ${Math.round(b.growth)}% · ${b.irrigated ? "irrigated" : "dry"}`);
   if (b.id === "sluice") lines.push(b.open ? "Open: flooding canals. Click to close." : "Closed. Click to flood the canals.");
+  if (b.def.moat) lines.push(moatWet(b) ? "🌊 Holding water: raiders wade at a crawl" : "Dry ditch: link it to a wewa with water");
   if (b.def.water && b.id !== "wewa") {
     const id = S.netOf[b.gy][b.gx];
     lines.push(id !== -1 && S.nets[id].wewas.size ? `Network water ${Math.round(S.nets[id].water)}` : "Not connected to a wewa");

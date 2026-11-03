@@ -719,7 +719,7 @@ function drawGround(b, now) {
   }
   if (hasSprite("wewa.base")) {
     if (b.id === "wewa") return drawWewaSprite(b, now);
-    if (b.id === "canal" || b.id === "sluice") return drawCanalSprite(b, now);
+    if (b.id === "canal" || b.id === "sluice" || b.id === "moat") return drawCanalSprite(b, now);
     if (b.id === "paddy") return drawPaddySprite(b, now);
   }
   if (b.id === "wewa") drawWewa(b, now);
@@ -869,17 +869,20 @@ function drawCanalSprite(b, now) {
   const { gx, gy } = b;
   const m = canalMask(b);
   drawSprite(`canal.${m}`, gx, gy);
+  if (b.id === "moat") drawMoatStakes(b);
   const id = S.netOf[gy][gx];
   const wet = id !== -1 && S.nets[id].water >= 1;
   const flooded = S.flooded.has(gy * MAP + gx);
   if (!wet && !flooded) return;
-  const z = flooded ? -0.4 : -1.4;
-  const col = flooded ? `rgba(${120 + Math.sin(now * 0.008 + gx + gy) * 25 | 0},200,240,0.92)` : "rgba(46,124,170,0.9)";
+  const moat = b.id === "moat";
+  const z = flooded ? -0.4 : moat ? -0.9 : -1.4;
+  const col = flooded ? `rgba(${120 + Math.sin(now * 0.008 + gx + gy) * 25 | 0},200,240,0.92)` : moat ? "rgba(26,72,112,0.95)" : "rgba(46,124,170,0.9)";
   const r = [[0.33, 0.33, 0.34, 0.34]];
   if (m & 1) r.push([0.67, 0.33, 0.33, 0.34]);
   if (m & 2) r.push([0, 0.33, 0.33, 0.34]);
   if (m & 4) r.push([0.33, 0.67, 0.34, 0.33]);
   if (m & 8) r.push([0.33, 0, 0.34, 0.33]);
+  if (moat) { diamond(gx + 0.12, gy + 0.12, 0.76, 0.76, z, col); }
   for (const [x, y, w, h] of r) diamond(gx + x, gy + y, w, h, z, col);
   // flowing glints
   const t = (now * 0.0006 + gx * 0.3 + gy * 0.2) % 1;
@@ -888,6 +891,15 @@ function drawCanalSprite(b, now) {
   ctx.fillRect(p.x - 1.5, p.y - 0.4, 3, 0.8);
   if (flooded) { const q = iso(gx + 0.5, gy + 0.38 + ((t + 0.5) % 1) * 0.24, z); ctx.fillRect(q.x - 1.5, q.y - 0.4, 3, 0.8); }
 }
+// Sharpened stakes planted along a moat's edge (drawn in the ground pass).
+function drawMoatStakes(b) {
+  for (let i = 0; i < 4; i++) {
+    const t = 0.15 + i * 0.23, p = iso(b.gx + t, b.gy + 0.1, 0), q = iso(b.gx + 0.1, b.gy + t, 0);
+    line(p, { x: p.x + 1, y: p.y - 6 }, "#6b4a28", 1.2);
+    line(q, { x: q.x - 1, y: q.y - 6 }, "#5a3c20", 1.2);
+  }
+}
+
 function drawSluice(b) {
   if (!drawSprite(`sluice.${b.open ? "open" : "closed"}`, b.gx, b.gy)) {
     box(b.gx + 0.12, b.gy + 0.12, 0.2, 0.2, 0, 16, PAL.stone);
@@ -1646,7 +1658,7 @@ function drawGhost() {
   if (!S.tool || !inb(h.gx, h.gy)) return;
   const def = BUILDINGS[S.tool];
   const ok = !canPlace(def, h.gx, h.gy);
-  const gk = { house: "house.0", palisade: "palisade.c", rampart: "rampart.c", gate: "gate.b", canal: "canal.0", sluice: "sluice.closed", paddy: "paddy.w1", wewa: "wewa.front" }[S.tool] || S.tool;
+  const gk = { house: "house.0", palisade: "palisade.c", rampart: "rampart.c", gate: "gate.b", canal: "canal.0", moat: "canal.0", sluice: "sluice.closed", paddy: "paddy.w1", wewa: "wewa.front" }[S.tool] || S.tool;
   if (hasSprite(gk)) {
     diamond(h.gx, h.gy, def.w, def.h, 0, ok ? "rgba(110,230,110,0.35)" : "rgba(245,75,75,0.4)", ok ? "rgba(140,255,140,0.9)" : "rgba(255,110,110,0.9)");
     if (S.tool === "wewa") drawSprite("wewa.base", h.gx, h.gy, 0, { alpha: 0.6 });

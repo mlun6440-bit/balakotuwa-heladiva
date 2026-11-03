@@ -136,21 +136,22 @@
   "2": {
    "P": {
     "paddyPerHouse": 2,
-    "houseRice": 0.64,
-    "maxHouses": 37.62,
-    "woodcutters": 2.52,
+    "houseRice": 0.5,
+    "maxHouses": 17.75,
+    "woodcutters": 2.77,
     "barracksAt": 20.01,
     "armyBase": 10,
     "armyPerRaid": 5,
-    "towersPerEdge": 2.17,
+    "towersPerEdge": 3,
     "towerAt": 5.99,
-    "walls": 6.44,
+    "walls": 7.43,
     "boltTowers": 0.49,
+    "moat": 0,
     "tribute": 0,
-    "reserve": 1,
-    "decrees": 0.58
+    "reserve": 0.94,
+    "decrees": 1
    },
-   "sigma": 0.5,
+   "sigma": 0.41,
    "history": [
     {
      "at": "2026-11-02T11:25",
@@ -261,6 +262,21 @@
      "at": "2026-11-03T09:03",
      "gen": 22,
      "score": 1380
+    },
+    {
+     "at": "2026-11-03T09:07",
+     "gen": 23,
+     "score": 1380
+    },
+    {
+     "at": "2026-11-03T09:07",
+     "gen": 24,
+     "score": 1380
+    },
+    {
+     "at": "2026-11-03T09:07",
+     "gen": 25,
+     "score": 1380
     }
    ],
    "score": 1380
@@ -278,11 +294,12 @@
     "towerAt": 52.9,
     "walls": 0,
     "boltTowers": 1.31,
+    "moat": 0,
     "tribute": 1.67,
     "reserve": 0.69,
     "decrees": 0.67
    },
-   "sigma": 0.32802166445031655,
+   "sigma": 0.1808606490846421,
    "history": [
     {
      "at": "2026-11-02T11:25",
@@ -393,6 +410,21 @@
      "at": "2026-11-03T09:03",
      "gen": 22,
      "score": 1375
+    },
+    {
+     "at": "2026-11-03T09:07",
+     "gen": 23,
+     "score": 1375
+    },
+    {
+     "at": "2026-11-03T09:07",
+     "gen": 24,
+     "score": 1375
+    },
+    {
+     "at": "2026-11-03T09:07",
+     "gen": 25,
+     "score": 1375
     }
    ],
    "score": 1375
@@ -401,20 +433,21 @@
    "P": {
     "paddyPerHouse": 2,
     "houseRice": 0.5,
-    "maxHouses": 10.17,
-    "woodcutters": 1.94,
+    "maxHouses": 11.64,
+    "woodcutters": 3.45,
     "barracksAt": 135.36,
-    "armyBase": 7.82,
-    "armyPerRaid": 3.15,
-    "towersPerEdge": 1.14,
+    "armyBase": 8.41,
+    "armyPerRaid": 2.63,
+    "towersPerEdge": 1.64,
     "towerAt": 157.96,
     "walls": 0,
     "boltTowers": 1.6,
-    "tribute": 0.18,
-    "reserve": 0.33,
+    "moat": 0,
+    "tribute": 0.64,
+    "reserve": 0.24,
     "decrees": 0.22
    },
-   "sigma": 0.31970892030660236,
+   "sigma": 0.2687153475176992,
    "history": [
     {
      "at": "2026-11-02T11:26",
@@ -525,6 +558,21 @@
      "at": "2026-11-03T09:03",
      "gen": 22,
      "score": 1275
+    },
+    {
+     "at": "2026-11-03T09:07",
+     "gen": 23,
+     "score": 1275
+    },
+    {
+     "at": "2026-11-03T09:07",
+     "gen": 24,
+     "score": 1275
+    },
+    {
+     "at": "2026-11-03T09:07",
+     "gen": 25,
+     "score": 1275
     }
    ],
    "score": 1275
@@ -532,21 +580,22 @@
   "5": {
    "P": {
     "paddyPerHouse": 1.49,
-    "houseRice": 0.5,
+    "houseRice": 3.07,
     "maxHouses": 3,
     "woodcutters": 2.75,
-    "barracksAt": 23.1,
-    "armyBase": 0.17,
+    "barracksAt": 246.48,
+    "armyBase": 6.8,
     "armyPerRaid": 3.43,
     "towersPerEdge": 3,
-    "towerAt": 184.41,
-    "walls": 11.15,
+    "towerAt": 0,
+    "walls": 12,
     "boltTowers": 2.88,
+    "moat": 3.58,
     "tribute": 0,
     "reserve": 0.02,
-    "decrees": 0.6
+    "decrees": 1
    },
-   "sigma": 0.4754743014672851,
+   "sigma": 0.41,
    "history": [
     {
      "at": "2026-11-02T11:26",
@@ -707,9 +756,24 @@
      "at": "2026-11-03T09:04",
      "gen": 32,
      "score": 1359
+    },
+    {
+     "at": "2026-11-03T09:07",
+     "gen": 33,
+     "score": 1361
+    },
+    {
+     "at": "2026-11-03T09:08",
+     "gen": 34,
+     "score": 1363
+    },
+    {
+     "at": "2026-11-03T09:08",
+     "gen": 35,
+     "score": 1363
     }
    ],
-   "score": 1359
+   "score": 1363
   }
  }
 }

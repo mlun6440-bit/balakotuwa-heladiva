@@ -24,6 +24,7 @@ const BOT = (() => {
     towerAt: [60, 0, 400],
     walls: [0, 0, 12],                // wall tiles facing the next raid
     boltTowers: [1, 0, 3],            // bolt towers (vs stone throwers) facing the raid
+    moat: [0, 0, 12],                 // moat tiles dug from the network toward the raid
     tribute: [0, 0, 3],               // pay tribute if gold > cost × this (0 = never)
     reserve: [1, 0, 1],               // hold back resources a "store N" objective needs
     decrees: [1, 0, 1]
@@ -138,6 +139,19 @@ const BOT = (() => {
     const t = best("tower", (x, y) => Math.hypot(x - tx, y - ty), 9);
     return t && place("tower", t[0], t[1], `facing ${edge}`);
   }
+  // a moat dug out from the water network toward the raid side, one tile per call
+  function digMoat(edge) {
+    if (!canAfford("moat")) return;
+    const [ex, ey] = EDGE[edge], c = C();
+    let pick = null, ps = Infinity;
+    for (const b of waterTiles()) for (const [dx, dy] of DIRS4) for (let k = 0; k < b.w * b.h; k++) {
+      const x = b.gx + (k % b.w) + dx, y = b.gy + Math.floor(k / b.w) + dy;
+      if (!inb(x, y) || !free("moat", x, y) || tooClose(x, y)) continue;
+      const s = -((x + 0.5 - c.x) * ex + (y + 0.5 - c.y) * ey) + Math.abs(d2c(x, y) - 5) * 0.5;
+      if (s < ps) { ps = s; pick = [x, y]; }
+    }
+    if (pick) place("moat", pick[0], pick[1], `moat toward ${edge}`);
+  }
   // a short wall (rampart if known, else palisade) across the approach
   function wallFacing(edge, n) {
     const id = S.unlocked.buildings.has("rampart") ? "rampart" : "palisade";
@@ -247,6 +261,7 @@ const BOT = (() => {
     if (!count("barracks") && wantBarracks) near("barracks", "train soldiers", 3.5);
     if (!novice && S.time >= P.towerAt) for (const e of nextFrom()) for (let k = 0; k < Math.round(P.towersPerEdge); k++) towerFacing(e, k);
     if (!novice && P.walls >= 1 && S.time > 30) wallFacing(nextFrom()[0], Math.round(P.walls));
+    if (!novice && (P.moat ?? 0) >= 1 && S.unlocked.buildings.has("moat") && count("moat") < Math.round(P.moat)) digMoat(nextFrom()[0]);
     if (!novice && S.unlocked.buildings.has("bolt") && count("bolt") < Math.round(P.boltTowers ?? 1) && S.time > 120) {
       const [ex, ey] = EDGE[nextFrom()[0]], c = C();
       const t = best("bolt", (x, y) => Math.hypot(x - (c.x + ex * 3), y - (c.y + ey * 3)), 8);
