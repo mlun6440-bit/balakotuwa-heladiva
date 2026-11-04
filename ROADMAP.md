@@ -104,6 +104,16 @@ Recorded so these are not re-added without a strong reason:
 - [x] R8 Diya agala (moat) fed by the canal network.
 - [x] R9 Simplify round 3 (below).
 
+## Loop batch 10 (R38–R41)
+
+- [x] R38 Drill masters: gold raises selected soldiers one rank (gold-glut finding).
+- [x] R39 **Cut before shipping: village militia.** Idle villagers mustering
+      when raiders reached the Maligawa. Measured on/off with everything else
+      equal: it flattened the raid tension built in R28/R31 (novice citadel on
+      the dam level 65–91% off, 100% on; Sea of Parakrama 68–88% off, 99% on),
+      even as a last-ditch muster of 4, and did not move the idle share (militia
+      exist only during raids). Not re-add without a cost that keeps raids sharp.
+
 ## Loop batch 9 (R34–R37): from the PC's indie-guide notes (docs/DEV-WORKFLOW.md)
 
 - [x] R34 Every one-shot sound varies a little each time it plays.
