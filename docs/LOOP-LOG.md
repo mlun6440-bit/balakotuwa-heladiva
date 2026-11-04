@@ -19,5 +19,5 @@ The resulting rules are in `docs/ITERATION-GUARDRAILS.md`
 | 6 | Inserting levels would have shifted saved progress and the learned dials, which were keyed by position. | Progress and `tools/playtest-brain.json` are keyed by level id. |
 | 7 | Hena helpers claim trees. Sending a helper home by filtering the list would have left trees claimed forever. | All helper removal goes through `endParty`, which releases claims. |
 | 8 | After seven batches nobody had checked that saves still restore everything new. | `node tools/review.mjs` (save and continue on every level, tooltips, top bar, every building and decree). |
-| 9 | Sound changes were checked by hand-written offline renders (a headless browser can't listen). | `tools/review.mjs` section 5 renders every effect three times and the music; `--selftest` switches variation off and must be caught. |
 | 8 | A checker that has never failed proves nothing. | `node tools/review.mjs --selftest` and `node tools/playtest.mjs detectors` replay known faults and must catch them. |
+| 9 | Sound changes were checked by hand-written offline renders (a headless browser can't listen). | `tools/review.mjs` section 5 renders every effect three times and the music; `--selftest` switches variation off and must be caught. |
