@@ -10,6 +10,11 @@ const SOUND = (() => {
   const beds = {};
   const next = { bird: 0, koel: 0, thunder: 0, frog: 0, drum: 0 };
   let beat = 0;
+  // Every one-shot is varied a little each time it plays (the ear catches exact
+  // repeats fast): pitch, filter and level, chosen once per play. Ambience is not.
+  const SAME = { pitch: 1, filt: 1, vol: 1 };
+  let vary = SAME;
+  const IN_TUNE = new Set(["harvest", "win", "lose"]); // melodic: level only, keep the key
 
   function init() {
     if (ac) return true;
@@ -37,6 +42,8 @@ const SOUND = (() => {
     g.gain.exponentialRampToValueAtTime(0.0001, t + a + d);
   }
   function tone(t, f, { type = "sine", dur = 0.2, vol = 0.2, a = 0.005, f2 = null, out = fx } = {}) {
+    const v = out === fx ? vary : SAME;
+    f *= v.pitch; if (f2) f2 *= v.pitch; vol *= v.vol;
     const o = ac.createOscillator(), g = ac.createGain();
     o.type = type; o.frequency.setValueAtTime(f, t);
     if (f2) o.frequency.exponentialRampToValueAtTime(f2, t + a + dur);
@@ -46,6 +53,8 @@ const SOUND = (() => {
     return o;
   }
   function hiss(t, { dur = 0.2, vol = 0.2, a = 0.003, type = "bandpass", f = 1000, f2 = null, q = 1, out = fx } = {}) {
+    const v = out === fx ? vary : SAME;
+    f *= v.filt; if (f2) f2 *= v.filt; vol *= v.vol;
     const s = ac.createBufferSource(), flt = ac.createBiquadFilter(), g = ac.createGain();
     s.buffer = noise; s.loop = true;
     flt.type = type; flt.frequency.setValueAtTime(f, t); flt.Q.value = q;
@@ -152,7 +161,10 @@ const SOUND = (() => {
   function play(kind) {
     if (!audio.on || !init()) return;
     const f = KINDS[kind];
+    const r = () => Math.random() - 0.5;
+    vary = { pitch: IN_TUNE.has(kind) ? 1 : 2 ** (r() * 0.16), filt: 2 ** (r() * 0.5), vol: 0.85 + Math.random() * 0.3 }; // ±1.4 semitones, ±0.35 octave
     if (f) try { f(ac.currentTime + 0.01); } catch (e) { /* ignore a dropped effect */ }
+    vary = SAME;
   }
   return { init, play, update };
 })();
