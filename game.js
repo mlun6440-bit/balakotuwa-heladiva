@@ -227,7 +227,7 @@ function makeSkirmish(seed, sandbox = false) {
     forests: Array.from({ length: ri(3, 5) }, () => [...rect(ri(4, 7), ri(4, 7)), 0.35 + r() * 0.2]),
     unlocks: {}, all,
     waves: sandbox ? [] : [0, 1, 2].map(k => skirmishWave(k, seed, riverEdge)),
-    hpScale: 1, objectives: [{ type: sandbox ? "sandbox" : "endless" }], wild: { first: 150, every: 110 }, floods: true,
+    hpScale: 1, objectives: [{ type: sandbox ? "sandbox" : "endless" }], wild: { first: 150, every: 110 }, floods: true, droughts: true,
     ...(sandbox ? {
       id: `sandbox-${seed}`, name: "Sandbox", sandbox: true, endless: false, era: `Royal sandbox · seed ${seed}`,
       intro: "A peaceful valley with full stores. Build anything; open 👑 Decrees to send raids of any size from any edge and test your defences.",
@@ -1611,8 +1611,8 @@ function tick() {
     S.season = SEASONS[S.season].next;
     S.seasonLeft = SEASONS[S.season].len;
     S.seasonNo++;
-    // Skirmish: one Yala in three (seeded by the map) is a drought year, half as long again.
-    S.drought = S.season === "yala" && !!S.L.skirmish && mulberry32(S.L.seed * 31 + S.seasonNo)() < DROUGHT_CHANCE;
+    // Levels with droughts (skirmish): one Yala in three (seeded by the map) runs half as long again.
+    S.drought = S.season === "yala" && !!S.L.droughts && mulberry32(S.L.seed * 31 + S.seasonNo)() < DROUGHT_CHANCE;
     if (S.drought) S.seasonLeft = Math.round(S.seasonLeft * 1.5);
     const rebuilt = S.dam && S.season === "maha" && S.dam.hp < S.dam.maxHp;
     if (rebuilt) S.dam.hp = S.dam.maxHp;

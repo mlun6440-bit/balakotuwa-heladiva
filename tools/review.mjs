@@ -8,6 +8,8 @@
 //   4. every building can still be placed, every decree proclaimed
 //   5. sound: every effect renders offline and varies between takes, and the
 //      music renders (headless browsers can't listen, so measure instead)
+//   6. mechanics: short scenarios for the systems first checked by hand (the
+//      pela, the disawa's dam, floods, Hold, drill masters)
 // Prints one line per problem and exits non-zero if there are any.
 //   --selftest   break saving on purpose (the dam is left out of the save) and
 //                switch sound variation off, and check that the review notices
@@ -149,6 +151,73 @@ async function page(w = 1400, h = 860) {
   await p.close();
 }
 
+// ---------- 6. mechanics ----------
+{
+  const p = await page();
+  const out = await p.evaluate(selftest => {
+    const res = [];
+    const lvl = id => { startLevel(LEVELS.findIndex(L => L.id === id)); document.getElementById("beginBtn").click(); S.paused = true; S.waveClock = -1e9; };
+    const put = (id, x, y) => { S.tool = id; const ok = tryBuild(x, y, true); S.tool = null; return ok; };
+    const run = secs => { for (let i = 0; i < secs * 20; i++) step(0.05); };
+    if (selftest) window.updateWild = function (u, dt) { const p = S.buildings.find(b => b.id === "paddy"); if (p) moveToward(u, p.gx + 1, p.gy + 1, dt); if (p && rectDist(u, p) < 0.4) { p.growth = 0; S.stats.eaten = (S.stats.eaten || 0) + 1; u.flee = true; u.gone = true; } };
+    // the pela turns a wild elephant back; without one the crop is eaten
+    for (const pela of [false, true]) {
+      lvl("ruhuna"); S.timber = 300;
+      const c = S.citadel; put("paddy", c.gx - 3, c.gy + 3); if (pela) put("pela", c.gx - 1, c.gy + 6);
+      refreshWorld(); staff();
+      const field = S.buildings.find(b => b.id === "paddy"); field.growth = 70;
+      const d = FOES.aliya; S.units.push({ uid: ++S.uid, team: "w", type: "aliya", def: d, gx: c.gx - 9, gy: c.gy + 4, tx: 0, ty: 0, hp: d.hp, maxHp: d.hp, last: -9, z: 0, hx: c.gx - 9, hy: c.gy + 4 });
+      for (let i = 0; i < 400; i++) { field.growth = Math.max(field.growth, 60); step(0.05); }
+      if (pela && (S.stats.eaten || 0) > 0) res.push("a staffed pela did not turn a wild elephant back");
+      if (!pela && !(S.stats.eaten > 0)) res.push("an elephant with no pela near did not eat the crop");
+    }
+    // the disawa's dam: dry in Yala, a gift opens it, soldiers break it and his raid comes early
+    lvl("dakkhina"); S.seasonLeft = 1; run(1.5);
+    if (!riverDry()) res.push("the disawa's dam did not shut in Yala");
+    S.gold = 500; proclaim("gift"); if (riverDry()) res.push("the gift did not open the dam"); S.edictEnd.gift = 0;
+    S.units.filter(u => u.team === "p" && !u.def.ranged).forEach((u, i) => { u.gx = u.tx = S.dam.gx + 0.5 + i * 0.3; u.gy = u.ty = S.dam.gy + S.dam.h + 0.3; u.ordered = true; });
+    S.waveClock = 0; let raidIn = null;
+    for (let i = 0; i < 800 && raidIn === null; i++) { step(0.05); if (S.dam.hp <= 0) raidIn = nextWaveIn(); }
+    if (raidIn === null) res.push("soldiers at the dam did not break it");
+    else if (raidIn > 20) res.push(`breaking the dam did not bring the raid early (next raid in ${raidIn}s)`);
+    // floods: a lone brimming wewa bursts; one with an open sluice holds
+    for (const sluice of [false, true]) {
+      startLevel(0, "brief", makeSkirmish(4321, true)); document.getElementById("beginBtn").click(); S.paused = true;
+      Object.assign(S, { timber: 999, stone: 999, season: "maha", seasonLeft: 999 });
+      const c = S.citadel; let wx = null, wy = null;
+      for (let r = 4; r < 10 && wx === null; r++) for (let y = c.gy - r; y <= c.gy + r && wx === null; y++) for (let x = c.gx - r; x <= c.gx + r && wx === null; x++) if (put("wewa", x, y)) { wx = x; wy = y; }
+      let sl = null; if (sluice) for (const [x, y] of [[wx, wy + 2], [wx + 1, wy + 2], [wx, wy - 1], [wx + 1, wy - 1]]) if (!sl && put("sluice", x, y)) sl = buildingAt(x, y);
+      refreshWorld(); if (sl) sl.open = true;
+      const w = buildingAt(wx, wy); w.water = wewaCap(w); run(35);
+      if (!sluice && !S.stats.breaches) res.push("a lone brimming wewa did not burst in the monsoon");
+      if (sluice && S.stats.breaches) res.push("a wewa with an open sluice burst anyway");
+    }
+    // Hold keeps a spearman on his post; Guard steps out
+    const strays = [];
+    for (const hold of [false, true]) {
+      lvl("anuradhapura");
+      const c = S.citadel, sp = S.units.find(u => u.type === "spearman"); S.units = [sp];
+      sp.gx = sp.tx = c.gx + 4; sp.gy = sp.ty = c.gy; sp.ordered = false; sp.hold = hold;
+      spawnFoe("raider", "east"); const f = S.units.find(u => u.team === "e"); f.gx = c.gx + 7; f.gy = c.gy + 0.2;
+      let away = 0; for (let i = 0; i < 60; i++) { step(0.05); away = Math.max(away, Math.hypot(sp.gx - sp.tx, sp.gy - sp.ty)); }
+      strays.push(away);
+    }
+    if (strays[1] > 0.05) res.push(`a soldier on Hold left his post (${strays[1].toFixed(2)} tiles)`);
+    if (strays[0] < 0.3) res.push("a soldier on Guard did not step out to meet a raider");
+    // drill masters raise a rank for the fee
+    lvl("lionrock"); S.gold = 500; S.timber = S.stone = 99;
+    for (let x = S.citadel.gx + 3; x < S.citadel.gx + 9 && !count("barracks"); x++) put("barracks", x, S.citadel.gy);
+    refreshWorld(); for (const u of S.units) u.sel = u.team === "p";
+    const n = S.units.filter(u => u.sel).length, g0 = S.gold; payDrill();
+    if (g0 - S.gold !== n * RANKS[1].fee || !S.units.filter(u => u.sel).every(u => u.rank === 1)) res.push("drill masters did not raise every selected soldier one rank for the fee");
+    return res;
+  }, selftest);
+  for (const r of out) bad(r);
+  if (!out.length) console.log("✓ mechanics: pela, dam, floods, Hold and drill masters behave");
+  if (p.errors.length) bad(`mechanics: page errors ${[...new Set(p.errors)].join("; ")}`);
+  await p.close();
+}
+
 // ---------- 5. sound ----------
 {
   const p = await page();
@@ -180,8 +249,8 @@ async function page(w = 1400, h = 860) {
 
 await browser.close();
 if (selftest) {
-  const caught = problems.some(p => p.includes("dakkhina") && p.includes("dam")) && problems.some(p => p.includes("identical every time"));
-  console.log(caught ? "\nselftest passed: the broken save and the unvaried sounds were caught" : "\nselftest FAILED: a planted fault went unnoticed");
+  const caught = problems.some(p => p.includes("dakkhina") && p.includes("dam")) && problems.some(p => p.includes("identical every time")) && problems.some(p => p.includes("pela did not turn"));
+  console.log(caught ? "\nselftest passed: the broken save, the unvaried sounds and the elephant that ignores the pela were caught" : "\nselftest FAILED: a planted fault went unnoticed");
   process.exit(caught ? 0 : 1);
 }
 console.log(problems.length ? `\n${problems.length} problem(s)` : "\nreview clean");
