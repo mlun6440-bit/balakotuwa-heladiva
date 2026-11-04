@@ -113,6 +113,8 @@ Recorded so these are not re-added without a strong reason:
       the dam level 65–91% off, 100% on; Sea of Parakrama 68–88% off, 99% on),
       even as a last-ditch muster of 4, and did not move the idle share (militia
       exist only during raids). Not re-add without a cost that keeps raids sharp.
+- [x] R40 A/B of R38 (drill masters on/off, two runs each): no flattening,
+      kept. The A/B became a tool: `node tools/playtest.mjs ab <ref> --reps N`.
 
 ## Loop batch 9 (R34–R37): from the PC's indie-guide notes (docs/DEV-WORKFLOW.md)
 
