@@ -66,3 +66,25 @@ people whether the goal is clear. No new features in those sessions.
 Keep a short log per feature: time to build, what went wrong, what made the
 next one faster. Their per-unit build time dropped from a week to under a
 day once the workflow settled. Ours should too.
+
+# Notes from an indie developer's beginner guide
+
+From a six-game solo developer's "how to start" video. Most of it this repo
+already does (one small part at a time, a fixed palette in
+`tools/art/ARTSTYLE.md`, scale and flip variety on trees). What still applies:
+
+- **Vary every repeated sound.** The ear catches exact repeats fast. `hit`
+  already randomises pitch; `build`, `splash` and other frequent one-shots in
+  `audio.js` do not. Add a small random pitch and filter offset to each one-shot.
+- **Music changes how a scene looks.** The "quiet melodic loop" roadmap
+  follow-up is worth more than it seems. Stay free: synthesise it in `audio.js`,
+  or sketch it first in a free grid tool (Bosca Ceoil, BeepBox).
+- **Style hides limits; consistency beats detail.** Check new sprites against
+  the palette before adding more detail. A single grade over the whole frame
+  ties sprites, terrain and effects together.
+- **Build the fun, not the plumbing.** Plain canvas is the current "engine".
+  Only consider a change (for example a WebGL renderer) if profiling shows a
+  real limit in late-game cities.
+- **AI code still needs checking.** It can solve one problem and create five.
+  Keep the smoke test, playtest bots and hand-played minute as the gate, and
+  read diffs for game-feel changes rather than trusting summaries.
