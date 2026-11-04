@@ -519,7 +519,7 @@
     "breakDam": 0.31,
     "drillGold": 50
    },
-   "sigma": 0.41,
+   "sigma": 0.22606087999999994,
    "history": [
     {
      "at": "2026-11-02T11:25",
@@ -735,6 +735,21 @@
      "at": "2026-11-04T12:25",
      "gen": 43,
      "score": 1375
+    },
+    {
+     "at": "2026-11-04T20:45",
+     "gen": 44,
+     "score": 1375
+    },
+    {
+     "at": "2026-11-04T20:45",
+     "gen": 45,
+     "score": 1375
+    },
+    {
+     "at": "2026-11-04T20:45",
+     "gen": 46,
+     "score": 1375
     }
    ],
    "score": 1375
@@ -760,7 +775,7 @@
     "breakDam": 0.79,
     "drillGold": 50
    },
-   "sigma": 0.35322012499999994,
+   "sigma": 0.19475427388099995,
    "history": [
     {
      "at": "2026-11-02T11:26",
@@ -976,6 +991,21 @@
      "at": "2026-11-04T12:26",
      "gen": 43,
      "score": 1275
+    },
+    {
+     "at": "2026-11-04T20:45",
+     "gen": 44,
+     "score": 1275
+    },
+    {
+     "at": "2026-11-04T20:45",
+     "gen": 45,
+     "score": 1275
+    },
+    {
+     "at": "2026-11-04T20:45",
+     "gen": 46,
+     "score": 1275
     }
    ],
    "score": 1275
@@ -986,22 +1016,22 @@
     "houseRice": 1.96,
     "maxHouses": 3,
     "woodcutters": 1,
-    "barracksAt": 191.96,
+    "barracksAt": 168.72,
     "armyBase": 6.8,
     "armyPerRaid": 4.52,
-    "towersPerEdge": 3,
-    "towerAt": 0,
+    "towersPerEdge": 2.89,
+    "towerAt": 79.64,
     "walls": 8.83,
     "boltTowers": 3,
     "moat": 5.25,
     "tribute": 0,
     "reserve": 0,
-    "decrees": 0.53,
+    "decrees": 0.67,
     "pelas": 1.55,
     "breakDam": 0.62,
-    "drillGold": 400
+    "drillGold": 685.28
    },
-   "sigma": 0.14102181437728856,
+   "sigma": 0.11852883498411101,
    "history": [
     {
      "at": "2026-11-02T11:26",
@@ -1267,6 +1297,21 @@
      "at": "2026-11-04T12:26",
      "gen": 53,
      "score": 1364
+    },
+    {
+     "at": "2026-11-04T20:46",
+     "gen": 54,
+     "score": 1364
+    },
+    {
+     "at": "2026-11-04T20:46",
+     "gen": 55,
+     "score": 1364
+    },
+    {
+     "at": "2026-11-04T20:46",
+     "gen": 56,
+     "score": 1364
     }
    ],
    "score": 1364
@@ -1374,26 +1419,26 @@
   },
   "dakkhina": {
    "P": {
-    "paddyPerHouse": 0.69,
-    "houseRice": 1.9,
-    "maxHouses": 14,
-    "woodcutters": 2.7,
-    "barracksAt": 70.84,
+    "paddyPerHouse": 0.63,
+    "houseRice": 1.57,
+    "maxHouses": 19.09,
+    "woodcutters": 3.71,
+    "barracksAt": 0,
     "armyBase": 9.12,
     "armyPerRaid": 3.61,
     "towersPerEdge": 1,
-    "towerAt": 0,
-    "walls": 0.67,
-    "boltTowers": 0.99,
+    "towerAt": 44.99,
+    "walls": 0,
+    "boltTowers": 0.93,
     "moat": 0,
     "tribute": 0,
-    "reserve": 1,
+    "reserve": 0.79,
     "decrees": 1,
-    "pelas": 0.28,
+    "pelas": 0.61,
     "breakDam": 0.61,
     "drillGold": 400
    },
-   "sigma": 0.12476445670501558,
+   "sigma": 0.1598544601533012,
    "history": [
     {
      "at": "2026-11-03T21:38",
@@ -1454,9 +1499,65 @@
      "at": "2026-11-04T12:25",
      "gen": 12,
      "score": 1375
+    },
+    {
+     "at": "2026-11-04T20:45",
+     "gen": 13,
+     "score": 1369
+    },
+    {
+     "at": "2026-11-04T20:45",
+     "gen": 14,
+     "score": 1376
+    },
+    {
+     "at": "2026-11-04T20:45",
+     "gen": 15,
+     "score": 1376
     }
    ],
-   "score": 1375
+   "score": 1376
+  },
+  "yapahuwa": {
+   "P": {
+    "paddyPerHouse": 1.1,
+    "houseRice": 2,
+    "maxHouses": 5.5,
+    "woodcutters": 2.46,
+    "barracksAt": 50,
+    "armyBase": 5.95,
+    "armyPerRaid": 3.01,
+    "towersPerEdge": 1,
+    "towerAt": 85.65,
+    "walls": 0,
+    "boltTowers": 1.13,
+    "moat": 0,
+    "tribute": 0,
+    "reserve": 1,
+    "decrees": 1,
+    "pelas": 0.14,
+    "breakDam": 0.78,
+    "drillGold": 400
+   },
+   "sigma": 0.48828125,
+   "history": [
+    {
+     "at": "2026-11-04T20:45",
+     "gen": 1,
+     "score": 1372
+    },
+    {
+     "at": "2026-11-04T20:45",
+     "gen": 2,
+     "score": 1377
+    },
+    {
+     "at": "2026-11-04T20:45",
+     "gen": 3,
+     "score": 1377
+    }
+   ],
+   "score": 1377
   }
  }
 }
