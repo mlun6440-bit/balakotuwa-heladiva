@@ -56,6 +56,21 @@ Curve after retraining: the planner wins every level (three stars on 1, 2, 3
 and 5; two on 4). The novice wins 1–4 and loses the finale, now to stone
 throwers and undefended north and south edges rather than hunger.
 
+## Loop batch 7 (R26–R29)
+
+| Round | Change | Bot evidence |
+|---|---|---|
+| R26 | Hena: idle villagers clear jungle-edge plots for millet in Yala | Planner idle 25–51% (was 34–56%), novice ~47% (was ~53%); no families lost |
+| R27 | Soldier stances: Hold (H) | Test: on guard a spearman strays 1.3 tiles to meet a raider, on hold 0. Bots don't use it yet |
+| R28 | Lion Rock's final assault: 10 raiders, 4 bowmen, 2 ram bearers | Novice still wins (3 of 3) with the citadel at 73–84% (was ~98%) |
+| R29 | Seasonal work behaviour lives on its table row | Same numbers as R28 |
+
+Curve after retraining: **both bots win all seven levels** for the first time,
+with no families lost anywhere. The novice holds Hill Kingdom with the citadel
+at 50% (one star). Open: big planner towns still idle 48–58% on Ruhuna, Lion
+Rock and the dam level; levels 1–3 and 5 raids barely touch the citadel; the
+learner has stopped paying tribute (dial 0.12) because fighting is enough.
+
 ## Loop batch 6 (R22–R25): a seven-level campaign
 
 | Round | Change | Bot evidence |

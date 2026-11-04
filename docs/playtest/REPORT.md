@@ -1,31 +1,30 @@
 # Automated playtest report
 
-Generated 2026-11-03 21:39 by `node tools/playtest.mjs learn`. Two bots per level: a **novice** that follows the tutorial and advisor hints, and a **learned planner** whose dials have been tuned by trial and error (see `tools/playtest-brain.json`). Bots only use player actions. They show what is *possible* and where play *stalls*; they cannot judge fun or clarity — that still needs people.
+Generated 2026-11-04 11:31 by `node tools/playtest.mjs learn`. Two bots per level: a **novice** that follows the tutorial and advisor hints, and a **learned planner** whose dials have been tuned by trial and error (see `tools/playtest-brain.json`). Bots only use player actions. They show what is *possible* and where play *stalls*; they cannot judge fun or clarity — that still needs people.
 
 | Level | Novice | Learned planner | Planner time | Citadel | Stars | Families lost (novice / planner) | Burned |
 |---|---|---|---|---|---|---|---|
-| 1. Dawn at Anuradhapura | won | won | 297s | 100% | ★★★ | 0 / 0 | 0 |
-| 2. Elephants of Ruhuna | won | won | 319s | 97% | ★★★ | 0 / 0 | 0 |
-| 3. The Dry Zone | won | won | 409s | 100% | ★★★ | 2 / 1 | 0 |
-| 4. Lion Rock | won | won | 412s | 100% | ★★ | 0 / 0 | 0 |
-| 5. The Disawa's Dam | won | won | 430s | 94% | ★★★ | 0 / 0 | 2 |
-| 6. Sea of Parakrama | won | won | 495s | 100% | ★★ | 0 / 0 | 0 |
-| 7. Hill Kingdom | unfinished | won | 724s | 99% | ★★★ | 3 / 0 | 1 |
+| 1. Dawn at Anuradhapura | won | won | 298s | 100% | ★★★ | 0 / 0 | 0 |
+| 2. Elephants of Ruhuna | won | won | 314s | 99% | ★★★ | 0 / 0 | 0 |
+| 3. The Dry Zone | won | won | 408s | 100% | ★★★ | 0 / 0 | 0 |
+| 4. Lion Rock | won | won | 510s | 100% | ★★★ | 0 / 0 | 1 |
+| 5. The Disawa's Dam | won | won | 425s | 98% | ★★★ | 0 / 0 | 1 |
+| 6. Sea of Parakrama | won | won | 511s | 100% | ★★ | 0 / 0 | 0 |
+| 7. Hill Kingdom | won | won | 721s | 98% | ★★★ | 0 / 0 | 2 |
 
 ## Findings
 
 - **L1 Dawn at Anuradhapura:** both bots won with the citadel almost untouched (100% / 100%). Raids may be too weak to create tension here.
-- **L2 Elephants of Ruhuna:** both bots won with the citadel almost untouched (98% / 97%). Raids may be too weak to create tension here.
-- **L2 Elephants of Ruhuna:** on average 56% of villagers were idle (no job). Idle people have nothing to do; consider jobs that use them (hauling, festival crowds, militia) or a cost to idleness.
+- **L2 Elephants of Ruhuna:** both bots won with the citadel almost untouched (98% / 99%). Raids may be too weak to create tension here.
+- **L2 Elephants of Ruhuna:** on average 51% of villagers were idle (no job). Idle people have nothing to do; consider jobs that use them (hauling, festival crowds, militia) or a cost to idleness.
 - **L3 The Dry Zone:** both bots won with the citadel almost untouched (95% / 100%). Raids may be too weak to create tension here.
-- **L4 Lion Rock:** both bots won with the citadel almost untouched (98% / 100%). Raids may be too weak to create tension here.
-- **L4 Lion Rock:** on average 48% of villagers were idle (no job). Idle people have nothing to do; consider jobs that use them (hauling, festival crowds, militia) or a cost to idleness.
+- **L4 Lion Rock:** on average 58% of villagers were idle (no job). Idle people have nothing to do; consider jobs that use them (hauling, festival crowds, militia) or a cost to idleness.
+- **L5 The Disawa's Dam:** both bots won with the citadel almost untouched (97% / 98%). Raids may be too weak to create tension here.
 - **L5 The Disawa's Dam:** on average 48% of villagers were idle (no job). Idle people have nothing to do; consider jobs that use them (hauling, festival crowds, militia) or a cost to idleness.
-- **L5 The Disawa's Dam:** fire destroyed 2 buildings even for the planner. Check that water carriers can keep up.
-- **L7 Hill Kingdom:** a hint-following novice did not finish. Unmet: 😊 Harmony 60+ 58/60, 🍚 rice 36/150. Consider a clearer hint or a gentler first raid here.
-- **Tribute:** the learner almost never pays it (dial 0.29). Either it is priced too high or fighting is too easy.
-- **Defence the learner relies on:** 2.0 towers per raid edge, 4.6 wall tiles, an army of 6.7 + 3.3 per raid. 
-- **Economy the learner prefers:** 1.23 paddies per house, at most 14 houses, 2.4 woodcutters.
+- **L7 Hill Kingdom:** fire destroyed 2 buildings even for the planner. Check that water carriers can keep up.
+- **Tribute:** the learner almost never pays it (dial 0.12). Either it is priced too high or fighting is too easy.
+- **Defence the learner relies on:** 2.0 towers per raid edge, 5.4 wall tiles, an army of 6.1 + 3.8 per raid. 
+- **Economy the learner prefers:** 0.95 paddies per house, at most 12 houses, 2.7 woodcutters.
 
 ## Bot limits (so findings aren't over-read)
 
@@ -35,13 +34,13 @@ Generated 2026-11-03 21:39 by `node tools/playtest.mjs learn`. Two bots per leve
 
 ## Learning history
 
-- L1: 31 generations, best score 1385; recent 1385 → 1385 → 1385 → 1385 → 1385
-- L2: 3 generations, best score 1383; recent 1383 → 1383 → 1383
-- L3: 34 generations, best score 1380; recent 1380 → 1380 → 1380 → 1380 → 1380
-- L4: 34 generations, best score 1279; recent 1279 → 1279 → 1279 → 1279 → 1279
-- L5: 3 generations, best score 1376; recent 1376 → 1376 → 1376
-- L6: 34 generations, best score 1275; recent 1275 → 1275 → 1275 → 1275 → 1275
-- L7: 44 generations, best score 1364; recent 1362 → 1362 → 1362 → 1362 → 1364
+- L1: 34 generations, best score 1385; recent 1385 → 1385 → 1385 → 1385 → 1385
+- L2: 6 generations, best score 1383; recent 1383 → 1383 → 1383 → 1383 → 1383
+- L3: 37 generations, best score 1380; recent 1380 → 1380 → 1380 → 1380 → 1380
+- L4: 37 generations, best score 1375; recent 1279 → 1279 → 1374 → 1375 → 1375
+- L5: 6 generations, best score 1377; recent 1376 → 1376 → 1375 → 1375 → 1377
+- L6: 37 generations, best score 1275; recent 1275 → 1275 → 1274 → 1274 → 1275
+- L7: 47 generations, best score 1363; recent 1362 → 1364 → 1363 → 1363 → 1363
 
 ## Screens (learned planner)
 
