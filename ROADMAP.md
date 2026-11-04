@@ -115,6 +115,8 @@ Recorded so these are not re-added without a strong reason:
       exist only during raids). Not re-add without a cost that keeps raids sharp.
 - [x] R40 A/B of R38 (drill masters on/off, two runs each): no flattening,
       kept. The A/B became a tool: `node tools/playtest.mjs ab <ref> --reps N`.
+- [x] R41 Simplify round 11: one Army-tab card for orders to the selected
+      soldiers (Hold, Drill master) instead of two.
 
 ## Loop batch 9 (R34–R37): from the PC's indie-guide notes (docs/DEV-WORKFLOW.md)
 

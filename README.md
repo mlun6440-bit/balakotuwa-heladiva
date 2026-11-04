@@ -40,7 +40,7 @@ and baked into `assets/` (regenerate with `cd tools && npm install` once, then
 - **Hena.** In Yala, idle villagers clear jungle-edge plots for millet; each plot fells a tree, which regrows.
 - **Attam.** In the monsoon, idle neighbours join the farmer on each watered paddy (traditional exchange labour), and the rice grows faster.
 - **Stances.** Select soldiers and press H (or use the Army tab) to hold them on their post; otherwise they step out to meet raiders nearby.
-- **Soldier ranks.** Soldiers resting by the Angam Maduwa drill between raids, and every fight teaches them: ★ veterans and ★★ champions are tougher and hit harder.
+- **Soldier ranks.** Soldiers resting by the Angam Maduwa drill between raids, and every fight teaches them: ★ veterans and ★★ champions are tougher and hit harder. With gold to spare, the drill masters raise selected soldiers a rank at once.
 - **Raids on the fields.** Raiders break off to trample ripening paddies and rob granaries on their way in, so guard the harvest, not just the citadel.
 - **Siege (Hill Kingdom).** Stone throwers outrange watchtowers. Bolt towers and archers on the walls can reach them. Melee raiders can't reach soldiers standing on walls or towers.
 - **Tribute (from level 2).** In the 30 seconds before a raid you can pay rice and gold to turn it back. It costs more each time and shames your people.
