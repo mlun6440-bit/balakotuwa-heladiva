@@ -188,7 +188,7 @@ const LEVELS = [
     rocks: [[3, 18, 7, 23], [20, 4, 23, 7]],
     forests: [[3, 4, 8, 10, 0.4], [17, 18, 23, 24, 0.35]],
     unlocks: { buildings: ["sluice", "moat", "tower", "pansala"] },
-    waves: [{ t: 160, from: ["east"], raider: 4, bowman: 1 }, { t: 280, from: ["south"], raider: 5, bowman: 2 }, { t: 400, from: ["east"], raider: 6, bowman: 2 }],
+    waves: [{ t: 160, from: ["east"], raider: 4, bowman: 1 }, { t: 280, from: ["south"], raider: 5, bowman: 2 }, { t: 400, from: ["east", "south"], raider: 9, bowman: 3 }],
     hpScale: 1.1,
     objectives: [{ type: "water", n: 150 }, { type: "res", key: "rice", n: 120 }, { type: "waves" }]
   },
@@ -225,7 +225,7 @@ const LEVELS = [
       { t: 170, from: ["east"], raider: 6, bowman: 2 },
       { t: 290, from: ["north"], raider: 6, bowman: 3 },
       { t: 410, from: ["east", "north"], raider: 8, bowman: 3, brute: 1 },
-      { t: 530, from: ["north", "south"], raider: 9, bowman: 4, brute: 1 }
+      { t: 530, from: ["north", "south"], raider: 12, bowman: 5, brute: 2 }
     ],
     hpScale: 1.2,
     objectives: [{ type: "res", key: "rice", n: 150 }, { type: "water", n: 200 }, { type: "waves" }]
