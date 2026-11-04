@@ -176,19 +176,21 @@ if (mode === "ab") {
 // hand in an earlier batch as a fake result and check the report names it.
 if (mode === "detectors") {
   const lv = LEVEL_IDS.indexOf("dakkhina") + 1;
-  const game = (style, extra) => ({ level: lv, name: "Detector check", style, outcome: "won", time: 500, citadel: 100, stars: 3, raidsDone: 4, raids: 4,
+  const game = (style, extra) => ({ level: lv, name: "Detector check", style, outcome: "won", time: 500, citadel: 80, stars: 3, raidsDone: 4, raids: 4,
     starved: 0, hungry: 0, burned: 0, trained: 0, tributes: 0, trampled: 0, looted: 0, rainKept: 100, objectives: [], causes: [], buildings: {},
     samples: [], said: [], bot: [], errors: [], shots: [], riceSold: 0, eaten: 0, scared: 0, damBroken: 0, damBrokenAt: null, lastWaveAt: 530, foesAtEnd: 0, ...extra });
   const cases = [
     ["stall", { outcome: "unfinished", time: 1500, foesAtEnd: 3 }, "**stall:**"],
     ["market sold food in a famine", { riceSold: 140, starved: 8 }, "the market sold"],
     ["elephants ate the fields", { eaten: 4 }, "wild elephants ate"],
-    ["the dam broken for free", { damBroken: 1, damBrokenAt: 17 }, "broke the disawa's dam"]
+    ["the dam broken for free", { damBroken: 1, damBrokenAt: 17, citadel: 100 }, "broke the disawa's dam"],
+    ["raids that bite nowhere", { citadel: 100, trampled: 0 }, "Raids may be too weak"],
+    ["raids that bite the fields instead", { citadel: 100, trampled: 15 }, "the pressure lands on the fields"]
   ];
   levels.length = 0; levels.push(lv);
   let ok = 0;
   for (const [what, extra, needle] of cases) {
-    const md = report([game("novice", {}), game("planner", extra)]);
+    const md = report([game("novice", extra), game("planner", extra)]);
     const hit = md.includes(needle);
     console.log(`${hit ? "✓" : "✗"} ${what}`);
     if (hit) ok++;
@@ -256,7 +258,13 @@ function report(results) {
     const tag = `**L${lv} ${p.name}:**`;
     if (p.outcome !== "won") F.push(`${tag} even the learned planner did not win (${p.outcome}). Unmet: ${p.objectives.filter(o => o.cur < o.n).map(o => `${o.label} ${o.cur}/${o.n}`).join(", ") || "none"}. ${p.causes.length ? "Causes: " + p.causes.join(" ") : ""} Either the level is too hard or the bot lacks a skill it needs (see bot limits).`);
     if (n.outcome !== "won") F.push(`${tag} a hint-following novice ${n.outcome === "lost" ? "lost" : "did not finish"}${n.causes.length ? ` — the defeat screen said: ${n.causes.join(" ")}` : ""}. Unmet: ${n.objectives.filter(o => o.cur < o.n).map(o => `${o.label} ${o.cur}/${o.n}`).join(", ") || "none"}. Consider a clearer hint or a gentler first raid here.`);
-    if (p.outcome === "won" && n.outcome === "won" && p.citadel >= 95 && n.citadel >= 95) F.push(`${tag} both bots won with the citadel almost untouched (${n.citadel}% / ${p.citadel}%). Raids may be too weak to create tension here.`);
+    // batch 11: raids can bite without touching the citadel (Lion Rock's rampart goal
+    // walls everyone in; the raiders trample the fields instead), so count field damage too
+    if (p.outcome === "won" && n.outcome === "won" && p.citadel >= 95 && n.citadel >= 95) {
+      const fields = (n.trampled || 0) + (n.looted || 0) / 20;
+      if (fields < 10) F.push(`${tag} both bots won with the citadel almost untouched (${n.citadel}% / ${p.citadel}%) and the novice lost little in the fields (${n.trampled || 0} paddies trampled). Raids may be too weak to create tension here.`);
+      else F.push(`${tag} raids never reached the citadel (${n.citadel}% / ${p.citadel}%) but cost the novice ${n.trampled || 0} trampled paddies: the pressure lands on the fields here.`);
+    }
     if (p.outcome === "won" && p.time < 260) F.push(`${tag} the planner won in ${p.time}s; the level may end before its ideas get explored.`);
     const s = p.samples.filter(x => x.villagers > 0);
     const idle = s.length ? mean(s.map(x => x.idle / x.villagers)) : 0;
