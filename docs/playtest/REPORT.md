@@ -1,32 +1,30 @@
 # Automated playtest report
 
-Generated 2026-11-02 11:59 by `node tools/playtest.mjs`. Two bots per level: a **novice** that follows the tutorial and advisor hints, and a **learned planner** whose dials have been tuned by trial and error (see `tools/playtest-brain.json`). Bots only use player actions. They show what is *possible* and where play *stalls*; they cannot judge fun or clarity — that still needs people.
+Generated 2026-11-04 11:47 by `node tools/playtest.mjs learn`. Two bots per level: a **novice** that follows the tutorial and advisor hints, and a **learned planner** whose dials have been tuned by trial and error (see `tools/playtest-brain.json`). Bots only use player actions. They show what is *possible* and where play *stalls*; they cannot judge fun or clarity — that still needs people.
 
 | Level | Novice | Learned planner | Planner time | Citadel | Stars | Families lost (novice / planner) | Burned |
 |---|---|---|---|---|---|---|---|
 | 1. Dawn at Anuradhapura | won | won | 299s | 100% | ★★★ | 0 / 0 | 0 |
-| 2. The Dry Zone | won | won | 411s | 100% | ★★★ | 3 / 1 | 0 |
-| 3. Lion Rock | lost | won | 502s | 100% | ★★★ | 13 / 6 | 1 |
-| 4. Sea of Parakrama | lost | won | 492s | 98% | ★★ | 0 / 0 | 0 |
-| 5. Hill Kingdom | lost | won | 777s | 93% | ★★★ | 7 / 0 | 4 |
+| 2. Elephants of Ruhuna | won | won | 313s | 99% | ★★★ | 0 / 0 | 0 |
+| 3. The Dry Zone | won | won | 413s | 100% | ★★★ | 0 / 0 | 0 |
+| 4. Lion Rock | won | won | 504s | 100% | ★★★ | 0 / 0 | 2 |
+| 5. The Disawa's Dam | won | won | 427s | 98% | ★★★ | 0 / 0 | 0 |
+| 6. Sea of Parakrama | won | won | 514s | 100% | ★★ | 0 / 0 | 0 |
+| 7. Hill Kingdom | lost | won | 721s | 100% | ★★★ | 0 / 0 | 2 |
 
 ## Findings
 
 - **L1 Dawn at Anuradhapura:** both bots won with the citadel almost untouched (100% / 100%). Raids may be too weak to create tension here.
-- **L1 Dawn at Anuradhapura:** on average 59% of villagers were idle (no job). Idle people have nothing to do; consider jobs that use them (hauling, festival crowds, militia) or a cost to idleness.
-- **L2 The Dry Zone:** both bots won with the citadel almost untouched (95% / 100%). Raids may be too weak to create tension here.
-- **L2 The Dry Zone:** on average 49% of villagers were idle (no job). Idle people have nothing to do; consider jobs that use them (hauling, festival crowds, militia) or a cost to idleness.
-- **L3 Lion Rock:** a hint-following novice lost — the defeat screen said: 🍚 The granary ran dry in the Yala dry season and 13 families left. Keep about one watered paddy per house. 🏹 The east side had no archers or watchtowers to meet the last raid. 🏹 The south side had no archers or watchtowers to meet the last raid.. Unmet: 🛡️ raids 3/4. Consider a clearer hint or a gentler first raid here.
-- **L3 Lion Rock:** on average 49% of villagers were idle (no job). Idle people have nothing to do; consider jobs that use them (hauling, festival crowds, militia) or a cost to idleness.
-- **L4 Sea of Parakrama:** a hint-following novice lost — the defeat screen said: 🏹 The east side had no archers or watchtowers to meet the last raid. 🔥 Fire took 7 buildings. Keep wewas full so villagers can carry water, and keep archers near the thatch. 🌾 Raiders trampled 22 paddies and looted 0 goods on the way in. A tower or archers by the fields on the raid side protect the harvest.. Unmet: 🛡️ raids 4/5. Consider a clearer hint or a gentler first raid here.
-- **L4 Sea of Parakrama:** on average 56% of villagers were idle (no job). Idle people have nothing to do; consider jobs that use them (hauling, festival crowds, militia) or a cost to idleness.
-- **L5 Hill Kingdom:** a hint-following novice lost — the defeat screen said: 🍚 The granary ran dry in the Maha monsoon and 7 families left. Keep about one watered paddy per house. 🏹 The north side had no archers or watchtowers to meet the last raid. 🏹 The east side had no archers or watchtowers to meet the last raid.. Unmet: 😊 Harmony 60+ 38/60, 🍚 rice 0/150, 🛡️ raids 4/7. Consider a clearer hint or a gentler first raid here.
-- **L5 Hill Kingdom:** on average 52% of villagers were idle (no job). Idle people have nothing to do; consider jobs that use them (hauling, festival crowds, militia) or a cost to idleness.
-- **L5 Hill Kingdom:** gold piled up to 1106 with nothing worth buying. Gold needs more sinks (upgrades, decrees, elite units) or slower income.
-- **L5 Hill Kingdom:** fire destroyed 4 buildings even for the planner. Check that water carriers can keep up.
-- **Tribute:** the learner pays it (dial 0.37), so it is a real option.
-- **Defence the learner relies on:** 2.3 towers per raid edge, 3.9 wall tiles, an army of 6.0 + 3.2 per raid. 
-- **Economy the learner prefers:** 1.55 paddies per house, at most 12 houses, 2.3 woodcutters.
+- **L2 Elephants of Ruhuna:** both bots won with the citadel almost untouched (96% / 99%). Raids may be too weak to create tension here.
+- **L2 Elephants of Ruhuna:** on average 47% of villagers were idle (no job). Idle people have nothing to do; consider jobs that use them (hauling, festival crowds, militia) or a cost to idleness.
+- **L4 Lion Rock:** gold piled up to 1258 with nothing worth buying. Gold needs more sinks (upgrades, decrees, elite units) or slower income.
+- **L4 Lion Rock:** fire destroyed 2 buildings even for the planner. Check that water carriers can keep up.
+- **L5 The Disawa's Dam:** on average 49% of villagers were idle (no job). Idle people have nothing to do; consider jobs that use them (hauling, festival crowds, militia) or a cost to idleness.
+- **L7 Hill Kingdom:** a hint-following novice lost — the defeat screen said: 🔥 Fire took 4 buildings. Keep wewas full so villagers can carry water, and keep archers near the thatch. 🧱 No walls stood on the east side, so the raiders walked straight in. 🧱 No walls stood on the south side, so the raiders walked straight in.. Unmet: 😊 Harmony 60+ 51/60, 🛡️ raids 6/7. Consider a clearer hint or a gentler first raid here.
+- **L7 Hill Kingdom:** fire destroyed 2 buildings even for the planner. Check that water carriers can keep up.
+- **Tribute:** the learner almost never pays it (dial 0.12). Either it is priced too high or fighting is too easy.
+- **Defence the learner relies on:** 2.2 towers per raid edge, 6.1 wall tiles, an army of 8.1 + 4.0 per raid. 
+- **Economy the learner prefers:** 1.06 paddies per house, at most 15 houses, 2.7 woodcutters.
 
 ## Bot limits (so findings aren't over-read)
 
@@ -36,11 +34,13 @@ Generated 2026-11-02 11:59 by `node tools/playtest.mjs`. Two bots per level: a *
 
 ## Learning history
 
-- L1: 20 generations, best score 1385; recent 1385 → 1385 → 1385 → 1385 → 1385
-- L2: 20 generations, best score 1379; recent 1379 → 1379 → 1379 → 1379 → 1379
-- L3: 20 generations, best score 1375; recent 1375 → 1375 → 1375 → 1375 → 1375
-- L4: 20 generations, best score 1275; recent 1275 → 1275 → 1275 → 1275 → 1275
-- L5: 30 generations, best score 1356; recent 903 → 1292 → 1302 → 1356 → 1356
+- L1: 37 generations, best score 1385; recent 1385 → 1385 → 1385 → 1385 → 1385
+- L2: 9 generations, best score 1384; recent 1383 → 1383 → 1383 → 1383 → 1384
+- L3: 40 generations, best score 1379; recent 1380 → 1380 → 1379 → 1379 → 1379
+- L4: 40 generations, best score 1375; recent 1375 → 1375 → 1375 → 1375 → 1375
+- L5: 9 generations, best score 1376; recent 1375 → 1377 → 1376 → 1376 → 1376
+- L6: 40 generations, best score 1275; recent 1274 → 1275 → 1275 → 1275 → 1275
+- L7: 50 generations, best score 1364; recent 1363 → 1363 → 1364 → 1364 → 1364
 
 ## Screens (learned planner)
 
@@ -54,3 +54,7 @@ Generated 2026-11-02 11:59 by `node tools/playtest.mjs`. Two bots per level: a *
 ![L4](L4-end.jpg)
 ![L5](L5-4min.jpg)
 ![L5](L5-end.jpg)
+![L6](L6-4min.jpg)
+![L6](L6-end.jpg)
+![L7](L7-4min.jpg)
+![L7](L7-end.jpg)

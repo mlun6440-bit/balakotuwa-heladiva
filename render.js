@@ -577,7 +577,8 @@ function render(now) {
   ctx.globalAlpha = 1;
   wearPaths();
   ctx.drawImage(paths.canvas, tx, ty, terrain.w, terrain.h);
-  drawWaterShimmer(now);
+  if (!riverDry()) drawWaterShimmer(now);
+  drawDam(now);
 
   for (const b of S.buildings) if (b.def.ground || b.id === "wewa") drawGround(b, now);
 
@@ -680,6 +681,36 @@ function drawWaterShimmer(now) {
 
 const isRiver = (x, y) => inb(x, y) && S.tiles[y][x].t === "river";
 
+// The disawa's dam: a stone weir with timber gates where the river enters.
+// While it is shut (Yala) the riverbed shows dry sand and stones.
+function drawDam(now) {
+  const d = S.dam;
+  if (!d) return;
+  if (riverDry()) for (let y = 0; y < MAP; y++) for (let x = 0; x < MAP; x++) {
+    if (!isRiver(x, y) || !onScreen(x, y)) continue;
+    diamond(x, y, 1, 1, 0.2, hash(x, y, 3) > 0.5 ? "rgba(196,170,122,0.92)" : "rgba(181,154,108,0.92)");
+    if (hash(x, y, 5) > 0.7) box(x + 0.3 + hash(x, y, 6) * 0.3, y + 0.3, 0.18, 0.14, 0.2, 2, "#9a9387");
+  }
+  const broken = d.hp <= 0;
+  const across = d.h === 1;
+  const [x0, y0, w, h] = across ? [d.gx, d.gy + 0.3, d.w, 0.4] : [d.gx + 0.3, d.gy, 0.4, d.h];
+  box(x0, y0, w, h, 0, broken ? 2 : 7, broken ? "#857e72" : "#a39b8c");
+  if (!broken) {
+    const n = Math.max(2, Math.round(across ? d.w : d.h) * 2);
+    for (let i = 0; i < n; i++) {
+      const k = (i + 0.5) / n;
+      const gx = across ? x0 + w * k - 0.06 : x0 + 0.1, gy = across ? y0 + 0.1 : y0 + h * k - 0.06;
+      box(gx, gy, 0.12, 0.12, 7, riverDry() ? 5 : 2, "#6b4426"); // gates down when shut
+    }
+    flag(iso(x0 + w / 2, y0 + h / 2, 12), 14, "#2a2a2a", now);
+    if (d.hp < d.maxHp) {
+      const p = iso(x0 + w / 2, y0 + h / 2, 22);
+      ctx.fillStyle = "rgba(0,0,0,0.75)"; ctx.fillRect(p.x - 16, p.y, 32, 3);
+      ctx.fillStyle = "#ff5a4a"; ctx.fillRect(p.x - 16, p.y, 32 * d.hp / d.maxHp, 3);
+    }
+  }
+}
+
 function drawRock(x, y) {
   diamond(x, y, 1, 1, 0, "#7c766b");
   const n = 2 + Math.floor(hash(x, y, 7) * 2);
@@ -710,16 +741,9 @@ function drawHoverTile() {
 // ==================== GROUND-LEVEL STRUCTURES ====================
 function drawGround(b, now) {
   const { gx, gy, w, h } = b;
-  if (b.id === "thorn") {
-    if (!drawSprite(`thorn.${b.uid % 2}`, gx, gy)) {
-      ctx.strokeStyle = "#6b5a3a"; ctx.lineWidth = 0.8;
-      for (let i = 0; i < 18; i++) { const p = iso(gx + 0.15 + hash(b.uid, i) * 0.7, gy + 0.15 + hash(i, b.uid) * 0.7, 0); ctx.beginPath(); ctx.moveTo(p.x, p.y); ctx.lineTo(p.x + (hash(i, 3) - 0.5) * 8, p.y - 3 - hash(i, 4) * 6); ctx.stroke(); }
-    }
-    return;
-  }
   if (hasSprite("wewa.base")) {
     if (b.id === "wewa") return drawWewaSprite(b, now);
-    if (b.id === "canal" || b.id === "sluice") return drawCanalSprite(b, now);
+    if (b.id === "canal" || b.id === "sluice" || b.id === "moat") return drawCanalSprite(b, now);
     if (b.id === "paddy") return drawPaddySprite(b, now);
   }
   if (b.id === "wewa") drawWewa(b, now);
@@ -869,17 +893,20 @@ function drawCanalSprite(b, now) {
   const { gx, gy } = b;
   const m = canalMask(b);
   drawSprite(`canal.${m}`, gx, gy);
+  if (b.id === "moat") drawMoatStakes(b);
   const id = S.netOf[gy][gx];
   const wet = id !== -1 && S.nets[id].water >= 1;
   const flooded = S.flooded.has(gy * MAP + gx);
   if (!wet && !flooded) return;
-  const z = flooded ? -0.4 : -1.4;
-  const col = flooded ? `rgba(${120 + Math.sin(now * 0.008 + gx + gy) * 25 | 0},200,240,0.92)` : "rgba(46,124,170,0.9)";
+  const moat = b.id === "moat";
+  const z = flooded ? -0.4 : moat ? -0.9 : -1.4;
+  const col = flooded ? `rgba(${120 + Math.sin(now * 0.008 + gx + gy) * 25 | 0},200,240,0.92)` : moat ? "rgba(26,72,112,0.95)" : "rgba(46,124,170,0.9)";
   const r = [[0.33, 0.33, 0.34, 0.34]];
   if (m & 1) r.push([0.67, 0.33, 0.33, 0.34]);
   if (m & 2) r.push([0, 0.33, 0.33, 0.34]);
   if (m & 4) r.push([0.33, 0.67, 0.34, 0.33]);
   if (m & 8) r.push([0.33, 0, 0.34, 0.33]);
+  if (moat) diamond(gx + 0.06, gy + 0.06, 0.88, 0.88, z, col);
   for (const [x, y, w, h] of r) diamond(gx + x, gy + y, w, h, z, col);
   // flowing glints
   const t = (now * 0.0006 + gx * 0.3 + gy * 0.2) % 1;
@@ -888,6 +915,15 @@ function drawCanalSprite(b, now) {
   ctx.fillRect(p.x - 1.5, p.y - 0.4, 3, 0.8);
   if (flooded) { const q = iso(gx + 0.5, gy + 0.38 + ((t + 0.5) % 1) * 0.24, z); ctx.fillRect(q.x - 1.5, q.y - 0.4, 3, 0.8); }
 }
+// Sharpened stakes planted along a moat's edge (drawn in the ground pass).
+function drawMoatStakes(b) {
+  for (let i = 0; i < 4; i++) {
+    const t = 0.15 + i * 0.23, p = iso(b.gx + t, b.gy + 0.1, 0), q = iso(b.gx + 0.1, b.gy + t, 0);
+    line(p, { x: p.x + 1, y: p.y - 6 }, "#6b4a28", 1.2);
+    line(q, { x: q.x - 1, y: q.y - 6 }, "#5a3c20", 1.2);
+  }
+}
+
 function drawSluice(b) {
   if (!drawSprite(`sluice.${b.open ? "open" : "closed"}`, b.gx, b.gy)) {
     box(b.gx + 0.12, b.gy + 0.12, 0.2, 0.2, 0, 16, PAL.stone);
@@ -1413,29 +1449,28 @@ function stride(o) {
   if (m > 0.002) {
     const sx = dx - dy, sy = dx + dy;
     g.back = sy < -0.05 * m; g.flip = sx < 0;
+    g.ang = Math.atan2(dy, dx); // world heading, for 8-direction 3D sprites
   }
   g.d += m; g.x = o.gx; g.y = o.gy;
   return g;
 }
 function drawWorkerSprite(w, now) {
-  const base = `u.v.${w.job === "bucket" || w.job === "shramadana" ? "farmer" : w.job}`;
-  if (!hasSprite(`${base}.f.i0`)) return false;
-  const g = stride(w);
-  const f = g.back ? "b" : "f";
-  const moving = g.moving;
-  const working = w.phase === "work" || (w.phase === "tend" && w.job !== "trader") || (w.job === "trader" && w.phase === "tend");
-  let fr;
-  if (moving) fr = `w${Math.floor(g.d * 7) % 6}`;
-  else if (working) fr = `a${Math.floor(now / (w.job === "farmer" || w.job === "trader" ? 260 : 150) + w.b.uid) % 3}`;
-  else fr = "i0";
-  drawSprite(`${base}.${f}.${fr}`, w.gx, w.gy, 0, { flip: g.flip });
-  if (w.carry && moving) drawSprite(`load.${w.carry.key === "silt" ? "stone" : w.carry.key}.${f}.${fr}`, w.gx, w.gy, 0, { flip: g.flip });
-  if (w.phase === "work" && Math.floor(now / 150) % 3 === 2 && hash(now | 0, 1) > 0.6) {
-    const p = iso(w.gx, w.gy, 0);
-    ctx.fillStyle = w.job === "mason" ? "#ddd" : "#d9b27a";
-    ctx.fillRect(p.x + (g.flip ? -9 : 7), p.y - 6, 1.5, 1.5);
+  const job = w.job === "bucket" || w.job === "shramadana" || w.job === "attam" || w.job === "watchman" || w.job === "hena" ? "farmer" : w.job === "gatherer" ? "woodcutter" : w.job;
+  if (hasSprite(`u3d.v.${job}.d0.i0`)) {
+    // pre-rendered 3D villager: 8 directions; carried loads are baked in
+    const g = stride(w);
+    const d = (((Math.round((g.ang ?? Math.PI / 4) / (Math.PI / 4))) % 8) + 8) % 8;
+    const working = w.phase === "work" || w.phase === "tend";
+    const load = w.carry ? (w.carry.key === "silt" ? "stone" : w.carry.key) : null;
+    let key;
+    if (g.moving) {
+      const fr = `w${Math.floor(g.d * 9.3) % 8}`;
+      key = load && hasSprite(`u3d.v.${job}+${load}.d${d}.${fr}`) ? `u3d.v.${job}+${load}.d${d}.${fr}` : `u3d.v.${job}.d${d}.${fr}`;
+    } else key = `u3d.v.${job}.d${d}.${working ? `a${Math.floor(now / (job === "farmer" || job === "trader" || job === "monk" ? 260 : 150) + w.b.uid) % 3}` : "i0"}`;
+    drawSprite(key, w.gx, w.gy);
+    return true;
   }
-  return true;
+  return false;
 }
 
 function drawWorker(w, now) {
@@ -1490,21 +1525,38 @@ function drawUnit(u, now) {
     ctx.strokeStyle = "#6cc070"; ctx.lineWidth = 1.6;
     ctx.beginPath(); ctx.ellipse(p.x, p.y + 1, heavy ? 16 : 8, heavy ? 7 : 4, 0, 0, Math.PI * 2); ctx.stroke();
   }
+  if (u.hold) { // holding its post: a dashed blue ring at the feet
+    ctx.save(); ctx.setLineDash([2, 2]); ctx.strokeStyle = "rgba(140,190,255,0.9)"; ctx.lineWidth = 1.2;
+    ctx.beginPath(); ctx.ellipse(p.x, p.y + 1, heavy ? 13 : 6, heavy ? 5.5 : 3, 0, 0, Math.PI * 2); ctx.stroke(); ctx.restore();
+  }
   const moving = u.team === "p" ? Math.hypot(u.tx - u.gx, u.ty - u.gy) > 0.15 : true;
   const base = `u.${u.type}`;
-  if (hasSprite(`${base}.f.i0`)) {
+  if (hasSprite(`u3d.${u.type}.d0.i0`)) {
+    // pre-rendered 3D unit: 8 true directions, 8-frame walk
     const g = stride(u);
+    const d = (((Math.round((g.ang ?? Math.PI / 4) / (Math.PI / 4))) % 8) + 8) % 8;
     const since = S.time - u.last;
     let fr;
     if (since >= 0 && since < 0.45) fr = `a${Math.min(2, Math.floor(since / 0.15))}`;
-    else if (g.moving) fr = `w${Math.floor(g.d * (u.type === "elephant" ? 4 : 7)) % 6}`;
+    else if (g.moving) fr = `w${Math.floor(g.d * 9.3) % 8}`;
     else fr = "i0";
-    const f = u.type === "elephant" || !g.back ? "f" : "b";
+    drawSprite(`u3d.${u.type}.d${d}.${fr}`, u.gx, u.gy, u.z);
+    if (u.team === "p" && typeof inCover === "function" && inCover(u)) drawSprite(`bush.${S.season}.${u.uid % 3}`, u.gx + 0.08, u.gy + 0.08, 0, { scale: 0.85, alpha: 0.9 });
+  }
+  else if (hasSprite(`${base}.f.i0`)) {
+    const g = stride(u);
+    const since = S.time - u.last;
+    const side = !hasSprite(`${base}.b.i0`); // side-view art (elephants, thrower) is mirrored only
+    let fr;
+    if (since >= 0 && since < 0.45) fr = `a${Math.min(2, Math.floor(since / 0.15))}`;
+    else if (g.moving) fr = `w${Math.floor(g.d * (u.def.heavy && side ? 4 : 7)) % 6}`;
+    else fr = "i0";
+    const f = side || !g.back ? "f" : "b";
     drawSprite(`${base}.${f}.${fr}`, u.gx, u.gy, u.z, { flip: g.flip });
     // hidden in the forest: foliage in front of the soldier
     if (u.team === "p" && typeof inCover === "function" && inCover(u)) drawSprite(`bush.${S.season}.${u.uid % 3}`, u.gx + 0.08, u.gy + 0.08, 0, { scale: u.type === "elephant" ? 1.4 : 0.85, alpha: 0.9 });
   }
-  else if (u.type === "elephant") drawElephant(p, u, now);
+  else if (u.type === "elephant" || u.type === "aliya") drawElephant(p, u, now);
   else if (u.team === "p") {
     const look = {
       archer: { upper: "#2f8f4e", lower: "#f2efe6", item: "bow", head: "turban", headCol: "#2f8f4e" },
@@ -1534,6 +1586,19 @@ function drawUnit(u, now) {
     ctx.fillStyle = u.team === "p" ? "#6cc070" : "#ff5a4a";
     ctx.fillRect(p.x - 9, p.y - top, 18 * k, 3);
   }
+  if (u.rank) drawRank(p.x, p.y - (u.type === "elephant" ? 40 : heavy ? 34 : 26) - 3, u.rank);
+}
+// Rank pips above a soldier: one gold star per rank, always shown.
+function drawRank(x, y, n) {
+  ctx.save();
+  ctx.fillStyle = "#ffd27a"; ctx.strokeStyle = "rgba(40,24,6,0.85)"; ctx.lineWidth = 1;
+  for (let i = 0; i < n; i++) {
+    const cx = x + (i - (n - 1) / 2) * 6;
+    ctx.beginPath();
+    for (let j = 0; j < 10; j++) { const a = -Math.PI / 2 + j * Math.PI / 5, r = j % 2 ? 1.2 : 2.8; ctx.lineTo(cx + Math.cos(a) * r, y + Math.sin(a) * r); }
+    ctx.closePath(); ctx.stroke(); ctx.fill();
+  }
+  ctx.restore();
 }
 
 // ==================== PROJECTILES, FX & OVERLAYS ====================
@@ -1646,7 +1711,7 @@ function drawGhost() {
   if (!S.tool || !inb(h.gx, h.gy)) return;
   const def = BUILDINGS[S.tool];
   const ok = !canPlace(def, h.gx, h.gy);
-  const gk = { house: "house.0", palisade: "palisade.c", rampart: "rampart.c", gate: "gate.b", canal: "canal.0", sluice: "sluice.closed", paddy: "paddy.w1", wewa: "wewa.front" }[S.tool] || S.tool;
+  const gk = { house: "house.0", palisade: "palisade.c", rampart: "rampart.c", gate: "gate.b", canal: "canal.0", moat: "canal.0", sluice: "sluice.closed", paddy: "paddy.w1", wewa: "wewa.front" }[S.tool] || S.tool;
   if (hasSprite(gk)) {
     diamond(h.gx, h.gy, def.w, def.h, 0, ok ? "rgba(110,230,110,0.35)" : "rgba(245,75,75,0.4)", ok ? "rgba(140,255,140,0.9)" : "rgba(255,110,110,0.9)");
     if (S.tool === "wewa") drawSprite("wewa.base", h.gx, h.gy, 0, { alpha: 0.6 });
@@ -1673,22 +1738,26 @@ function drawGhost() {
   }
 }
 
+// The last minute before a raid: the stretch of each edge where raiders will
+// enter glows red, with arrows pointing in (the countdown is in the HUD).
+const RAID_SHOW = 60;
 function drawWaveMarkers(now) {
   const soon = nextWaveIn();
-  if (soon > 25) return;
+  if (soon > RAID_SHOW) return;
   const w = S.L.waves[S.nextWave];
-  const pulse = 0.5 + 0.5 * Math.sin(now * 0.008);
-  const m = MAP / 2;
+  const urgent = soon <= 20;
+  const pulse = 0.5 + 0.5 * Math.sin(now * (urgent ? 0.012 : 0.004));
   for (const edge of w.from) {
-    const [x, y] = edge === "east" ? [MAP - 0.5, m] : edge === "west" ? [0.5, m] : edge === "north" ? [m, 0.5] : [m, MAP - 0.5];
-    const c = iso(x, y, 0);
-    const g = ctx.createRadialGradient(c.x, c.y, 2, c.x, c.y, 60);
-    g.addColorStop(0, `rgba(220,50,30,${0.35 + pulse * 0.25})`);
-    g.addColorStop(1, "rgba(220,50,30,0)");
-    ctx.fillStyle = g;
-    ctx.beginPath(); ctx.ellipse(c.x, c.y, 60, 30, 0, 0, Math.PI * 2); ctx.fill();
-    flag(c, 30, "#2a2a2a", now);
-    label(`${soon}s`, x, y, -10, "bold 12px sans-serif", "#ff8a7a");
+    const q = edgeStrip(edge).map(([x, y]) => iso(x, y, 0));
+    ctx.fillStyle = `rgba(220,50,30,${(urgent ? 0.32 : 0.16) + pulse * 0.2})`;
+    ctx.beginPath(); q.forEach((p, i) => (i ? ctx.lineTo(p.x, p.y) : ctx.moveTo(p.x, p.y))); ctx.closePath(); ctx.fill();
+    const [ix, iy] = edge === "east" ? [-1, 0] : edge === "west" ? [1, 0] : edge === "north" ? [0, 1] : [0, -1];
+    ctx.fillStyle = `rgba(255,110,80,${0.6 + pulse * 0.4})`;
+    for (const k of [0.25, 0.5, 0.75]) {
+      const along = 6 + k * (MAP - 12), ox = ix ? (ix > 0 ? 1.2 : MAP - 1.2) : along, oy = iy ? (iy > 0 ? 1.2 : MAP - 1.2) : along;
+      const tip = iso(ox + ix * 0.9, oy + iy * 0.9, 0), l = iso(ox + iy * 0.45, oy + ix * 0.45, 0), r = iso(ox - iy * 0.45, oy - ix * 0.45, 0);
+      ctx.beginPath(); ctx.moveTo(tip.x, tip.y); ctx.lineTo(l.x, l.y); ctx.lineTo(r.x, r.y); ctx.closePath(); ctx.fill();
+    }
   }
 }
 
@@ -1851,9 +1920,9 @@ function drawBirds(now) {
 // While the festival decree is in force, a procession circles the citadel:
 // tuskers, Kandyan dancers and torch-bearers. Positions follow S.time so the
 // parade halts when the game is paused.
-const PERAHERA = ["u.v.farmer", "u.angampora", "u.angampora", "u.elephant", "u.v.trader", "u.v.farmer", "u.angampora", "u.elephant", "u.v.farmer"];
+const PERAHERA = ["u3d.v.farmer", "u3d.angampora", "u3d.angampora", "u.elephant", "u3d.v.trader", "u3d.v.farmer", "u3d.angampora", "u.elephant", "u3d.v.farmer"];
 function peraheraMembers() {
-  if (typeof edictOn !== "function" || !edictOn("perahera") || !hasSprite("u.elephant.f.i0")) return [];
+  if (typeof edictOn !== "function" || !edictOn("perahera") || !hasSprite("u.elephant.f.i0") || !hasSprite("u3d.angampora.d0.i0")) return [];
   const c = S.citadel, x0 = c.gx - 1.4, y0 = c.gy - 1.4, x1 = c.gx + c.w + 1.4, y1 = c.gy + c.h + 1.4;
   const W = x1 - x0, H = y1 - y0, per = 2 * (W + H);
   const at = d => {
@@ -1867,14 +1936,15 @@ function peraheraMembers() {
   return PERAHERA.map((key, i) => {
     const d = head - i * (key === "u.elephant" || PERAHERA[i - 1] === "u.elephant" ? 0.75 : 0.5);
     const [gx, gy, dx, dy] = at(d);
-    return { key, gx, gy, sx: dx - dy, sy: dx + dy, d, torch: key === "u.v.farmer" };
+    return { key, gx, gy, ang: Math.atan2(dy, dx), flip: dx - dy < 0, d, torch: key === "u3d.v.farmer" };
   });
 }
 function drawPeraheraMember(m, now) {
-  const back = m.sy < 0, flip = m.sx < 0;
-  const elephant = m.key === "u.elephant";
-  const fr = `w${Math.floor(m.d * (elephant ? 4 : 7)) % 6}`;
-  drawSprite(`${m.key}.${elephant || !back ? "f" : "b"}.${fr}`, m.gx, m.gy, 0, { flip });
+  if (m.key === "u.elephant") drawSprite(`u.elephant.f.w${Math.floor(m.d * 4) % 6}`, m.gx, m.gy, 0, { flip: m.flip });
+  else {
+    const d = ((Math.round(m.ang / (Math.PI / 4)) % 8) + 8) % 8;
+    drawSprite(`${m.key}.d${d}.w${Math.floor(m.d * 9.3) % 8}`, m.gx, m.gy);
+  }
   if (m.torch) {
     const p = iso(m.gx, m.gy, 26);
     const r = 5 + Math.sin(now * 0.02 + m.d * 9) * 1.2;
@@ -1908,8 +1978,17 @@ function renderMinimap() {
   }
   for (const u of S.units) {
     const [a, c] = px(u.gx, u.gy);
-    mctx.fillStyle = u.team === "p" ? "#6cc070" : "#ff4a3a";
+    mctx.fillStyle = u.team === "p" ? "#6cc070" : u.team === "w" ? "#c8c4b8" : "#ff4a3a";
     mctx.fillRect(a - 1, c - 1, 2.5, 2.5);
+  }
+  const soon = nextWaveIn();
+  if (soon <= RAID_SHOW && (soon > 20 || Math.floor(performance.now() / 300) % 2)) {
+    mctx.strokeStyle = "#ff4a3a"; mctx.lineWidth = 3;
+    for (const edge of S.L.waves[S.nextWave].from) {
+      const q = edgeStrip(edge), [i, j] = { east: [1, 2], west: [0, 3], north: [0, 1], south: [2, 3] }[edge];
+      const [a0, b0] = px(...q[i]), [a1, b1] = px(...q[j]);
+      mctx.beginPath(); mctx.moveTo(a0, b0); mctx.lineTo(a1, b1); mctx.stroke();
+    }
   }
   const W2 = view.w / view.zoom, H2 = view.h / view.zoom;
   const corners = [screenToGrid(0, 0), screenToGrid(W2, 0), screenToGrid(W2, H2), screenToGrid(0, H2)];

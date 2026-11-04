@@ -32,7 +32,8 @@ off here when they ship.
       menu; "Continue" on the menu (`saveRun`/`continueRun` in `game.js`).
 - [x] **Building upgrades.** ⬆️ Upgrade tool; palisade → rampart, house →
       walawwa (+cap, +harmony). Rows declare `upgrade: { to, cost }`.
-- [ ] **Soldier stances.** Hold / guard / patrol; a "garrison this tower" command.
+- [x] **Soldier stances.** Guard (default) and Hold (H) in batch 7 (R27). Archers
+      already garrison a tower or wall by being moved onto it. Patrol not planned.
 
 ## Ideas from Sri Lankan history (gameplay)
 
@@ -73,7 +74,8 @@ system, not a copy of any other game's mechanic.
       screen lists the 2–3 most telling reasons with what to do next time.
 - [ ] Notes #15 (raiders strengthen while you wait), #16 (home-ground bonus),
       #17 (hidden forest paths), #18 (buried coin hoards).
-- [ ] Minimap arrows for incoming raids (notes #4); wall stairs (notes #7);
+- [x] Minimap arrows for incoming raids (notes #4, R18).
+- [ ] Wall stairs (notes #7);
       merit currency for elite units (notes #10); sealed-citadel pathing test (notes #12).
 
 ## Simplify round 1 (cut or merged, per docs/ITERATION-GUARDRAILS.md)
@@ -94,6 +96,112 @@ Recorded so these are not re-added without a strong reason:
   never reached 80 rice (true on `main` before any of this work too). A new
   hint ("keep about one watered paddy for each house") fixes it; following it,
   the scripted player wins at ~350s.
+
+## Loop batch 2 (R6–R9)
+
+- [x] R6 Fields: warning before raiders reach them, half-crop trampling, Maha rations.
+- [x] R7 Monsoon deadwood gathering by idle villagers (late timber fixed).
+- [x] R8 Diya agala (moat) fed by the canal network.
+- [x] R9 Simplify round 3 (below).
+
+## Loop batch 8 (R30–R33): review, and the loop improves itself
+
+- [x] R30 Review round: `tools/review.mjs` (save and continue on every level,
+      tooltips, top bar, every building and decree) with a self-test.
+- [x] R31 Final raids with teeth on The Dry Zone and The Disawa's Dam.
+- [x] R32 Past hand investigations become permanent playtest detectors, each
+      with a self-test; `docs/LOOP-LOG.md`; four new guardrail rules.
+- [x] R33 Simplify round 9 (below).
+
+## Simplify round 9 (R33)
+
+- **Merged (code):** eleven once-only advisor tips with their own flags go
+  through one `tip(key, text)`; a flag that was set but never read is gone.
+
+## Loop batch 7 (R26–R29)
+
+- [x] R26 Hena (chena): idle villagers clear jungle-edge plots for millet in Yala.
+- [x] R27 Soldier stances: Hold position (H, or the Army tab card).
+- [x] R28 Lion Rock's final assault: 10 raiders, 4 bowmen, 2 ram bearers.
+- [x] R29 Simplify round 8 (below).
+
+## Simplify round 8 (R29)
+
+- **Merged (code):** every seasonal job's work and drop-off behaviour lives on
+  its `SEASON_WORK` row (`done`, `again`) instead of branches in `updateWorker`.
+
+## Loop batch 6 (R22–R25)
+
+- [x] R22 Wild elephants and the pela; new level 2, Elephants of Ruhuna.
+      Progress and the playtest brain are now keyed by level id.
+- [x] R23 The disawa's dam; new level 5, The Disawa's Dam (break it or gift).
+- [x] R24 Drought years in skirmish.
+- [x] R25 Simplify round 7 (below).
+
+## Simplify round 7 (R25)
+
+- **Merged (code):** the season-change messages are one `SEASON_NEWS` table;
+  decree proclamations are data (`said`) instead of a branch per decree.
+
+## Loop batch 5 (R18–R21)
+
+- [x] R18 Where the next raid comes from: the Next raid row names the edge;
+      in the last minute that edge's entry stretch glows with arrows, and the
+      minimap marks it (notes #4).
+- [x] R19 The scouts (45s before a raid) name sides with no archers or towers.
+- [x] R20 The market trader keeps two rice per villager (Lion Rock's required
+      market was selling the harvest while families starved).
+- [x] R21 Simplify round 6 (below).
+
+## Simplify round 6 (R21)
+
+- **Cut:** the mid-edge glow, flag and countdown of the old raid marker; the
+  R18 band says where and the HUD says when.
+- **Merged (code):** the defeat screen and the scouts share one `edgeDefence`.
+
+## Loop batch 4 (R14–R17)
+
+- [x] R14 Attam: in Maha, idle villagers join the farmer on watered paddies.
+- [x] R15 Fire losses are counted only when fire brings a building down (the
+      Hill Kingdom "fire" finding was mostly raiders finishing damaged buildings).
+- [x] R16 Soldier ranks (asked for by the player): drill by the Angam Maduwa
+      and fight to become ★ veteran / ★★ champion.
+- [x] R17 Simplify round 5 (below).
+- [x] Deferred to batch 5: show where the next raid comes from (R18).
+
+## Simplify round 5 (R17)
+
+- **Merged (code):** shramadana, deadwood gathering and attam are rows in one
+  `SEASON_WORK` table with one dispatcher, instead of three assign functions
+  that each did their own season cleanup.
+
+## Loop batch 3 (R10–R13): pre-rendered 3D figures
+
+- [x] R10 3D pipeline: three.js models rendered by the bake (orthographic
+      camera matching `iso()`, one sun, soft shadows), spearman first. A 3D
+      house was tried and dropped: the hand-modelled 2D houses read better.
+- [x] R11 Every combat unit in 3D: 8 directions, 8-frame walk, 3-frame attack.
+- [x] R12 Villagers in 3D with their job tools; carried rice, water, stone,
+      timber and arms are baked into the walk frames.
+- [x] R13 Simplify round 4 (below).
+
+Before/after: `docs/screens/batch3-units.png`.
+
+## Simplify round 4 (R13)
+
+- **Cut:** the 2D villager, soldier and raider frames and the separate load
+  overlays (about 300 sprites). Only the elephant and stone thrower stay 2D.
+  The festival procession uses the 3D dancers and torch-bearers.
+- **Cost:** the atlas is 6.1 MB in four pages (was 4.6 MB); 3D figures are
+  most of it. Next lever if it matters: fewer attack frames, or k=3 figures.
+
+## Simplify round 3 (R9)
+
+- **Cut: the thorn barrier (katu wetiya).** It did the same job as the moat
+  (a tile that slows raiders crossing it) without touching water, so it
+  would work the same in any castle game. The moat stays. Old saves load:
+  buildings of a removed type are dropped.
+- **Polish:** the resource bar never wraps; moat water is one channel.
 
 ## Simplify round 2 (R5)
 

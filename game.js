@@ -63,12 +63,17 @@ function costText(cost) {
 function loadProgress() {
   try {
     const p = JSON.parse(localStorage.getItem(SAVE_KEY));
-    if (p && typeof p.unlocked === "number") return { unlocked: p.unlocked, stars: p.stars || {}, skirmishBest: p.skirmishBest || 0 };
+    if (p && typeof p.unlocked === "number") {
+      // unlocked is stored by id too, so inserting a level never shifts it; old saves used the first five levels' order
+      const id = p.unlockedId || ["anuradhapura", "dryzone", "lionrock", "parakrama", "senkadagala"][p.unlocked];
+      const i = LEVELS.findIndex(L => L.id === id);
+      return { unlocked: i >= 0 ? i : p.unlocked, stars: p.stars || {}, skirmishBest: p.skirmishBest || 0 };
+    }
   } catch (e) { /* storage blocked or corrupt: start fresh */ }
   return { unlocked: 0, stars: {}, skirmishBest: 0 };
 }
 function saveProgress() {
-  try { localStorage.setItem(SAVE_KEY, JSON.stringify(progress)); } catch (e) { /* ignore */ }
+  try { localStorage.setItem(SAVE_KEY, JSON.stringify({ ...progress, unlockedId: LEVELS[progress.unlocked].id })); } catch (e) { /* ignore */ }
 }
 
 // ==================== SAVE A RUN ====================
@@ -93,7 +98,7 @@ function saveRun() {
     buildings: S.buildings.map(b => ({ uid: b.uid, id: b.id, gx: b.gx, gy: b.gy, hp: b.hp, maxHp: b.maxHp, water: b.water, growth: b.growth,
       open: b.open, next: b.next, at: b.at, fire: b.fire, silt: b.silt, irrigated: b.irrigated })),
     units: S.units.map(u => ({ uid: u.uid, team: u.team, type: u.type, gx: r3(u.gx), gy: r3(u.gy), tx: u.tx, ty: u.ty, hp: u.hp, maxHp: u.maxHp,
-      last: u.last, z: u.z, ordered: u.ordered, lastFire: u.lastFire, party: u.party, hx: u.hx, hy: u.hy, flee: u.flee, looted: u.looted }))
+      last: u.last, z: u.z, ordered: u.ordered, lastFire: u.lastFire, party: u.party, hx: u.hx, hy: u.hy, flee: u.flee, looted: u.looted, rank: u.rank, xp: u.xp, hold: u.hold }))
   };
   try { localStorage.setItem(RUN_KEY, JSON.stringify(data)); } catch (e) { /* storage full or blocked */ }
   S.lastSave = S.time;
@@ -111,7 +116,7 @@ function continueRun() {
   startLevel(d.idx, "idle", custom);
   Object.assign(S, d.st);
   S.trees = d.trees.map(([gx, gy, stage]) => ({ gx, gy, stage, reserved: false }));
-  S.buildings = d.buildings.map(o => {
+  S.buildings = d.buildings.filter(o => BUILDINGS[o.id]).map(o => {
     const def = BUILDINGS[o.id];
     return { ...o, def, w: def.w, h: def.h, maxHp: o.maxHp || def.hp, worker: null, fire: o.fire || 0 };
   });
@@ -222,7 +227,7 @@ function makeSkirmish(seed, sandbox = false) {
     forests: Array.from({ length: ri(3, 5) }, () => [...rect(ri(4, 7), ri(4, 7)), 0.35 + r() * 0.2]),
     unlocks: {}, all,
     waves: sandbox ? [] : [0, 1, 2].map(k => skirmishWave(k, seed, riverEdge)),
-    hpScale: 1, objectives: [{ type: sandbox ? "sandbox" : "endless" }],
+    hpScale: 1, objectives: [{ type: sandbox ? "sandbox" : "endless" }], wild: { first: 150, every: 110 },
     ...(sandbox ? {
       id: `sandbox-${seed}`, name: "Sandbox", sandbox: true, endless: false, era: `Royal sandbox · seed ${seed}`,
       intro: "A peaceful valley with full stores. Build anything; open 👑 Decrees to send raids of any size from any edge and test your defences.",
@@ -272,7 +277,8 @@ function startLevel(idx, mode = "brief", custom = null) {
     tool: null, demolish: false, cat: "water",
     paused: true, speed: 1, mode, growAcc: 0, starveAcc: 0, tutorialStep: 0, warnedWave: -1, uid: 0,
     seasonNo: 0, edictEnd: {}, edictUsed: {}, rain: { caught: 0, lost: 0, spilled: 0 },
-    stats: { starved: 0, starveSeason: null, lost: {}, burned: 0, trained: 0, tributes: 0, lastFrom: [], lastSize: 0, hungry: 0 }
+    stats: { starved: 0, starveSeason: null, lost: {}, burned: 0, trained: 0, tributes: 0, lastFrom: [], lastSize: 0, hungry: 0 },
+    dam: L.rival ? makeDam(tiles, L.rivers[0]) : null
   };
   const [cx, cy] = L.citadel;
   S.citadel = addBuilding("citadel", cx, cy);
@@ -436,13 +442,13 @@ function demolishAt(gx, gy) {
   syncHud();
 }
 
-function damageBuilding(b, amt) {
+function damageBuilding(b, amt, byFire = false) {
   if (!S.buildings.includes(b)) return;
   b.hp -= amt;
   if (b.hp > 0) return;
   if (b === S.citadel) { endLevel(false); return; }
   S.stats.lost[b.id] = (S.stats.lost[b.id] || 0) + 1;
-  if (b.fire > 0) S.stats.burned++;
+  if (byFire) S.stats.burned++; // only when the fire itself brought it down
   puff(b.gx + b.w / 2, b.gy + b.h / 2, 14, "#7a6a58");
   spawnFloat(`${b.def.name} destroyed!`, b.gx + b.w / 2, b.gy + b.h / 2, "#ff6b5b");
   S.fear = Math.min(30, S.fear + 6);
@@ -457,7 +463,7 @@ function enterCost(x, y) {
   const t = S.tiles[y][x].t;
   let c = t === "river" ? 6 : t === "rock" ? 1.6 : 1;
   const b = S.occ[y][x];
-  if (b && b !== S.citadel) c += b.def.solid ? 3 + b.maxHp / 90 : b.def.thorn ? 4 : 0.3;
+  if (b && b !== S.citadel) c += b.def.solid ? 3 + b.maxHp / 90 : b.def.moat ? 4 : 0.3;
   return c;
 }
 
@@ -539,6 +545,8 @@ function updateNetWater() {
   }
 }
 
+const moatWet = b => { const id = S.netOf[b.gy][b.gx]; return id !== -1 && S.nets[id].water >= 1; };
+
 function drainNet(net, amt) {
   const ws = [...net.wewas].sort((a, b) => b.water - a.water);
   for (const w of ws) {
@@ -555,7 +563,38 @@ function edgeTiles(b) {
   return out.filter(([x, y]) => inb(x, y));
 }
 
-const riverBeside = b => edgeTiles(b).some(([x, y]) => S.tiles[y][x].t === "river");
+const riverBeside = b => !riverDry() && edgeTiles(b).some(([x, y]) => S.tiles[y][x].t === "river");
+
+// ==================== THE DISAWA'S DAM ====================
+// On levels with `rival`, a rival lord's dam stands where the river enters the
+// map. Every Yala he shuts it and the river runs dry, unless the dam is broken
+// (soldiers standing at it hack it down, and his raid comes early and stronger)
+// or a 🎁 gift decree is in force. He rebuilds it every Maha.
+const DAM_HP = 900, REVENGE = ["raider", "raider", "raider", "raider", "brute"];
+function makeDam(tiles, r) {
+  const along = r.edge === "west" || r.edge === "east"; // the river runs along y; upstream is its y = 1 end
+  const cells = [];
+  for (let k = 0; k < MAP; k++) { const [x, y] = along ? [k, 1] : [1, k]; if (tiles[y][x].t === "river") cells.push(k); }
+  const a = Math.min(...cells), b = Math.max(...cells);
+  return along ? { gx: a, gy: 1, w: b - a + 1, h: 1, hp: DAM_HP, maxHp: DAM_HP } : { gx: 1, gy: a, w: 1, h: b - a + 1, hp: DAM_HP, maxHp: DAM_HP };
+}
+const riverDry = () => !!(S.dam && S.dam.hp > 0 && S.season === "yala" && !edictOn("gift"));
+function hitDam(u) {
+  if (S.time - u.last < 1.2) return;
+  u.last = S.time;
+  const d = S.dam;
+  d.hp -= u.def.dmg * (u.rank ? RANKS[u.rank].dmg : 1);
+  puff(d.gx + d.w / 2, d.gy + d.h / 2, 3, "#9a9080");
+  if (d.hp > 0) return;
+  d.hp = 0;
+  S.stats.damBroken = (S.stats.damBroken || 0) + 1;
+  S.stats.damBrokenAt = S.stats.damBrokenAt ?? Math.round(S.time);
+  const w = S.L.waves[S.nextWave];
+  if (w) S.waveClock = Math.max(S.waveClock, w.t - 20);
+  S.revenge = true;
+  say("The disawa's dam is broken and the river runs free! His men are coming for revenge, in 20 seconds, and in strength.", true);
+  sfx("conch");
+}
 
 // Returns "river", a network object, or null.
 function waterSource(b) {
@@ -597,11 +636,8 @@ function tickWater() {
     }
     S.rain.lost += amt;
   }
-  if (S.rain.spilled > 0 && !S.warnedCascade) { S.warnedCascade = true; say("A full wewa spills down the canal into the next tank. That is ellangawa: no rain wasted."); }
-  if (S.rain.lost > 20 && !S.warnedSpill && S.L.objectives.some(o => o.type === "catch")) {
-    S.warnedSpill = true;
-    say("Rain is spilling from full wewas to the sea! Link another wewa to them with a canal.", true);
-  }
+  if (S.rain.spilled > 0) tip("cascade", "A full wewa spills down the canal into the next tank. That is ellangawa: no rain wasted.");
+  if (S.rain.lost > 20 && S.L.objectives.some(o => o.type === "catch")) tip("spill", "Rain is spilling from full wewas to the sea! Link another wewa to them with a canal.", true);
   updateNetWater();
   for (const p of S.buildings) {
     if (p.id !== "paddy") continue;
@@ -618,31 +654,99 @@ function tickWater() {
   updateNetWater();
 }
 
-// ==================== SHRAMADANA (communal work) ====================
-// Outside the monsoon, idle villagers gather in work parties to dig silt out
-// of the wewas, and carry it to the paddies, where tank silt is good manure.
-function assignShramadana() {
-  if (S.season === "maha") { S.workers = S.workers.filter(w => w.job !== "shramadana" || w.fireTarget); return; }
-  for (const b of S.buildings) {
-    if (b.id !== "wewa" || (b.silt || 0) < 8) continue;
-    let have = S.workers.filter(w => w.job === "shramadana" && w.siltTarget === b).length;
-    while (have < 3 && idleVillagers() > 0) {
-      goTo(helper("shramadana", { siltTarget: b }), b.gx + 1, b.gy + 2.25, "toSilt");
-      have++;
+// ==================== SEASONAL WORK (idle villagers) ====================
+// Idle villagers join seasonal work parties as temporary helpers. A real job
+// always takes them first (staff), and a fire can borrow them. Each row says
+// when the work runs, where it wants hands, and how a helper sets out.
+//   shramadana (Yala): dig silt out of the wewas and carry it to the paddies as manure.
+//   gatherer (Maha): fetch fallen deadwood from the forest edge (never felling trees).
+//   attam (Maha): exchange labour beside the farmer on watered paddies; rice grows faster.
+//   hena (Yala): clear and burn a plot at the jungle edge for millet (counted as rice);
+//     the tree is felled and regrows, so the jungle shrinks for a while.
+// done(w): what a helper does when a spell of work ends.
+// again(w): what a helper does after dropping its load at a store (default: go home).
+const GATHERERS = 4, GATHER_CAP = 150;
+const ATTAM_HANDS = 2, ATTAM_GROWTH = 4, ATTAM_TIME = 5;
+const HENA_HANDS = 4, HENA_RICE = 2, HENA_TIME = 8;
+const SEASON_WORK = [
+  { job: "shramadana", season: "yala", spots: () => S.buildings.filter(b => b.id === "wewa" && (b.silt || 0) >= 8)
+      .map(b => ({ n: 3, mine: w => w.siltTarget === b, send: w => { w.siltTarget = b; goTo(w, b.gx + 1, b.gy + 2.25, "toSilt"); } })),
+    done: w => { // dig out silt and carry it to the nearest paddy as manure
+      const b = w.siltTarget;
+      if (b && S.buildings.includes(b)) b.silt = Math.max(0, b.silt - 6);
+      w.carry = { key: "silt", n: 1 };
+      let best = null, bd = 8;
+      for (const p of S.buildings) if (p.id === "paddy") { const d = Math.hypot(p.gx + 1 - w.gx, p.gy + 1 - w.gy); if (d < bd) { bd = d; best = p; } }
+      w.field = best;
+      goTo(w, best ? best.gx + 1 : w.gx + 1, best ? best.gy + 2.2 : w.gy + 0.8, "toField");
+    } },
+  { job: "gatherer", season: "maha", tip: "In the monsoon, idle villagers gather fallen wood from the forest for the stores.",
+    spots: () => S.timber >= GATHER_CAP ? [] : [{ n: GATHERERS, mine: () => true, send: sendGatherer }],
+    done: w => carryHome(w, "timber", 2),
+    again: w => (S.season === "maha" && S.timber < GATHER_CAP ? sendGatherer(w) : endParty(w)) },
+  { job: "hena", season: "yala", tip: "In Yala, idle villagers clear hena plots at the jungle edge and bring back millet, but each plot costs a tree.",
+    spots: () => [{ n: HENA_HANDS, mine: () => true, send: sendHena }],
+    done: w => { // the tree is felled and burned for the plot; millet goes to the store
+      const t = w.target; w.target = null;
+      if (t && S.trees.includes(t)) { t.stage = 0; t.reserved = false; puff(t.gx, t.gy, 5, "#8a8378"); }
+      carryHome(w, "rice", HENA_RICE);
+    },
+    again: w => (S.season === "yala" ? sendHena(w) : endParty(w)) },
+  { job: "attam", season: "maha", tip: "In the monsoon, idle neighbours join attam work on watered paddies, and the rice grows faster.",
+    spots: () => S.buildings.filter(p => p.id === "paddy" && p.irrigated && p.worker)
+      .map(p => ({ n: ATTAM_HANDS, mine: w => w.field === p, send: (w, i) => { w.field = p; goTo(w, p.gx + 0.6 + i * 0.8, p.gy + 1.3 + i * 0.3, "toPaddy"); } })),
+    done: w => { // stays on the field, working in spells, while it is watered and the monsoon lasts
+      const p = w.field;
+      if (!p || !S.buildings.includes(p) || !p.irrigated || !p.worker || S.season !== "maha") { endParty(w); return; }
+      if (p.growth < 100) p.growth = Math.min(100, p.growth + ATTAM_GROWTH);
+      w.timer = ATTAM_TIME;
+    } }
+];
+function assignSeasonWork() {
+  for (const row of SEASON_WORK) {
+    if (S.season !== row.season) { S.workers.filter(w => w.job === row.job && !w.fireTarget).forEach(endParty); continue; }
+    const crew = S.workers.filter(w => w.job === row.job);
+    for (const spot of row.spots()) {
+      for (let have = crew.filter(spot.mine).length; have < spot.n && idleVillagers() > 0; have++) spot.send(helper(row.job, {}), have);
     }
+    if (row.tip && S.workers.some(w => w.job === row.job)) tip(row.job, row.tip);
   }
-  if (!S.warnedSilt && S.buildings.some(b => b.id === "wewa" && b.silt >= 20)) {
-    S.warnedSilt = true;
-    say("Monsoon rain washes silt into the wewas, and they hold less. In Yala, idle villagers gather for shramadana to dig it out and manure the paddies.");
-  }
+  if (S.buildings.some(b => b.id === "wewa" && b.silt >= 20)) tip("silt", "Monsoon rain washes silt into the wewas, and they hold less. In Yala, idle villagers gather for shramadana to dig it out and manure the paddies.");
 }
-const endParty = w => { S.workers = S.workers.filter(x => x !== w); };
+const endParty = w => { if (w.target && w.target.reserved) w.target.reserved = false; S.workers = S.workers.filter(x => x !== w); };
 // A temporary helper drawn from the idle villagers (water carrier or work party).
 function helper(job, extra) {
   const w = { b: S.citadel, job, temp: true, gx: S.citadel.gx + 1, gy: S.citadel.gy + 2.2, tx: 0, ty: 0, phase: "plan", timer: 0, carry: null, target: null, ...extra };
   S.workers.push(w);
   return w;
 }
+function woodSpot(w) {
+  let best = null, bd = Infinity;
+  for (const t of S.trees) {
+    if (t.stage < 100) continue;
+    const d = Math.hypot(t.gx - w.gx, t.gy - w.gy);
+    if (d < bd) { bd = d; best = t; }
+  }
+  return best;
+}
+// Hena: the nearest mature tree nobody has claimed, felled for the plot.
+function sendHena(w) {
+  let best = null, bd = Infinity;
+  for (const t of S.trees) {
+    if (t.stage < 100 || t.reserved) continue;
+    const d = Math.hypot(t.gx - w.gx, t.gy - w.gy);
+    if (d < bd) { bd = d; best = t; }
+  }
+  if (!best) { endParty(w); return; }
+  best.reserved = true; w.target = best;
+  goTo(w, best.gx + 0.35, best.gy + 0.35, "toWood");
+}
+function sendGatherer(w) {
+  const t = woodSpot(w);
+  if (!t) { endParty(w); return; }
+  goTo(w, t.gx + 0.35, t.gy + 0.35, "toWood");
+}
+
 // Send a helper (or a worker borrowed for a fire) home: helpers leave, workers go back to their job.
 function dismiss(w) { if (w.temp) endParty(w); else planJob(w); }
 
@@ -652,9 +756,9 @@ function staff() {
   for (const b of S.buildings) {
     if (!b.def.worker || b.worker) continue;
     if (S.workers.length >= S.villagers) {
-      const party = S.workers.findIndex(w => w.job === "shramadana" && !w.fireTarget);
+      const party = S.workers.findIndex(w => w.temp && w.job !== "bucket" && !w.fireTarget);
       if (party < 0) break;
-      S.workers.splice(party, 1); // a real job beats a work party
+      endParty(S.workers[party]); // a real job beats a work party
     }
     const w = { b, job: b.def.worker, gx: S.citadel.gx + 1, gy: S.citadel.gy + 2.2, tx: 0, ty: 0, phase: "plan", timer: 0, carry: null, target: null };
     b.worker = w;
@@ -745,6 +849,12 @@ function updateWorker(w, dt) {
       w.timer -= dt * workMult();
       if (w.timer <= 0) planJob(w);
       break;
+    case "toWood":
+      if (walk(w, dt)) { w.phase = "work"; w.timer = w.job === "hena" ? HENA_TIME : 6; }
+      break;
+    case "toPaddy":
+      if (walk(w, dt)) { w.phase = "work"; w.timer = ATTAM_TIME; }
+      break;
     case "toSilt":
       if (walk(w, dt)) {
         const b = w.siltTarget;
@@ -803,17 +913,8 @@ function updateWorker(w, dt) {
     case "work":
       w.timer -= dt * workMult();
       if (w.timer > 0) break;
-      if (w.job === "shramadana") {
-        const b = w.siltTarget;
-        if (b && S.buildings.includes(b)) b.silt = Math.max(0, b.silt - 6);
-        w.carry = { key: "silt", n: 1 };
-        let best = null, bd = 8;
-        for (const p of S.buildings) if (p.id === "paddy") { const d = Math.hypot(p.gx + 1 - w.gx, p.gy + 1 - w.gy); if (d < bd) { bd = d; best = p; } }
-        w.field = best;
-        if (best) goTo(w, best.gx + 1, best.gy + 2.2, "toField");
-        else goTo(w, w.gx + 1, w.gy + 0.8, "toField");
-        break;
-      }
+      const season = w.temp && SEASON_WORK.find(r => r.job === w.job);
+      if (season) { season.done(w); break; } // a seasonal work party finished a spell of work
       if (w.job === "woodcutter") {
         const t = w.target;
         w.target = null;
@@ -841,7 +942,7 @@ function updateWorker(w, dt) {
           w.timer = 6;
           // Pola orders (👑 tab): sell rice above a level, buy timber/stone below one at a markup
           const m = S.market || (S.market = { sell: 30, buy: 0 });
-          if (S.rice > m.sell + 5) { S.rice -= 5; S.gold += 8; spawnFloat("-5🍚 +8🪙", w.gx, w.gy, "#e9b949"); sfx("coin"); }
+          if (S.rice > sellAbove() + 5) { S.rice -= 5; S.gold += 8; S.stats.riceSold = (S.stats.riceSold || 0) + 5; spawnFloat("-5🍚 +8🪙", w.gx, w.gy, "#e9b949"); sfx("coin"); }
           else if (S.gold >= 12 && (S.timber < m.buy || S.stone < m.buy)) {
             const k = S.timber <= S.stone ? "timber" : "stone";
             S.gold -= 12; S[k] += 5; spawnFloat(`-12🪙 +5${RES[k]}`, w.gx, w.gy, "#e9b949"); sfx("coin");
@@ -857,7 +958,9 @@ function updateWorker(w, dt) {
         }
         if (w.carry.key === "rice") sfx("harvest");
         w.carry = null;
-        planJob(w);
+        const row = w.temp && SEASON_WORK.find(r => r.job === w.job);
+        if (row) (row.again || endParty)(w);
+        else planJob(w);
       }
       break;
   }
@@ -867,6 +970,75 @@ function updateWorker(w, dt) {
 function spawnSoldier(type, gx, gy) {
   const d = TROOPS[type];
   S.units.push({ uid: ++S.uid, team: "p", type, def: d, gx, gy, tx: gx, ty: gy, hp: d.hp, maxHp: d.hp, last: -9, z: 0, sel: false, ordered: false });
+}
+
+// Drill and battle make veterans (RANKS in data.js): tougher and harder-hitting.
+function gainXp(u, n) {
+  u.xp = (u.xp || 0) + n;
+  const r = u.rank || 0, next = RANKS[r + 1];
+  if (!next || u.xp < next.xp) return;
+  u.rank = r + 1;
+  const hp = Math.round(u.def.hp * next.hp);
+  u.hp += hp - u.maxHp; u.maxHp = hp;
+  spawnFloat(`${"★".repeat(u.rank)} ${next.name}!`, u.gx, u.gy, "#ffd27a");
+  tip("rank", "A soldier has risen in rank. Soldiers resting by the Angam Maduwa drill between raids, and every fight teaches them.");
+}
+function drillSoldiers() {
+  const halls = S.buildings.filter(b => b.id === "barracks");
+  if (!halls.length) return;
+  for (const u of S.units) {
+    if (u.team !== "p" || nearestFoe(u, 6)) continue;
+    if (halls.some(b => rectDist(u, b) <= 3)) gainXp(u, 1);
+  }
+}
+
+// ==================== WILD ELEPHANTS ====================
+// On levels with `wild`, an elephant leaves a far stretch of jungle whenever a
+// paddy is ripening, walks to it and eats the crop, then goes home. A staffed
+// pela within PELA_RANGE turns it back. Nobody fights it (team "w").
+const PELA_RANGE = 5;
+function spawnWild() {
+  const W = S.L.wild;
+  if (!W) return;
+  if (S.nextWild == null) S.nextWild = W.first;
+  if (S.time < S.nextWild) return;
+  if (!S.buildings.some(b => b.id === "paddy" && b.growth >= 50)) { S.nextWild = S.time + 10; return; }
+  S.nextWild = S.time + W.every;
+  const c = S.citadel, far = S.trees.filter(t => t.stage >= 100 && Math.hypot(t.gx - c.gx, t.gy - c.gy) > 9);
+  const t = far.length ? far[Math.floor(Math.random() * far.length)] : null;
+  const [x, y] = t ? [t.gx, t.gy] : edgeSpawn(["east", "west", "north", "south"][Math.floor(Math.random() * 4)]);
+  const d = FOES.aliya;
+  S.units.push({ uid: ++S.uid, team: "w", type: "aliya", def: d, gx: x, gy: y, tx: x, ty: y, hp: d.hp, maxHp: d.hp, last: -9, z: 0, hx: x, hy: y });
+  tip("wild", `A wild elephant is coming out of the jungle for your ripening rice!${S.unlocked.buildings.has("pela") ? " A pela (watch hut) by the paddies scares elephants away." : ""}`, true);
+}
+function updateWild(u, dt) {
+  if (u.flee) {
+    moveToward(u, u.hx, u.hy, dt);
+    if (Math.hypot(u.hx - u.gx, u.hy - u.gy) < 0.4) u.gone = true;
+    return;
+  }
+  const pela = S.buildings.find(b => b.id === "pela" && b.worker && rectDist(u, b) <= PELA_RANGE);
+  if (pela) {
+    u.flee = true;
+    S.stats.scared = (S.stats.scared || 0) + 1;
+    spawnFloat("Hoo! Hoo! 🔥", pela.gx + 0.5, pela.gy + 0.5, "#ffd27a");
+    return;
+  }
+  let p = u.lootTarget;
+  if (!p || !S.buildings.includes(p) || p.growth < 30) {
+    p = null; let bd = Infinity;
+    for (const b of S.buildings) if (b.id === "paddy" && b.growth >= 50) { const d = rectDist(u, b); if (d < bd) { bd = d; p = b; } }
+    u.lootTarget = p;
+    if (!p) { u.flee = true; return; }
+  }
+  if (rectDist(u, p) > 0.3) { moveToward(u, p.gx + 1, p.gy + 1, dt); return; }
+  u.eat = (u.eat || 0) + dt;
+  if (S.time - u.last >= 1) u.last = S.time; // eating: the trunk works
+  if (u.eat < 3) return;
+  p.growth = 0;
+  S.stats.eaten = (S.stats.eaten || 0) + 1;
+  spawnFloat("🐘 The rice is eaten!", p.gx + 1, p.gy + 1, "#ff9a7a");
+  u.flee = true;
 }
 
 function spawnFoe(type, edge, party = null) {
@@ -911,7 +1083,7 @@ function terrainMult(u) {
   const x = Math.floor(u.gx), y = Math.floor(u.gy);
   if (!inb(x, y)) return 1;
   if (u.team === "e" && S.flooded.has(y * MAP + x)) return 0.4;
-  if (u.team === "e" && S.occ[y][x] && S.occ[y][x].def.thorn) return 0.45; // pushing through thorns
+  if (u.team === "e" && S.occ[y][x] && S.occ[y][x].def.moat) return moatWet(S.occ[y][x]) ? 0.3 : 0.75; // wading a moat
   if (u.team === "e" && coverAt(u.gx, u.gy) >= 3) return 0.7; // thick jungle
   const t = S.tiles[y][x].t;
   return t === "river" ? 0.55 : t === "rock" ? 0.85 : 1;
@@ -953,7 +1125,7 @@ function unitsNear(x, y, r) {
 function nearestFoe(u, radius, from = u) {
   let best = null, bd = radius;
   for (const v of unitsNear(from.gx, from.gy, radius)) {
-    if (v.team === u.team || v.hp <= 0) continue;
+    if (v.team === u.team || v.team === "w" || v.hp <= 0) continue; // nobody fights wild elephants
     const d = Math.hypot(v.gx - from.gx, v.gy - from.gy);
     if (u.team === "e" && d > 1.5 && inCover(v)) continue; // hidden in the forest
     if (u.team === "e" && !u.def.ranged && v.z > 0) continue; // out of reach up on a wall or tower
@@ -967,7 +1139,7 @@ function nearestFoe(u, radius, from = u) {
 function volleyTarget(u, range, from = u) {
   const near = [];
   for (const v of unitsNear(from.gx, from.gy, range)) {
-    if (v.team === u.team || v.hp <= 0 || v.flee) continue;
+    if (v.team === u.team || v.team === "w" || v.hp <= 0 || v.flee) continue;
     const d = Math.hypot(v.gx - from.gx, v.gy - from.gy);
     if (d <= range && !(u.team === "e" && d > 1.5 && inCover(v))) near.push([d, v]);
   }
@@ -981,8 +1153,9 @@ function attack(u, target, dmg) {
   if (u.team === "p" && inCover(u) && S.time - u.last > AMBUSH_RESET) {
     dmg *= 2;
     spawnFloat("Ambush!", u.gx, u.gy, "#bff0a8");
-    if (!S.warnedAmbush) { S.warnedAmbush = true; say("Ambush! Soldiers hidden in the forest strike first for double damage, and raiders can't see them from afar."); }
+    tip("ambush", "Ambush! Soldiers hidden in the forest strike first for double damage, and raiders can't see them from afar.");
   }
+  if (u.rank) dmg *= RANKS[u.rank].dmg;
   u.last = S.time;
   if (u.def.ranged) fireShot(u.gx, u.gy, u.z + 12, target, dmg);
   else hitUnit(target, dmg, u.def.splash);
@@ -1019,7 +1192,7 @@ function siegeTarget(u, range) {
 function lobStone(u, b) {
   const tx = b.gx + b.w / 2, ty = b.gy + b.h / 2, d = Math.hypot(tx - u.gx, ty - u.gy);
   S.shots.push({ sx: u.gx, sy: u.gy, sz: 14, target: { gx: tx, gy: ty, hp: 0 }, dmg: 0, t: 0, dur: Math.max(0.6, d / 5), stone: b, bdmg: u.def.bdmg, kind: "stone" });
-  if (!S.warnedSiege) { S.warnedSiege = true; say("A stone thrower! It outranges watchtowers. Bolt towers and archers on the walls can reach it, or send soldiers out to cut down its crew.", true); }
+  tip("siege", "A stone thrower! It outranges watchtowers. Bolt towers and archers on the walls can reach it, or send soldiers out to cut down its crew.", true);
 }
 const nearestSiege = (c, range) => { let best = null, bd = range; for (const v of unitsNear(c.gx, c.gy, range)) { if (v.team === "e" && v.def.siege && v.hp > 0) { const d = Math.hypot(v.gx - c.gx, v.gy - c.gy); if (d <= bd) { bd = d; best = v; } } } return best; };
 
@@ -1047,13 +1220,18 @@ function lootRaid(u, dt) {
     for (const b of S.buildings) if (LOOTABLE(b)) { const d = rectDist(u, b); if (d < bd) { bd = d; best = b; } }
     if (!best) return false;
     u.lootTarget = best;
+    if ((S.lootWarnAt ?? -99) < S.time - 30) {
+      S.lootWarnAt = S.time;
+      spawnFloat("⚠ Raiders!", best.gx + best.w / 2, best.gy + best.h / 2, "#ffb04a");
+      say(`Raiders are turning toward the ${best.id === "paddy" ? "paddies" : best.def.name.split(" (")[0]}! Send soldiers there, or post archers by the fields next time.`, true);
+    }
   }
   const b = u.lootTarget;
   if (rectDist(u, b) > 0.35) { moveToward(u, b.gx + b.w / 2, b.gy + b.h / 2, dt); return true; }
   u.looted = true; u.lootTarget = null;
   if (b.id === "paddy") {
     S.stats.trampled = (S.stats.trampled || 0) + 1;
-    b.growth = 0;
+    b.growth = Math.floor(b.growth / 2); // half the crop is lost, not all of it
     spawnFloat("Trampled!", b.gx + 1, b.gy + 1, "#ff9a7a");
   } else {
     const key = b.id === "bissa" ? "rice" : S.timber >= S.stone ? "timber" : "stone";
@@ -1062,7 +1240,6 @@ function lootRaid(u, dt) {
     S.stats.looted = (S.stats.looted || 0) + n;
     spawnFloat(`−${n}${RES[key]} looted`, b.gx + b.w / 2, b.gy + b.h / 2, "#ff9a7a");
   }
-  if (!S.warnedLoot) { S.warnedLoot = true; say("Raiders are trampling the paddies and robbing the stores! Post archers or a tower by the fields on the raid side.", true); }
   return true;
 }
 
@@ -1125,14 +1302,15 @@ function updateSoldier(u, dt) {
   const toPost = Math.hypot(u.tx - u.gx, u.ty - u.gy);
   if (u.ordered && toPost < 0.15) u.ordered = false;
 
-  const foe = nearestFoe(u, u.ordered || d.ranged ? range : 4);
+  const foe = nearestFoe(u, u.ordered || d.ranged || u.hold ? range : 4);
   if (foe && dist(u, foe) <= range) {
     attack(u, d.ranged ? volleyTarget(u, range) || foe : foe, d.dmg);
     if (!u.ordered) return;
-  } else if (foe && !u.ordered && Math.hypot(foe.gx - u.tx, foe.gy - u.ty) < 5) {
+  } else if (foe && !u.ordered && !u.hold && Math.hypot(foe.gx - u.tx, foe.gy - u.ty) < 5) {
     moveToward(u, foe.gx, foe.gy, dt);
     return;
   }
+  if (S.dam && S.dam.hp > 0 && rectDist(u, S.dam) <= 1) hitDam(u);
   if (toPost > 0.15) moveToward(u, u.tx, u.ty, dt);
 }
 
@@ -1154,7 +1332,7 @@ function updateCombat(dt) {
   buildUnitGrid();
   for (const u of S.units) {
     if (u.hp <= 0) continue;
-    if (u.team === "p") updateSoldier(u, dt); else updateFoe(u, dt);
+    if (u.team === "p") updateSoldier(u, dt); else if (u.team === "w") updateWild(u, dt); else updateFoe(u, dt);
   }
   buildUnitGrid();
   separate();
@@ -1184,6 +1362,7 @@ function updateCombat(dt) {
     if (u.gone) { S.units.splice(i, 1); continue; } // fled off the map: no gold
     if (u.hp > 0) continue;
     if (u.team === "e") {
+      for (const v of unitsNear(u.gx, u.gy, 4)) if (v.team === "p" && v.hp > 0) gainXp(v, KILL_XP);
       S.gold += u.def.gold;
       spawnFloat(`+${u.def.gold}🪙`, u.gx, u.gy, "#e9b949");
     }
@@ -1216,12 +1395,9 @@ function ignite(b) {
   if (!(b.fire > 0)) spawnFloat("🔥 Fire!", b.gx + b.w / 2, b.gy + b.h / 2, "#ffb04a");
   b.fire = Math.max(b.fire, 1);
   sfx("fire");
-  if (!S.warnedFire) {
-    S.warnedFire = true;
-    say(S.season === "maha"
-      ? "Fire arrows! The monsoon rain will help, but villagers are running with water pots."
-      : "Fire arrows on the thatch! In Yala it spreads fast. Villagers fetch water from the wewas: keep them full.", true);
-  }
+  tip("fire", S.season === "maha"
+    ? "Fire arrows! The monsoon rain will help, but villagers are running with water pots."
+    : "Fire arrows on the thatch! In Yala it spreads fast. Villagers fetch water from the wewas: keep them full.", true);
 }
 
 function tickFire() {
@@ -1236,7 +1412,7 @@ function tickFire() {
         if (nb && nb !== b && nb.def.flammable && !(nb.fire > 0) && Math.random() < 0.05 * b.fire) ignite(nb);
       }
     }
-    damageBuilding(b, 6 * b.fire);
+    damageBuilding(b, 6 * b.fire, true);
   }
   assignFirefighters();
 }
@@ -1278,7 +1454,7 @@ function nearestWater(w) {
     if (b.id === "wewa" && b.water >= 2) consider(b.gx + 1, b.gy + 2.25, { wewa: b });
     else if (b.def.water && b.id !== "wewa") { const id = S.netOf[b.gy][b.gx]; if (id !== -1 && S.nets[id].water >= 2) consider(b.gx + 0.5, b.gy + 0.5, { net: S.nets[id] }); }
   }
-  for (let y = 0; y < MAP; y++) for (let x = 0; x < MAP; x++) {
+  if (!riverDry()) for (let y = 0; y < MAP; y++) for (let x = 0; x < MAP; x++) {
     if (S.tiles[y][x].t !== "river") continue;
     for (const [dx, dy] of DIRS4) if (inb(x + dx, y + dy) && S.tiles[y + dy][x + dx].t !== "river") { consider(x + 0.5 + dx * 0.45, y + 0.5 + dy * 0.45, {}); break; }
   }
@@ -1305,6 +1481,7 @@ function launchWave() {
   }
   const list = [];
   for (const type of Object.keys(FOES)) for (let i = 0; i < (w[type] || 0); i++) list.push(type);
+  if (S.revenge) { list.push(...REVENGE); S.revenge = false; } // the disawa's men, after his dam was broken
   S.stats.lastFrom = w.from;
   S.stats.lastSize = 0;
   const party = S.nextWave;
@@ -1349,6 +1526,17 @@ function payTribute() {
   syncHud();
 }
 
+// "north", or "N+E" when a raid comes from several sides (keeps the HUD row short).
+const raidFromText = from => from.length === 1 ? from[0] : from.map(e => e[0].toUpperCase()).join("+");
+// Where raiders from an edge can enter, in grid space: the strip edgeSpawn draws from.
+function edgeStrip(edge) {
+  const a = 6, b = MAP - 6;
+  return edge === "east" ? [[MAP - 1, a], [MAP, a], [MAP, b], [MAP - 1, b]]
+    : edge === "west" ? [[0, a], [1, a], [1, b], [0, b]]
+    : edge === "north" ? [[a, 0], [b, 0], [b, 1], [a, 1]]
+    : [[a, MAP - 1], [b, MAP - 1], [b, MAP], [a, MAP]];
+}
+
 function callRaidEarly() {
   if (!S || S.mode !== "play" || S.nextWave >= S.L.waves.length) return;
   S.waveClock = S.L.waves[S.nextWave].t;
@@ -1357,8 +1545,19 @@ function callRaidEarly() {
   launchWave();
 }
 
+const DROUGHT_CHANCE = 1 / 3;
+// What the advisor says when the season turns: the first row that applies.
+const SEASON_NEWS = [
+  [rebuilt => rebuilt, "Over the monsoon the disawa has rebuilt his dam. He will shut it again in Yala.", false],
+  [() => S.drought, () => `A drought year: the monsoon is late, and this Yala will last ${S.seasonLeft} seconds. Make the wewas last.`, true],
+  [() => riverDry(), "Yala, and the disawa upstream has shut his dam: the river runs dry. Live on your wewas, send soldiers to break the dam, or send him a 🎁 gift (👑 tab).", true],
+  [() => S.season === "maha", "The Maha monsoon breaks! The wewas fill and every paddy drinks.", false],
+  [() => true, "Yala, the dry season. Only paddies beside water will grow now.", false]
+];
+
 // Soldiers eat more than villagers: a standing army has a real cost.
-const SOLDIER_RICE = 0.06;
+// Rations are dearer in the dry season, when the granary is under pressure.
+const SOLDIER_RICE = { maha: 0.03, yala: 0.06 };
 
 // ==================== ONE-SECOND TICK ====================
 function tick() {
@@ -1367,37 +1566,43 @@ function tick() {
     S.season = SEASONS[S.season].next;
     S.seasonLeft = SEASONS[S.season].len;
     S.seasonNo++;
-    say(S.season === "maha"
-      ? "The Maha monsoon breaks! The wewas fill and every paddy drinks."
-      : "Yala, the dry season. Only paddies beside water will grow now.");
+    // Skirmish: one Yala in three (seeded by the map) is a drought year, half as long again.
+    S.drought = S.season === "yala" && !!S.L.skirmish && mulberry32(S.L.seed * 31 + S.seasonNo)() < DROUGHT_CHANCE;
+    if (S.drought) S.seasonLeft = Math.round(S.seasonLeft * 1.5);
+    const rebuilt = S.dam && S.season === "maha" && S.dam.hp < S.dam.maxHp;
+    if (rebuilt) S.dam.hp = S.dam.maxHp;
+    const [text, warn] = SEASON_NEWS.find(([when]) => when(rebuilt)).slice(1);
+    say(typeof text === "function" ? text() : text, warn);
   }
 
   S.waveClock++;
   while (nextWaveIn() <= 0) launchWave();
-  if (nextWaveIn() === 20 && S.warnedWave !== S.nextWave) {
+  if (nextWaveIn() === SCOUT_AT && S.warnedWave !== S.nextWave) {
     S.warnedWave = S.nextWave;
     const from = S.L.waves[S.nextWave].from;
-    const fresh = from.filter(e => !S.L.waves.slice(0, S.nextWave).some(w => w.from.includes(e)));
-    say(fresh.length && S.nextWave > 0
-      ? `Scouts report raiders coming from the ${fresh.join(" and ")} for the first time, in 20 seconds! That side may have no towers or archers yet.`
-      : `Scouts report raiders from the ${from.join(" and ")} in 20 seconds.`, true);
+    const open = from.filter(e => { const d = edgeDefence(e); return !d.towers && !d.archers; });
+    S.scoutOpen = open; // read by the playtest novice, which follows hints
+    const fix = S.unlocked.buildings.has("tower") ? "Post archers there or raise a watchtower." : "Post archers there (select them, right-click).";
+    say(open.length
+      ? `Scouts report raiders from the ${from.join(" and ")} in ${SCOUT_AT} seconds, and the ${open.join(" and ")} side${open.length > 1 ? "s have" : " has"} no archers or towers! ${fix}`
+      : `Scouts report raiders from the ${from.join(" and ")} in ${SCOUT_AT} seconds.`, true);
   }
 
   tickWater();
   tickFire();
-  assignShramadana();
+  assignSeasonWork();
+  drillSoldiers();
+  spawnWild();
   updateCover();
 
   for (const u of S.units) {
     if (u.team !== "e") continue;
     if (S.flooded.has(Math.floor(u.gy) * MAP + Math.floor(u.gx))) u.hp -= 4;
-    const tb = buildingAt(Math.floor(u.gx), Math.floor(u.gy));
-    if (tb && tb.def.thorn) { u.hp -= 3; damageBuilding(tb, 4); } // scratched, and the hedge is trampled
   }
 
   // Economy & harmony
   const soldiers = S.units.filter(u => u.team === "p").length;
-  S.rice = Math.max(0, S.rice - S.villagers * 0.04 - soldiers * SOLDIER_RICE);
+  S.rice = Math.max(0, S.rice - S.villagers * 0.04 - soldiers * SOLDIER_RICE[S.season]);
   S.gold += S.villagers * 0.02 * (S.harmony / 60);
   S.fear = Math.max(0, S.fear - 0.5);
 
@@ -1475,19 +1680,32 @@ function checkVictory() {
   if (S.L.objectives.every(o => { const r = objective(o); return r.cur >= r.n; })) endLevel(true);
 }
 
+// Which side of the citadel a tile is on, and what stands guard there.
+// Shared by the scouts' warning and the defeat screen.
+const SCOUT_AT = 45;
+function sideTest(edge) {
+  const c = S.citadel, cx = c.gx + 1, cy = c.gy + 1;
+  return { east: (x, y) => x > cx + 1, west: (x, y) => x < cx - 1, north: (x, y) => y < cy - 1, south: (x, y) => y > cy + 1 }[edge] || (() => false);
+}
+function edgeDefence(edge) {
+  const inSide = sideTest(edge);
+  return {
+    towers: S.buildings.filter(b => b.def.tower && b !== S.citadel && inSide(b.gx, b.gy)).length,
+    archers: S.units.filter(u => u.team === "p" && u.def.ranged && inSide(u.gx, u.gy)).length,
+    walls: S.buildings.filter(b => b.def.wall && inSide(b.gx, b.gy)).length
+  };
+}
+
 // ==================== WHY THE CITADEL FELL ====================
 // Hard but fair: the defeat screen names the likely causes, most telling first.
 function defeatCauses() {
   const st = S.stats, out = [];
-  const c = S.citadel, cx = c.gx + 1, cy = c.gy + 1;
-  const side = { east: (x, y) => x > cx + 1, west: (x, y) => x < cx - 1, north: (x, y) => y < cy - 1, south: (x, y) => y > cy + 1 };
   if (st.starved >= 2) out.push([5, `🍚 The granary ran dry${st.starveSeason ? ` in ${st.starveSeason === "yala" ? "the Yala dry season" : "the Maha monsoon"}` : ""} and ${st.starved} famil${st.starved === 1 ? "y" : "ies"} left. Keep about one watered paddy per house.`]);
   else if (st.hungry >= 20) out.push([3, "🍚 The granary was empty for long stretches, so few new families came to work and fight."]);
+  if (S.dam && S.dam.hp > 0 && st.starved >= 2) out.push([4, "🌊 The disawa's dam kept the river dry every Yala. Fill wewas in Maha, break the dam with soldiers, or send him a gift."]);
+  if ((st.eaten || 0) >= 3) out.push([3, `🐘 Wild elephants ate ${st.eaten} paddies. A staffed pela by the fields keeps them off.`]);
   for (const e of st.lastFrom || []) {
-    const inSide = side[e] || (() => false);
-    const towers = S.buildings.filter(b => b.id === "tower" && inSide(b.gx, b.gy)).length;
-    const archers = S.units.filter(u => u.team === "p" && u.def.ranged && inSide(u.gx, u.gy)).length;
-    const walls = S.buildings.filter(b => b.def.wall && inSide(b.gx, b.gy)).length;
+    const { towers, archers, walls } = edgeDefence(e);
     if (!towers && !archers) out.push([4, `🏹 The ${e} side had no archers or watchtowers to meet the last raid.`]);
     else if (!walls && (st.lastSize || 0) >= 6) out.push([2, `🧱 No walls stood on the ${e} side, so the raiders walked straight in.`]);
   }
@@ -1625,12 +1843,17 @@ function affordable(cost) {
   return Object.entries(cost).every(([k, v]) => S[k] >= v);
 }
 
+// The trader never sells the families' food: two rice per villager stay in
+// store whatever the 👑 sell limit says.
+const RICE_RESERVE = 2;
+const sellAbove = () => Math.max((S.market || { sell: 30 }).sell, S.villagers * RICE_RESERVE);
+
 // Pola orders: two thresholds the market's trader follows.
 function marketCard(pal) {
   const m = S.market || (S.market = { sell: 30, buy: 0 });
   const c = document.createElement("div");
   c.className = "card wide";
-  c.title = "The market's trader sells 5 rice for 8 gold above the first level, and buys 5 timber or stone for 12 gold below the second.";
+  c.title = `The trader sells 5 rice for 8 gold above the first level (never below ${RICE_RESERVE} per villager, now ${sellAbove()}), and buys 5 timber or stone for 12 gold below the second.`;
   c.innerHTML = `<div class="card-head">⚖️ Pola orders</div><div class="card-desc">
     <span>Sell 🍚 above</span><button class="btn" data-m="sell,-10">−</button><b>${m.sell}</b><button class="btn" data-m="sell,10">+</button>
     <span>Buy 🪵🪨 below</span><button class="btn" data-m="buy,-10">−</button><b>${m.buy}</b><button class="btn" data-m="buy,10">+</button></div>`;
@@ -1670,6 +1893,12 @@ function renderPalette() {
       pal.appendChild(card);
     }
   } else if (S.cat === "army") {
+    const sel = S.units.filter(u => u.team === "p" && u.sel), held = sel.length && sel.every(u => u.hold);
+    const stance = document.createElement("button");
+    stance.className = `card ${held ? "selected" : ""}`;
+    stance.innerHTML = `<div class="card-head">${held ? "⚔️ Back on guard" : "✋ Hold position"} (H)</div><div class="card-desc">Selected soldiers stay on their post and only strike what reaches them.</div><div class="card-cost">${sel.length ? `${sel.length} selected` : "select soldiers first"}</div>`;
+    stance.addEventListener("click", toggleHold);
+    pal.appendChild(stance);
     for (const [id, t] of Object.entries(TROOPS)) {
       if (!S.unlocked.troops.has(id)) continue;
       const card = document.createElement("button");
@@ -1713,6 +1942,7 @@ function edictBlocked(id) {
   const e = EDICTS[id];
   if (edictOn(id)) return `In force for ${Math.ceil(S.edictEnd[id] - S.time)}s`;
   if (e.once === "maha" && S.season !== "maha") return "Only in the Maha monsoon";
+  if (e.once === "yala" && S.season !== "yala") return "Only in the Yala dry season";
   if (S.edictUsed[id] === S.seasonNo) return "Already proclaimed this season";
   if (!affordable(e.cost)) return `Needs ${costText(e.cost)}`;
   return null;
@@ -1726,9 +1956,7 @@ function proclaim(id) {
   S.edictEnd[id] = S.time + e.dur;
   S.edictUsed[id] = S.seasonNo;
   S.harmony = clamp(S.harmony + e.harmony, 0, 100);
-  say(id === "rajakariya"
-    ? "Rajakariya is proclaimed. Every family sends a worker for the king's service: build now, it costs less!"
-    : "The Perahera begins! Drums, torches and the tusker's procession lift every heart.");
+  say(e.said);
   spawnFloat(`${e.icon} ${e.name.split(" (")[0]}`, S.citadel.gx + 1, S.citadel.gy, "#e9b949");
   sfx("conch");
   renderPalette();
@@ -1766,14 +1994,14 @@ function recruit(id) {
 
 function syncHud() {
   document.getElementById("levelName").textContent = levelTitle();
-  document.getElementById("seasonBadge").textContent = `${SEASONS[S.season].label} · ${S.seasonLeft}s`;
+  document.getElementById("seasonBadge").textContent = `${S.drought ? "☀️ Drought year" : SEASONS[S.season].label} · ${S.seasonLeft}s`;
   document.getElementById("objectives").innerHTML = S.L.objectives.map(o => {
     const r = objective(o);
     return `<li class="${r.cur >= r.n ? "done" : ""}">${r.label}${r.n === Infinity ? "" : ` ${Math.min(r.cur, r.n)}/${r.n}`}</li>`;
   }).join("");
   document.getElementById("resources").innerHTML = Object.entries(RES)
-    .map(([k, ic]) => `<span>${ic} ${k}: <strong>${Math.floor(S[k])}</strong></span>`).join("") +
-    `<span>💧 water: <strong>${Math.floor(totalWater())}</strong></span>`;
+    .map(([k, ic]) => `<span title="${k}">${ic} <strong>${Math.floor(S[k])}</strong></span>`).join("") +
+    `<span title="water held in wewas">💧 <strong>${Math.floor(totalWater())}</strong></span>`;
   const hv = Math.round(S.harmony);
   document.getElementById("harmonyVal").textContent = hv;
   const fill = document.getElementById("harmonyFill");
@@ -1785,7 +2013,7 @@ function syncHud() {
   const n = nextWaveIn();
   document.getElementById("raidVal").textContent = n === Infinity
     ? (foesAlive() || S.spawnQueue.length ? "Under attack!" : "None left")
-    : `${String(Math.floor(n / 60)).padStart(2, "0")}:${String(n % 60).padStart(2, "0")}`;
+    : `${String(Math.floor(n / 60)).padStart(2, "0")}:${String(n % 60).padStart(2, "0")} · ${raidFromText(S.L.waves[S.nextWave].from)}`;
   document.getElementById("conchBtn").disabled = n === Infinity || S.mode !== "play";
   const tb = document.getElementById("tributeBtn"), open = tributeOpen();
   tb.hidden = !open;
@@ -1805,6 +2033,15 @@ function syncHud() {
 }
 
 let advisorTimer = null;
+// Once-only advice: a tip is said the first time its moment comes in a level.
+function tip(key, text, warn = false) {
+  S.tips = S.tips || {};
+  if (S.tips[key]) return false;
+  S.tips[key] = true;
+  say(text, warn);
+  return true;
+}
+
 function say(text, warn = false) {
   const el = document.getElementById("advisor");
   document.getElementById("advisorText").textContent = text;
@@ -1830,6 +2067,7 @@ function describe(b) {
   }
   if (b.id === "paddy") lines.push(`Growth ${Math.round(b.growth)}% · ${b.irrigated ? "irrigated" : "dry"}`);
   if (b.id === "sluice") lines.push(b.open ? "Open: flooding canals. Click to close." : "Closed. Click to flood the canals.");
+  if (b.def.moat) lines.push(moatWet(b) ? "🌊 Holding water: raiders wade at a crawl" : "Dry ditch: link it to a wewa with water");
   if (b.def.water && b.id !== "wewa") {
     const id = S.netOf[b.gy][b.gx];
     lines.push(id !== -1 && S.nets[id].wewas.size ? `Network water ${Math.round(S.nets[id].water)}` : "Not connected to a wewa");
@@ -2096,6 +2334,7 @@ window.addEventListener("mouseup", () => {
     }
   }
   if (best) best.sel = true;
+  if (S.cat === "army") renderPalette(); // the stance card counts the selection
 });
 
 canvas.addEventListener("contextmenu", e => e.preventDefault());
@@ -2117,11 +2356,25 @@ window.addEventListener("keydown", e => {
     buildTabs(); renderPalette();
   } else if (k === "c") {
     centerCamera();
+  } else if (k === "h" && S.mode === "play") {
+    toggleHold();
   } else if (/^Digit[1-9]$/.test(e.code)) {
     controlGroup(Number(e.code.slice(5)), e.ctrlKey || e.metaKey || e.shiftKey);
     e.preventDefault();
   }
 });
+
+// Stances. Guard (the default): melee soldiers step out to meet raiders near
+// their post. Hold (H): they stay on the post and only strike what reaches them.
+function toggleHold() {
+  const sel = S.units.filter(u => u.team === "p" && u.sel);
+  if (!sel.length) { say("Select soldiers first, then press H to hold them on their post."); return; }
+  const hold = !sel.every(u => u.hold);
+  for (const u of sel) u.hold = hold;
+  const gx = sel.reduce((a, u) => a + u.gx, 0) / sel.length, gy = sel.reduce((a, u) => a + u.gy, 0) / sel.length;
+  spawnFloat(hold ? `✋ ${sel.length} holding` : `⚔️ ${sel.length} on guard`, gx, gy, "#9fc8ff");
+  if (S.cat === "army") renderPalette();
+}
 
 // Control groups: Ctrl/Shift+1..9 stores the selected soldiers, 1..9 selects
 // them again, pressing the same number twice centres the camera on them.
@@ -2138,6 +2391,7 @@ function controlGroup(n, assign) {
   const members = S.units.filter(u => u.team === "p" && ids.has(u.uid));
   if (!members.length) return;
   for (const u of S.units) u.sel = ids.has(u.uid) && u.team === "p";
+  if (S.cat === "army") renderPalette();
   const now = performance.now();
   if (lastGroupKey.n === n && now - lastGroupKey.at < 400) {
     centerCamera(members.reduce((a, u) => a + u.gx, 0) / members.length, members.reduce((a, u) => a + u.gy, 0) / members.length);

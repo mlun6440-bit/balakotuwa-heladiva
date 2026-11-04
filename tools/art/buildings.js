@@ -231,6 +231,26 @@ ART.add("bissa", () => {
   for (let i = 1; i < 5; i++) gline([0.86 - i * 0.012, 0.72 - i * 0.012, i * 2.5], [0.92 - i * 0.012, 0.62 - i * 0.012, i * 2.5], "#8a6a40", 0.5);
 }, { size: 140 });
 
+// Pela: a farmer's watch hut on tall stilts above the paddies, reached by a
+// ladder, with a fire pot below for the night watch against wild elephants.
+ART.add("pela", () => {
+  box(0.22, 0.22, 0, 0.56, 0.56, 0.4, M.earth, { edges: false });
+  for (const [x, y] of [[0.32, 0.32], [0.68, 0.32], [0.32, 0.68], [0.68, 0.68]]) post(x, y, 0.025, 0.4, 17, M.timber, 6);
+  gline([0.32, 0.32, 6], [0.68, 0.68, 12], "#6b4426", 0.5); gline([0.68, 0.32, 6], [0.32, 0.68, 12], "#6b4426", 0.5);
+  box(0.26, 0.26, 16, 0.48, 0.48, 1.2, M.timberH, { edges: false });
+  box(0.3, 0.3, 17.2, 0.4, 0.4, 4, { top: M.mud, left: M.mud, right: M.mud }, { top: false });
+  hipRoof(0.18, 0.18, 0.64, 0.64, 21, 8, M.thatchOld, { thick: 1.4, capCol: shadeC(COL.thatch, 0.7) });
+  // ladder
+  gline([0.86, 0.74, 0], [0.74, 0.62, 16], "#6b4426", 0.6); gline([0.94, 0.66, 0], [0.82, 0.54, 16], "#6b4426", 0.6);
+  for (let i = 1; i < 7; i++) gline([0.86 - i * 0.017, 0.74 - i * 0.017, i * 2.3], [0.94 - i * 0.017, 0.66 - i * 0.017, i * 2.3], "#8a6a40", 0.45);
+  // fire pot for the night watch
+  lathe(0.16, 0.84, [[0.06, 0.4], [0.07, 1.6], [0.05, 2.6]], { col: "#9a4a26" }, { seg: 12 });
+  at(0.16, 0.84, 2.8, c => {
+    const gr = c.createRadialGradient(0, 0, 0, 0, 0, 3); gr.addColorStop(0, "#fff0a0"); gr.addColorStop(0.4, "#ff9a28"); gr.addColorStop(1, "rgba(140,30,0,0)");
+    c.fillStyle = gr; c.beginPath(); c.ellipse(0, 0, 3, 1.8, 0, 0, 7); c.fill();
+  });
+}, { size: 140 });
+
 // Pola (market): an open bazaar of four stalls with cadjan and cloth roofs.
 function stall(x, y, roof, goods) {
   for (const [px, py] of [[0, 0], [0.6, 0], [0, 0.5], [0.6, 0.5]]) post(x + px, y + py, 0.02, 2, 13, M.timber, 6);
@@ -464,31 +484,6 @@ ART.add("rampart.px", () => rampartPiece(RO + RW, RO, 1 - RO - RW, RW, "x"), { s
 ART.add("rampart.nx", () => rampartPiece(0, RO, RO, RW, "x"), { size: 110, oy: 0.8 });
 ART.add("rampart.py", () => rampartPiece(RO, RO + RW, RW, 1 - RO - RW, "y"), { size: 110, oy: 0.8 });
 ART.add("rampart.ny", () => rampartPiece(RO, 0, RW, RO, "y"), { size: 110, oy: 0.8 });
-
-// Katu wetiya: a hedge of cut thorny branches piled between a few stakes.
-for (let v = 0; v < 2; v++) ART.add(`thorn.${v}`, () => {
-  blob(0.5, 0.5, 26, 12, "rgba(30,20,8,0.35)");
-  for (const [x, y] of [[0.2, 0.25], [0.75, 0.3], [0.3, 0.78], [0.8, 0.8]]) post(x, y, 0.018, 0, 9 + R() * 3, M.timber, 6);
-  const branches = [];
-  for (let i = 0; i < 46; i++) branches.push([rr(0.08, 0.92), rr(0.08, 0.92), rr(-1, 1), rr(5, 11)]);
-  branches.sort((a, b) => a[0] + a[1] - b[0] - b[1]);
-  for (const [x, y, lean, h] of branches) {
-    if (MODE.shadow) { gline([x, y, 0], [x + lean * 0.1, y, h], "#000", 0.8); continue; }
-    const p = P(x, y, 0);
-    const col = pick(["#6b5434", "#7d6440", "#584530", "#8a7048"]);
-    g.strokeStyle = col; g.lineWidth = rr(0.5, 0.9); g.lineCap = "round";
-    const tx = p.x + lean * 6, ty = p.y - h;
-    g.beginPath(); g.moveTo(p.x, p.y); g.quadraticCurveTo(p.x + lean * 2, p.y - h * 0.6, tx, ty); g.stroke();
-    // thorns and twigs
-    g.lineWidth = 0.3;
-    for (let k = 0; k < 4; k++) {
-      const t = rr(0.25, 0.95), mx = lerp(p.x, tx, t), my = lerp(p.y, ty, t), side = R() < 0.5 ? -1 : 1;
-      g.beginPath(); g.moveTo(mx, my); g.lineTo(mx + side * rr(1, 2.5), my - rr(0.5, 1.5)); g.stroke();
-    }
-    if (R() < 0.3) { g.fillStyle = pick(["#5d7a2e", "#7a8f3a", "#4a6a28"]); g.beginPath(); g.ellipse(tx, ty, 1.1, 0.6, lean, 0, 7); g.fill(); }
-  }
-  gline([0.2, 0.25, 6], [0.8, 0.8, 6], "#b18a4c", 0.5);
-}, { size: 90 });
 
 // ---------- water works ----------
 // Wewa: earthen bund around a basin. "base" is drawn before the water, "front" after.

@@ -21,7 +21,7 @@ const RES = { timber: "🪵", stone: "🪨", rice: "🍚", gold: "🪙" };
 // solid: blocks raiders (they must break it). ground: flat, walkable.
 // flammable: thatch or timber that raider fire arrows can set alight.
 // upgrade: { to, cost } lets the ⬆️ Upgrade tool rebuild it in place.
-// thorn: walkable, but slows and scratches raiders; raiders path around it.
+// moat: a canal tile that slows raiders to a crawl while its network holds water.
 // worker: job type staffed by one villager. store: drop-off for those resources.
 const BUILDINGS = {
   citadel:    { name: "Maligawa (Citadel)", cat: null, icon: "🏯", w: 2, h: 2, hp: 2500, solid: true, z: 40, store: ["timber", "stone", "rice"],
@@ -31,6 +31,8 @@ const BUILDINGS = {
                 desc: "Stores Maha rain; silt builds up, and idle villagers dig it out in Yala." },
   canal:      { name: "Ela (Canal)", cat: "water", icon: "〰️", w: 1, h: 1, hp: 150, cost: { stone: 1 }, ground: true, water: true, paint: true,
                 desc: "Carries wewa water to paddies; drag to paint." },
+  moat:       { name: "Diya Agala (Moat)", cat: "water", icon: "🌊", w: 1, h: 1, hp: 300, cost: { stone: 2, timber: 1 }, ground: true, water: true, moat: true, paint: true,
+                desc: "Canal ditch: while it holds water, raiders wade at a crawl." },
   sluice:     { name: "Sorowwa (Sluice)", cat: "water", icon: "🚪", w: 1, h: 1, hp: 400, cost: { timber: 6, stone: 8 }, ground: true, water: true,
                 desc: "Click to flood its canals, slowing and drowning raiders." },
 
@@ -38,6 +40,8 @@ const BUILDINGS = {
                 desc: "Grows rice; in Yala only beside a watered canal, wewa or river." },
   bissa:      { name: "Vee Bissa (Granary)", cat: "food", icon: "🏺", w: 1, h: 1, hp: 350, cost: { timber: 12 }, solid: true, flammable: true, z: 26, store: ["rice"],
                 desc: "Farmers drop rice here instead of walking to the citadel." },
+  pela:       { name: "Pela (Watch hut)", cat: "food", icon: "🛖", w: 1, h: 1, hp: 120, cost: { timber: 5 }, solid: true, flammable: true, z: 22, worker: "watchman",
+                desc: "Its watchman scares wild elephants away from everything within 5 tiles." },
   market:     { name: "Pola (Market)", cat: "food", icon: "⚖️", w: 2, h: 2, hp: 320, cost: { timber: 14, stone: 4 }, solid: true, flammable: true, z: 16, worker: "trader",
                 desc: "A trader sells spare rice for gold (set limits in the 👑 tab)." },
 
@@ -61,8 +65,6 @@ const BUILDINGS = {
 
   palisade:   { name: "Palisade", cat: "defence", icon: "🪵", w: 1, h: 1, hp: 320, cost: { timber: 3 }, solid: true, flammable: true, wall: true, z: 20, paint: true, upgrade: { to: "rampart", cost: { stone: 4 } },
                 desc: "Cheap wall; archers on it are safe from swords." },
-  thorn:      { name: "Katu Wetiya (Thorn barrier)", cat: "defence", icon: "🌿", w: 1, h: 1, hp: 140, cost: { timber: 1 }, ground: true, thorn: true, flammable: true, paint: true,
-                desc: "Slows and scratches raiders pushing through; burns easily." },
   rampart:    { name: "Gal Bamma (Rampart)", cat: "defence", icon: "🧱", w: 1, h: 1, hp: 950, cost: { stone: 5 }, solid: true, wall: true, z: 26, paint: true,
                 desc: "Stone wall; archers on it are safe from swords and shoot farther." },
   gate:       { name: "Vahalkada (Gate)", cat: "defence", icon: "⛩️", w: 1, h: 1, hp: 900, cost: { timber: 8, stone: 6 }, solid: true, wall: true, z: 30,
@@ -72,19 +74,24 @@ const BUILDINGS = {
   bolt:       { name: "Yantra Atuwa (Bolt tower)", cat: "defence", icon: "🎯", w: 1, h: 1, hp: 800, cost: { timber: 20, stone: 16, gold: 20 }, solid: true, z: 44,
                 tower: { range: 8, dmg: 45, cd: 3.2, siege: true }, desc: "A great bolt-thrower that outranges stone throwers and hunts them first." },
   barracks:   { name: "Angam Maduwa (Barracks)", cat: "defence", icon: "⚔️", w: 2, h: 2, hp: 700, cost: { timber: 18, stone: 8 }, solid: true, z: 22,
-                desc: "Needed to train soldiers in the Army tab." }
+                desc: "Trains soldiers; those resting nearby drill and rise to ★ veteran, then ★★ champion." }
 };
 
 // ==================== ROYAL DECREES ====================
 // Proclaimed from the 👑 tab. once: "season" = once per season, "maha" = once
-// per Maha. dur in simulation seconds. Effects are read by name in game.js.
+// per Maha, "yala" = once per Yala. said: the advisor's line when proclaimed. dur in simulation seconds. Effects are read by name in game.js.
 const EDICTS = {
   rajakariya: { name: "Rajakariya (Royal service)", icon: "🛠️", cost: { rice: 15 }, once: "season", dur: 30, harmony: -8,
                 work: 1.6, buildDiscount: 0.3,
-                desc: "30s of faster work and 30% cheaper building, at −8 harmony." },
+                desc: "30s of faster work and 30% cheaper building, at −8 harmony.",
+                said: "Rajakariya is proclaimed. Every family sends a worker for the king's service: build now, it costs less!" },
   perahera:   { name: "Perahera (Festival)", icon: "🐘", cost: { rice: 40, gold: 30 }, once: "maha", dur: 60, harmony: 6,
                 harmonyTarget: 25,
-                desc: "Once per Maha, a 60s procession lifts harmony towards +25." }
+                desc: "Once per Maha, a 60s procession lifts harmony towards +25.",
+                said: "The Perahera begins! Drums, torches and the tusker's procession lift every heart." },
+  gift:       { name: "Gift to the Disawa", icon: "🎁", cost: { gold: 60, rice: 20 }, once: "yala", dur: 60, harmony: -3,
+                desc: "In Yala, buys the rival disawa's goodwill: he opens his dam and the river runs for this dry season.",
+                said: "The disawa takes your gift and opens his dam. The river runs again, for this dry season." }
 };
 
 const CATS = [
@@ -110,17 +117,29 @@ const TROOPS = {
                desc: "Tramples every raider near its target." }
 };
 
+// Ranks: soldiers resting within 3 tiles of a barracks drill (1 xp/s while no
+// raider is near), and every raider killed close by teaches them (KILL_XP).
+const RANKS = [
+  { name: "Recruit", xp: 0, hp: 1, dmg: 1 },
+  { name: "Veteran", xp: 90, hp: 1.25, dmg: 1.2 },
+  { name: "Champion", xp: 300, hp: 1.5, dmg: 1.4 }
+];
+const KILL_XP = 6;
+
 const FOES = {
   raider: { name: "Raider", hp: 90, dmg: 12, bdmg: 12, range: 0.9, speed: 1.5, gold: 6, morale: 0.35, loot: true },
   bowman: { name: "Raider bowman", hp: 60, dmg: 9, bdmg: 4, range: 4.2, speed: 1.5, ranged: true, gold: 6, fire: true, morale: 0.45 },
   brute:  { name: "Ram bearer", hp: 280, dmg: 10, bdmg: 48, range: 0.9, speed: 1.0, heavy: true, gold: 15, morale: 0 },
-  thrower: { name: "Stone thrower", hp: 240, dmg: 0, bdmg: 70, range: 6.8, speed: 0.7, ranged: true, siege: true, cd: 4.5, heavy: true, gold: 25, morale: 0 }
+  thrower: { name: "Stone thrower", hp: 240, dmg: 0, bdmg: 70, range: 6.8, speed: 0.7, ranged: true, siege: true, cd: 4.5, heavy: true, gold: 25, morale: 0 },
+  aliya: { name: "Wild elephant", hp: 900, dmg: 0, bdmg: 0, range: 0.6, speed: 0.9, heavy: true, gold: 0, morale: 0, wild: true }
 };
 
 // siege: stops at range and lobs stones at walls and towers (outranges watchtowers).
 // fire: shoots fire arrows at flammable buildings when no soldier is in range
 // (only on levels with fireArrows: true).
 // loot: on the way in, breaks off to trample a ripening paddy or rob a granary.
+// wild: not a raider (team "w"): comes out of the jungle for ripe rice on levels
+// with `wild: { first, every }`, and turns back from a staffed pela. Nobody fights it.
 // morale: when its raid party falls below this share of its strength, the
 // raider flees back to its edge (0 = never). Fleeing raiders give no gold.
 
@@ -145,6 +164,21 @@ const LEVELS = [
     tutorial: true
   },
   {
+    id: "ruhuna", name: "Elephants of Ruhuna", era: "Magama", seed: 29,
+    intro: "In the southern kingdom of Ruhuna, wild elephants come out of the jungle when the rice ripens. Raise a pela (watch hut) beside your paddies: its watchman scares them away. Feed a growing village and hold off the raiders.",
+    citadel: [12, 12], season: "maha",
+    start: { timber: 90, stone: 30, rice: 60, gold: 70, villagers: 9 },
+    army: { spearman: 2, archer: 2 },
+    rivers: [{ edge: "south", at: 0, width: 2, wobble: 1.4 }],
+    rocks: [[18, 4, 21, 7]],
+    forests: [[2, 2, 10, 9, 0.6], [17, 13, 24, 20, 0.5], [2, 15, 7, 21, 0.45]],
+    unlocks: { buildings: ["pela"] },
+    wild: { first: 70, every: 65 },
+    waves: [{ t: 180, from: ["east"], raider: 4 }, { t: 300, from: ["north"], raider: 4, bowman: 2 }],
+    hpScale: 1.0,
+    objectives: [{ type: "res", key: "rice", n: 120 }, { type: "pop", n: 20 }, { type: "waves" }]
+  },
+  {
     id: "dryzone", name: "The Dry Zone", era: "Rajarata", seed: 23,
     intro: "The rains here are short. Store every drop in wewas and canals. A sluice gate can flood those canals under the raiders' feet.",
     citadel: [13, 13], season: "yala",
@@ -153,8 +187,8 @@ const LEVELS = [
     rivers: [{ edge: "north", at: 0, width: 1, wobble: 1 }],
     rocks: [[3, 18, 7, 23], [20, 4, 23, 7]],
     forests: [[3, 4, 8, 10, 0.4], [17, 18, 23, 24, 0.35]],
-    unlocks: { buildings: ["sluice", "tower", "pansala"] },
-    waves: [{ t: 160, from: ["east"], raider: 4, bowman: 1 }, { t: 280, from: ["south"], raider: 5, bowman: 2 }, { t: 400, from: ["east"], raider: 6, bowman: 2 }],
+    unlocks: { buildings: ["sluice", "moat", "tower", "pansala"] },
+    waves: [{ t: 160, from: ["east"], raider: 4, bowman: 1 }, { t: 280, from: ["south"], raider: 5, bowman: 2 }, { t: 400, from: ["east", "south"], raider: 9, bowman: 3 }],
     hpScale: 1.1,
     objectives: [{ type: "water", n: 150 }, { type: "res", key: "rice", n: 120 }, { type: "waves" }]
   },
@@ -167,15 +201,34 @@ const LEVELS = [
     rivers: [{ edge: "west", at: 0, width: 2, wobble: 1.5 }],
     rocks: [[15, 6, 19, 9], [5, 16, 8, 19]],
     forests: [[3, 3, 10, 8, 0.45], [18, 17, 25, 24, 0.4], [3, 21, 8, 25, 0.4]],
-    unlocks: { buildings: ["rampart", "gate", "market", "walawwa", "thorn", "kammala"], troops: ["angampora"] }, fireArrows: true,
+    unlocks: { buildings: ["rampart", "gate", "market", "walawwa", "kammala"], troops: ["angampora"] }, fireArrows: true,
     waves: [
       { t: 150, from: ["east"], raider: 5, bowman: 2 },
       { t: 260, from: ["south"], raider: 6, bowman: 2 },
       { t: 370, from: ["east", "south"], raider: 7, bowman: 3 },
-      { t: 480, from: ["east", "south"], raider: 8, bowman: 3, brute: 1 }
+      { t: 480, from: ["east", "south"], raider: 10, bowman: 4, brute: 2 }
     ],
     hpScale: 1.2,
     objectives: [{ type: "build", id: "rampart", n: 10 }, { type: "build", id: "market", n: 1 }, { type: "res", key: "gold", n: 250 }, { type: "waves" }]
+  },
+  {
+    id: "dakkhina", name: "The Disawa's Dam", era: "Dakkhinadesa", seed: 47,
+    intro: "Upstream, a rival disawa shuts his dam every dry season and your river runs dry. Fill your wewas in the monsoon, and when Yala comes, break his dam with soldiers (his men will come for it) or send him a gift from the 👑 tab.",
+    citadel: [13, 12], season: "maha",
+    start: { timber: 130, stone: 60, rice: 80, gold: 120, villagers: 12 },
+    army: { spearman: 3, archer: 3, angampora: 1 },
+    rivers: [{ edge: "west", at: 2, width: 2, wobble: 1.2 }],
+    rocks: [[18, 18, 22, 21], [16, 3, 19, 6]],
+    forests: [[7, 18, 12, 24, 0.45], [19, 8, 24, 14, 0.4]],
+    unlocks: { buildings: [], edicts: ["gift"] }, rival: true, fireArrows: true,
+    waves: [
+      { t: 170, from: ["east"], raider: 6, bowman: 2 },
+      { t: 290, from: ["north"], raider: 6, bowman: 3 },
+      { t: 410, from: ["east", "north"], raider: 8, bowman: 3, brute: 1 },
+      { t: 530, from: ["north", "south"], raider: 12, bowman: 5, brute: 2 }
+    ],
+    hpScale: 1.2,
+    objectives: [{ type: "res", key: "rice", n: 150 }, { type: "water", n: 200 }, { type: "waves" }]
   },
   {
     id: "parakrama", name: "Sea of Parakrama", era: "Polonnaruwa", seed: 53,

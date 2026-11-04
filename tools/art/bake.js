@@ -6,26 +6,36 @@ function renderOne(item) {
   const k = item.opts.k || 3;
   const SZ = Math.max(200, Math.round((item.opts.size || 300) * 1.7)); // world px canvas, generous; trimmed after
   item.opts.oy = 0.5;
-  const c = document.createElement("canvas");
-  c.width = c.height = SZ * k;
-  g = c.getContext("2d");
-  g.setTransform(k, 0, 0, k, (SZ * k) / 2, (SZ * k) * (item.opts.oy ?? 0.72));
-  R = rng(item.key);
-  MODE.shadow = false;
-  item.draw(item.opts.arg);
+  let c;
+  if (item.opts.render3d) {
+    // 3D model (tools/art3d): rendered through the isometric camera
+    c = item.opts.render3d({ k, SZ, oy: item.opts.oy });
+  } else {
+    c = document.createElement("canvas");
+    c.width = c.height = SZ * k;
+    g = c.getContext("2d");
+    g.setTransform(k, 0, 0, k, (SZ * k) / 2, (SZ * k) * (item.opts.oy ?? 0.72));
+    R = rng(item.key);
+    MODE.shadow = false;
+    item.draw(item.opts.arg);
+  }
   if (item.opts.outline !== false) outline(c, item.opts.outlineK ?? 0.62);
   const out = trim(c, k, SZ, item.opts.oy ?? 0.72, item.key);
   out.key = item.key; out.k = k;
   let shadow = null;
   if (item.opts.shadow !== false) {
-    const s = document.createElement("canvas");
-    s.width = s.height = SZ * k;
-    g = s.getContext("2d");
-    g.setTransform(k, 0, 0, k, (SZ * k) / 2, (SZ * k) * (item.opts.oy ?? 0.72));
-    R = rng(item.key);
-    MODE.shadow = true;
-    item.draw(item.opts.arg);
-    MODE.shadow = false;
+    let s;
+    if (item.opts.render3d) s = item.opts.render3d({ k, SZ, oy: item.opts.oy, shadowOnly: true });
+    else {
+      s = document.createElement("canvas");
+      s.width = s.height = SZ * k;
+      g = s.getContext("2d");
+      g.setTransform(k, 0, 0, k, (SZ * k) / 2, (SZ * k) * (item.opts.oy ?? 0.72));
+      R = rng(item.key);
+      MODE.shadow = true;
+      item.draw(item.opts.arg);
+      MODE.shadow = false;
+    }
     // soften
     const b = document.createElement("canvas");
     b.width = b.height = SZ * k;
@@ -65,12 +75,13 @@ function trim(c, k, SZ, oy, key) {
   for (let y = 0; y < H; y++) for (let i = 0; i < W; i++) {
     if (d[(y * W + i) * 4 + 3] > 2) { if (i < x0) x0 = i; if (i > x1) x1 = i; if (y < y0) y0 = y; if (y > y1) y1 = y; }
   }
-  if (x1 < 0) { x0 = y0 = 0; x1 = y1 = 0; }
+  if (x1 < 0) { x0 = y0 = 0; x1 = y1 = 0; console.warn("sprite is empty: " + key); }
   x0 = Math.max(0, x0 - 1); y0 = Math.max(0, y0 - 1); x1 = Math.min(W - 1, x1 + 1); y1 = Math.min(H - 1, y1 + 1);
   const w = x1 - x0 + 1, h = y1 - y0 + 1;
   const o = document.createElement("canvas"); o.width = w; o.height = h;
   o.getContext("2d").drawImage(c, x0, y0, w, h, 0, 0, w, h);
-  if (x0 === 0 || y0 === 0 || x1 === W - 1 || y1 === H - 1) console.warn("sprite touches canvas edge: " + key);
+  if (x1 <= 1 && y1 <= 1) console.warn("sprite is empty: " + key);
+  else if (x0 === 0 || y0 === 0 || x1 === W - 1 || y1 === H - 1) console.warn("sprite touches canvas edge: " + key);
   return { canvas: o, w, h, ax: W / 2 - x0, ay: H * oy - y0 };
 }
 

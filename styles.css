@@ -284,3 +284,7 @@ details.how summary { cursor: pointer; color: var(--gold); }
 .causes ul { margin: 4px 0 0; padding-left: 18px; }
 .causes li { margin: 3px 0; }
 #tributeBtn { border-color: var(--gold); }
+
+/* the resource bar stays one line */
+.resources { flex-wrap: nowrap; white-space: nowrap; overflow: hidden; gap: 10px; }
+.resources span { white-space: nowrap; }

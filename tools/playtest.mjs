@@ -2,6 +2,8 @@
 //
 //   node tools/playtest.mjs                 evaluate: novice + learned bot on every level, write the report
 //   node tools/playtest.mjs learn --gens 3  keep learning: evolve the bot's dials per level, then evaluate
+//   node tools/playtest.mjs detectors       feed the report fake games with each known
+//                                           problem and check every detector fires
 //   options: --levels 1,3   --pages 4 (parallel games)   --out docs/playtest   --limit 1500 (sim seconds)
 //
 // Bots (tools/playtest-bot.js) use only player actions. What they learn is
@@ -19,14 +21,14 @@ const { chromium } = (() => { try { return require("playwright"); } catch { retu
 const root = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "..");
 const args = process.argv.slice(2);
 const opt = (k, d) => { const i = args.indexOf(k); return i >= 0 ? args[i + 1] : d; };
-const mode = args[0] === "learn" ? "learn" : "evaluate";
+const mode = args[0] === "learn" ? "learn" : args[0] === "detectors" ? "detectors" : "evaluate";
 const outDir = path.resolve(root, opt("--out", "docs/playtest"));
-const levels = opt("--levels", "1,2,3,4,5").split(",").map(Number);
+const levelsArg = opt("--levels", null);
 const GENS = Number(opt("--gens", "3")), LAMBDA = Number(opt("--lambda", "6")), REPS = Number(opt("--reps", "2"));
 const PAGES = Number(opt("--pages", "4")), LIMIT = Number(opt("--limit", "1500"));
 const brainFile = path.join(root, "tools/playtest-brain.json");
 fs.mkdirSync(outDir, { recursive: true });
-const brain = fs.existsSync(brainFile) ? JSON.parse(fs.readFileSync(brainFile, "utf8")) : { version: 1, levels: {} };
+const brain = fs.existsSync(brainFile) ? JSON.parse(fs.readFileSync(brainFile, "utf8")) : { version: 2, levels: {} };
 
 // ---------- running games ----------
 const browser = await chromium.launch();
@@ -44,6 +46,15 @@ async function newPage() {
 const pool = [];
 for (let i = 0; i < PAGES; i++) pool.push(await newPage());
 const DIALS = await pool[0].evaluate(() => BOT.DIALS);
+// Learned dials are kept per level id, so inserting a level never shifts them.
+const LEVEL_IDS = await pool[0].evaluate(() => LEVELS.map(L => L.id));
+const levels = levelsArg ? levelsArg.split(",").map(Number) : LEVEL_IDS.map((_, i) => i + 1);
+if ((brain.version || 1) < 2) { // version 1 was keyed 1..5 by the first campaign's order
+  const old = ["anuradhapura", "dryzone", "lionrock", "parakrama", "senkadagala"];
+  brain.levels = Object.fromEntries(Object.entries(brain.levels).map(([k, v]) => [old[Number(k) - 1] || k, v]));
+  brain.version = 2;
+}
+const mind = lv => brain.levels[LEVEL_IDS[lv - 1]];
 const DEFAULTS = await pool[0].evaluate(() => BOT.DEFAULTS);
 
 async function play(page, lv, style, P, shotPrefix = null) {
@@ -84,6 +95,8 @@ async function play(page, lv, style, P, shotPrefix = null) {
       time: Math.round(S.time), citadel: Math.round(100 * Math.max(0, S.citadel.hp) / S.citadel.maxHp), stars: won ? (S.starsEarned || 0) : 0,
       raidsDone: S.nextWave, raids: S.L.waves.length, starved: S.stats.starved, hungry: S.stats.hungry, burned: S.stats.burned,
       trained: S.stats.trained, tributes: S.stats.tributes, trampled: S.stats.trampled || 0, looted: S.stats.looted || 0, rainKept: rainKept(), objectives: objs, causes: S.causes || [],
+      riceSold: S.stats.riceSold || 0, eaten: S.stats.eaten || 0, scared: S.stats.scared || 0, damBroken: S.stats.damBroken || 0, damBrokenAt: S.stats.damBrokenAt ?? null,
+      lastWaveAt: S.L.waves.length ? S.L.waves[S.L.waves.length - 1].t : null, foesAtEnd: S.units.filter(u => u.team === "e").length,
       buildings: S.buildings.reduce((m, b) => (m[b.id] = (m[b.id] || 0) + 1, m), {}),
       samples: PT.samples, said: PT.said.slice(0, 80), bot: BOT.log.slice(0, 120)
     };
@@ -119,9 +132,37 @@ function mutate(P, sigma) {
   }
   return Q;
 }
+// A detector that has never fired proves nothing: replay each problem found by
+// hand in an earlier batch as a fake result and check the report names it.
+if (mode === "detectors") {
+  const lv = LEVEL_IDS.indexOf("dakkhina") + 1;
+  const game = (style, extra) => ({ level: lv, name: "Detector check", style, outcome: "won", time: 500, citadel: 100, stars: 3, raidsDone: 4, raids: 4,
+    starved: 0, hungry: 0, burned: 0, trained: 0, tributes: 0, trampled: 0, looted: 0, rainKept: 100, objectives: [], causes: [], buildings: {},
+    samples: [], said: [], bot: [], errors: [], shots: [], riceSold: 0, eaten: 0, scared: 0, damBroken: 0, damBrokenAt: null, lastWaveAt: 530, foesAtEnd: 0, ...extra });
+  const cases = [
+    ["stall", { outcome: "unfinished", time: 1500, foesAtEnd: 3 }, "**stall:**"],
+    ["market sold food in a famine", { riceSold: 140, starved: 8 }, "the market sold"],
+    ["elephants ate the fields", { eaten: 4 }, "wild elephants ate"],
+    ["the dam broken for free", { damBroken: 1, damBrokenAt: 17 }, "broke the disawa's dam"]
+  ];
+  levels.length = 0; levels.push(lv);
+  let ok = 0;
+  for (const [what, extra, needle] of cases) {
+    const md = report([game("novice", {}), game("planner", extra)]);
+    const hit = md.includes(needle);
+    console.log(`${hit ? "✓" : "✗"} ${what}`);
+    if (hit) ok++;
+  }
+  const clean = report([game("novice", {}), game("planner", {})]);
+  const quiet = !cases.some(([, , needle]) => clean.includes(needle));
+  console.log(`${quiet ? "✓" : "✗"} a clean game raises none of them`);
+  await browser.close();
+  process.exit(ok === cases.length && quiet ? 0 : 1);
+}
+
 if (mode === "learn") {
   for (const lv of levels) {
-    const mem = brain.levels[lv] || (brain.levels[lv] = { P: { ...DEFAULTS }, sigma: 0.25, history: [] });
+    const mem = mind(lv) || (brain.levels[LEVEL_IDS[lv - 1]] = { P: { ...DEFAULTS }, sigma: 0.25, history: [] });
     mem.P = { ...DEFAULTS, ...mem.P }; // new dials get their defaults
     // the game may have changed since the last run: score the incumbent again
     let best = mem.P, bestScore = mean((await runAll(Array.from({ length: REPS }, () => ({ lv, style: "planner", P: best })))).map(score));
@@ -148,7 +189,7 @@ if (mode === "learn") {
 const jobs = [];
 for (const lv of levels) {
   jobs.push({ lv, style: "novice", P: DEFAULTS });
-  jobs.push({ lv, style: "planner", P: { ...DEFAULTS, ...(brain.levels[lv]?.P || {}) }, shot: `L${lv}` });
+  jobs.push({ lv, style: "planner", P: { ...DEFAULTS, ...(mind(lv)?.P || {}) }, shot: `L${lv}` });
 }
 const results = await runAll(jobs);
 for (const r of results) console.log(`L${r.level} ${r.style.padEnd(7)} ${r.outcome.padEnd(10)} t=${r.time}s citadel ${r.citadel}% stars ${r.stars} raids ${r.raidsDone}/${r.raids} starved ${r.starved} burned ${r.burned} trampled ${r.trampled} looted ${r.looted} tributes ${r.tributes} errors ${r.errors.length}`);
@@ -186,15 +227,33 @@ function report(results) {
     if (maxV > 120) F.push(`${tag} population snowballed to ${maxV}. Growth has no natural brake besides rice; consider housing that costs upkeep or land.`);
     if (p.hungry > 60 || n.hungry > 60) F.push(`${tag} the granary sat empty for ${Math.max(p.hungry, n.hungry)}s in one run: food balance is still the main trap.`);
     if (p.burned >= 2) F.push(`${tag} fire destroyed ${p.burned} buildings even for the planner. Check that water carriers can keep up.`);
+    // Detectors added after hand investigations in earlier batches (docs/LOOP-LOG.md):
+    for (const r of [n, p]) {
+      // batch 5: stone throwers ground on forever and the level never ended
+      if (r.outcome === "unfinished" && r.raidsDone >= r.raids && r.foesAtEnd > 0)
+        F.push(`${tag} **stall:** every raid launched but ${r.foesAtEnd} raider(s) still stood at the time limit for the ${r.style} (${r.time - (r.lastWaveAt ?? 0)}s after the last raid). Something can't end: a siege engine nobody can reach, or a raider stuck.`);
+      // batch 5: the market sold the harvest while families starved
+      if (r.riceSold >= 40 && r.starved >= 2) F.push(`${tag} the market sold ${r.riceSold} rice while ${r.starved} families starved (${r.style}). Check the trader's floor.`);
+      // batch 6: wild elephants
+      if (r.eaten >= 3) F.push(`${tag} wild elephants ate ${r.eaten} paddies for the ${r.style} (${r.scared} scared off). Is the pela easy enough to find and use?`);
+      // batch 6: a choice that can be taken for free early on (the dam broken in the first 20s)
+      if (r.damBrokenAt !== null && r.damBrokenAt < 60 && r.outcome === "won" && r.citadel >= 95) F.push(`${tag} the ${r.style} broke the disawa's dam at ${r.damBrokenAt}s and still won with the citadel at ${r.citadel}%: breaking may be free.`);
+    }
     const errs = [...n.errors, ...p.errors];
     if (errs.length) F.push(`${tag} **page errors:** ${[...new Set(errs)].join("; ")}`);
   }
   // what the learner chose tells us which systems matter
-  const learned = levels.map(lv => brain.levels[lv]?.P).filter(Boolean);
+  const learned = levels.map(lv => mind(lv)?.P).filter(Boolean);
   if (learned.length) {
     const avg = k => mean(learned.map(P => P[k] ?? DEFAULTS[k]));
     if (avg("tribute") < 0.3) F.push(`**Tribute:** the learner almost never pays it (dial ${avg("tribute").toFixed(2)}). Either it is priced too high or fighting is too easy.`);
     else F.push(`**Tribute:** the learner pays it (dial ${avg("tribute").toFixed(2)}), so it is a real option.`);
+    // batch 6: a two-way choice the learner always settles the same way may have a dominant side
+    for (const [dial, what, lo, hi] of [["breakDam", "the disawa's dam", "always pays the gift", "always breaks it"]]) {
+      const vals = levels.filter(lv => LEVEL_IDS[lv - 1] === "dakkhina").map(lv => mind(lv)?.P?.[dial]).filter(v => v !== undefined);
+      if (vals.length && mind(levels.find(lv => LEVEL_IDS[lv - 1] === "dakkhina"))?.history?.length >= 6 && (vals[0] <= 0.1 || vals[0] >= 0.9))
+        F.push(`**Choice check (${what}):** after training the learner ${vals[0] <= 0.1 ? lo : hi} (dial ${vals[0]}). One side may dominate.`);
+    }
     F.push(`**Defence the learner relies on:** ${avg("towersPerEdge").toFixed(1)} towers per raid edge, ${avg("walls").toFixed(1)} wall tiles, an army of ${avg("armyBase").toFixed(1)} + ${avg("armyPerRaid").toFixed(1)} per raid. ${avg("walls") < 1 ? "Walls are not worth building for it — raiders may be too easy to stop with soldiers alone." : ""}`);
     F.push(`**Economy the learner prefers:** ${avg("paddyPerHouse").toFixed(2)} paddies per house, at most ${avg("maxHouses").toFixed(0)} houses, ${avg("woodcutters").toFixed(1)} woodcutters.`);
   }
@@ -205,7 +264,7 @@ function report(results) {
     "- Raids involve randomness; a single run per bot is a sample, not a verdict. Learning averages several runs per candidate.", "");
   L.push("## Learning history", "");
   for (const lv of levels) {
-    const m = brain.levels[lv];
+    const m = mind(lv);
     L.push(`- L${lv}: ${m ? `${m.history.length} generations, best score ${m.score ?? "?"}; recent ${m.history.slice(-5).map(h => h.score).join(" → ")}` : "not trained yet (default dials)"}`);
   }
   L.push("", "## Screens (learned planner)", "");

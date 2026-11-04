@@ -28,3 +28,11 @@ No shapes, layouts, palettes or sprites are copied from any existing game.
 
 **Craft over quantity.** Before adding a new element, refine what is there:
 better light, cleaner silhouette, more coherent colour.
+
+**3D figures (`tools/art3d/`).** Soldiers, raiders and villagers are built
+from the kit in `kit3d.js` (`figure()`, `box`, `cyl`, `flat` colours from the
+same palette) and pre-rendered by the bake. The camera matches `iso()` exactly
+and the sun sits where the 2D light comes from (upper left), so figures and
+painted buildings share one light. Keep figures simple and readable at 1×:
+one clear silhouette, one team colour (sash, shield or turban), no texture
+detail that only shows at 4×.

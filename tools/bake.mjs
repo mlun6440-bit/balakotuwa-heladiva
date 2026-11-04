@@ -6,6 +6,7 @@ import fs from "node:fs";
 import path from "node:path";
 import { fileURLToPath } from "node:url";
 import { execFileSync } from "node:child_process";
+import http from "node:http";
 const require = createRequire(import.meta.url);
 const { chromium } = (() => { try { return require("playwright"); } catch { return require("/opt/node22/lib/node_modules/playwright"); } })();
 
@@ -15,7 +16,16 @@ const browser = await chromium.launch();
 const page = await browser.newPage();
 page.on("console", m => { if (!m.text().includes("willReadFrequently") && (m.type() === "warning" || m.type() === "error")) console.log("[page]", m.text()); });
 page.on("pageerror", e => { console.error(e); process.exitCode = 1; });
-await page.goto("file://" + path.join(root, "tools/art/bake.html"));
+// ES modules (the three.js models) don't load from file://, so serve the repo locally.
+const TYPES = { ".html": "text/html", ".js": "text/javascript", ".png": "image/png", ".json": "application/json" };
+const server = http.createServer((q, r) => {
+  const f = path.join(root, decodeURIComponent(q.url.split("?")[0]));
+  if (!f.startsWith(root)) { r.writeHead(403); r.end(); return; }
+  fs.readFile(f, (e, d) => { if (e) { r.writeHead(404); r.end(); } else { r.writeHead(200, { "content-type": TYPES[path.extname(f)] || "application/octet-stream" }); r.end(d); } });
+});
+await new Promise(ok => server.listen(0, "127.0.0.1", ok));
+await page.goto(`http://127.0.0.1:${server.address().port}/tools/art/bake.html`);
+await page.waitForFunction(() => window.ART3D_READY === true, null, { timeout: 30000 }).catch(() => console.log("[bake] 3D models did not load (is three installed? cd tools && npm install)"));
 
 const save = (file, dataUrl) => fs.writeFileSync(file, Buffer.from(dataUrl.split(",")[1], "base64"));
 if (args[0] === "--preview") {
@@ -35,3 +45,4 @@ if (args[0] === "--preview") {
   console.log(`baked ${res.count} sprites into ${files.length} page(s), ${Math.round(kb)} KB, ${res.ms} ms`);
 }
 await browser.close();
+server.close();

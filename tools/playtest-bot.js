@@ -24,9 +24,12 @@ const BOT = (() => {
     towerAt: [60, 0, 400],
     walls: [0, 0, 12],                // wall tiles facing the next raid
     boltTowers: [1, 0, 3],            // bolt towers (vs stone throwers) facing the raid
+    moat: [0, 0, 12],                 // moat tiles dug from the network toward the raid
     tribute: [0, 0, 3],               // pay tribute if gold > cost × this (0 = never)
     reserve: [1, 0, 1],               // hold back resources a "store N" objective needs
-    decrees: [1, 0, 1]
+    decrees: [1, 0, 1],
+    pelas: [1, 0, 3],                 // watch huts among the paddies (levels with wild elephants)
+    breakDam: [0.5, 0, 1]             // ≥ 0.5: send melee soldiers to break the disawa's dam; else pay the gift in Yala
   };
   const DEFAULTS = Object.fromEntries(Object.entries(DIALS).map(([k, v]) => [k, v[0]]));
   const log = [];
@@ -126,6 +129,15 @@ const BOT = (() => {
     return t && place(id, t[0], t[1], why);
   }
 
+  // a watch hut placed where it covers the most paddies within PELA_RANGE
+  function pela(why) {
+    if (!S.unlocked.buildings.has("pela") || !canAfford("pela")) return false;
+    const fields = S.buildings.filter(b => b.id === "paddy" && !S.buildings.some(p => p.id === "pela" && rectDist({ gx: p.gx + 0.5, gy: p.gy + 0.5 }, b) <= PELA_RANGE - 1));
+    if (!fields.length) return false;
+    const t = best("pela", (x, y) => -fields.filter(b => rectDist({ gx: x + 0.5, gy: y + 0.5 }, b) <= PELA_RANGE - 1).length * 5 + d2c(x, y) * 0.2, 11);
+    return t && place("pela", t[0], t[1], why);
+  }
+
   // ---------- defence ----------
   const nextFrom = () => (S.L.waves[S.nextWave] || S.L.waves[S.L.waves.length - 1] || { from: ["east"] }).from;
   function towerFacing(edge, k = 0) {
@@ -137,6 +149,19 @@ const BOT = (() => {
     if (have) return false;
     const t = best("tower", (x, y) => Math.hypot(x - tx, y - ty), 9);
     return t && place("tower", t[0], t[1], `facing ${edge}`);
+  }
+  // a moat dug out from the water network toward the raid side, one tile per call
+  function digMoat(edge) {
+    if (!canAfford("moat")) return;
+    const [ex, ey] = EDGE[edge], c = C();
+    let pick = null, ps = Infinity;
+    for (const b of waterTiles()) for (const [dx, dy] of DIRS4) for (let k = 0; k < b.w * b.h; k++) {
+      const x = b.gx + (k % b.w) + dx, y = b.gy + Math.floor(k / b.w) + dy;
+      if (!inb(x, y) || !free("moat", x, y) || tooClose(x, y)) continue;
+      const s = -((x + 0.5 - c.x) * ex + (y + 0.5 - c.y) * ey) + Math.abs(d2c(x, y) - 5) * 0.5;
+      if (s < ps) { ps = s; pick = [x, y]; }
+    }
+    if (pick) place("moat", pick[0], pick[1], `moat toward ${edge}`);
   }
   // a short wall (rampart if known, else palisade) across the approach
   function wallFacing(edge, n) {
@@ -177,6 +202,16 @@ const BOT = (() => {
       recruit(id);
       if (S.units.length > n0) note(`trained ${id}`); else return;
     }
+  }
+  function heedScouts(open) {
+    const c = C();
+    open.forEach((e, i) => {
+      towerFacing(e, 0);
+      const [ex, ey] = EDGE[e];
+      let archer = S.units.find(u => u.team === "p" && u.def.ranged && u.guard === e);
+      if (!archer && affordable(troopCost("archer")) && S.villagers >= 3) { const n0 = S.units.length; recruit("archer"); if (S.units.length > n0) { archer = S.units[S.units.length - 1]; archer.guard = e; note(`archer to guard ${e}`); } }
+      if (archer) { archer.tx = clamp(c.x + ex * 3.2, 0.3, MAP - 0.3); archer.ty = clamp(c.y + ey * 3.2, 0.3, MAP - 0.3); archer.ordered = true; }
+    });
   }
   // archers go up on towers and on walls facing the raid; the rest form up in front of the citadel
   function rally(edge) {
@@ -242,11 +277,23 @@ const BOT = (() => {
     if (!novice && S.unlocked.buildings.has("pansala") && !count("pansala") && S.gold > 60) near("pansala", "harmony");
     if (!novice && S.unlocked.buildings.has("kammala") && !count("kammala") && count("barracks")) near("kammala", "cheaper soldiers");
 
+    // the disawa's dam: the novice pays the gift the advisor offers; the planner breaks it or pays, by its dial
+    if (S.dam && S.dam.hp > 0) {
+      const breakIt = !novice && P.breakDam >= 0.5;
+      if (breakIt && riverDry() && !raidSoon && !under) S.units.filter(u => u.team === "p" && !u.def.ranged).forEach((u, i) => {
+        u.tx = S.dam.gx + Math.min(S.dam.w - 0.5, 0.5 + (i % 3) * 0.6); u.ty = S.dam.gy + S.dam.h + 0.3 + Math.floor(i / 3) * 0.3; u.ordered = true;
+      });
+      else if (!breakIt && riverDry() && S.unlocked.edicts.has("gift") && !edictBlocked("gift")) { proclaim("gift"); note("gift to the disawa"); }
+    }
+    // wild elephants: the novice heeds the advisor, the planner builds by its dial
+    if (S.L.wild && count("pela") < (novice ? (S.tips?.wild ? 1 : 0) : Math.round(P.pelas ?? 1)) && count("paddy")) pela(novice ? "the advisor said elephants" : "against elephants");
+
     // defence
     const wantBarracks = novice ? S.tutorialStep >= 5 || (S.idx > 0 && nextWaveIn() <= 35) : S.time >= P.barracksAt;
     if (!count("barracks") && wantBarracks) near("barracks", "train soldiers", 3.5);
     if (!novice && S.time >= P.towerAt) for (const e of nextFrom()) for (let k = 0; k < Math.round(P.towersPerEdge); k++) towerFacing(e, k);
     if (!novice && P.walls >= 1 && S.time > 30) wallFacing(nextFrom()[0], Math.round(P.walls));
+    if (!novice && (P.moat ?? 0) >= 1 && S.unlocked.buildings.has("moat") && count("moat") < Math.round(P.moat)) digMoat(nextFrom()[0]);
     if (!novice && S.unlocked.buildings.has("bolt") && count("bolt") < Math.round(P.boltTowers ?? 1) && S.time > 120) {
       const [ex, ey] = EDGE[nextFrom()[0]], c = C();
       const t = best("bolt", (x, y) => Math.hypot(x - (c.x + ex * 3), y - (c.y + ey * 3)), 8);
@@ -255,8 +302,11 @@ const BOT = (() => {
     const target = novice ? (raidSoon || under ? 3 : 0) : Math.round(P.armyBase + S.nextWave * P.armyPerRaid);
     army(target, style);
     if (raidSoon || under) rally(nextFrom()[0]);
+    // the novice follows the scouts' warning: a tower and an archer for each side left open
+    if (novice && raidSoon && S.scoutOpen && S.scoutOpen.length) heedScouts(S.scoutOpen);
     // sally out: melee soldiers go after siege engines that outrange the walls
-    const engine = !novice && S.units.find(u => u.team === "e" && u.def.siege && u.hp > 0);
+    // (the novice does it too once the advisor has said so)
+    const engine = (!novice || S.tips?.siege) && S.units.find(u => u.team === "e" && u.def.siege && u.hp > 0);
     if (engine) S.units.filter(u => u.team === "p" && !u.def.ranged).forEach((u, i) => {
       u.tx = clamp(engine.gx + (i % 3 - 1) * 0.3, 0.3, MAP - 0.3); u.ty = clamp(engine.gy + 0.3, 0.3, MAP - 0.3); u.ordered = true;
     });
