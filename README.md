@@ -61,10 +61,11 @@ and baked into `assets/` (regenerate with `cd tools && npm install` once, then
 | 4 | Lion Rock | Sigiriya | **Fire arrows and water carriers**; ramparts, gates, upgrades, market, smithy, Angampora fighters |
 | 5 | The Disawa's Dam | Dakkhinadesa | **A rival dams your river every Yala**: break it or send a gift |
 | 6 | Sea of Parakrama | Polonnaruwa | **Cascading tanks and the rain-catch goal**; dagoba, war elephants, ram bearers |
-| 7 | Hill Kingdom | Senkadagala | **The great siege** (stone throwers, bolt towers) and **royal decrees**; raids from three sides |
+| 7 | The Stair of Yapahuwa | Yapahuwa | **A siege mission**: start inside a built rock fortress and hold it against raids from every side |
+| 8 | Hill Kingdom | Senkadagala | **The great siege** (stone throwers, bolt towers) and **royal decrees**; raids from three sides |
 
 Each level introduces one headline mechanic (in bold); the finale brings two. The rest are buildings and units that use ideas you already know.
-| ∞ | Skirmish | Random map | Endless escalating raids, wild elephants and drought years; best score saved |
+| ∞ | Skirmish | Random map | Endless escalating raids, wild elephants, drought years and floods; best score saved |
 | ∞ | Sandbox | Random map | Full stores; send raids of any size yourself |
 
 Progress, star ratings, the skirmish best and the level in progress are saved in the browser; "Continue" on the menu resumes a level.
