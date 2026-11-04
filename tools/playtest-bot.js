@@ -286,7 +286,7 @@ const BOT = (() => {
       else if (!breakIt && riverDry() && S.unlocked.edicts.has("gift") && !edictBlocked("gift")) { proclaim("gift"); note("gift to the disawa"); }
     }
     // wild elephants: the novice heeds the advisor, the planner builds by its dial
-    if (S.L.wild && count("pela") < (novice ? (S.warnedWild ? 1 : 0) : Math.round(P.pelas ?? 1)) && count("paddy")) pela(novice ? "the advisor said elephants" : "against elephants");
+    if (S.L.wild && count("pela") < (novice ? (S.tips?.wild ? 1 : 0) : Math.round(P.pelas ?? 1)) && count("paddy")) pela(novice ? "the advisor said elephants" : "against elephants");
 
     // defence
     const wantBarracks = novice ? S.tutorialStep >= 5 || (S.idx > 0 && nextWaveIn() <= 35) : S.time >= P.barracksAt;
@@ -306,7 +306,7 @@ const BOT = (() => {
     if (novice && raidSoon && S.scoutOpen && S.scoutOpen.length) heedScouts(S.scoutOpen);
     // sally out: melee soldiers go after siege engines that outrange the walls
     // (the novice does it too once the advisor has said so)
-    const engine = (!novice || S.warnedSiege) && S.units.find(u => u.team === "e" && u.def.siege && u.hp > 0);
+    const engine = (!novice || S.tips?.siege) && S.units.find(u => u.team === "e" && u.def.siege && u.hp > 0);
     if (engine) S.units.filter(u => u.team === "p" && !u.def.ranged).forEach((u, i) => {
       u.tx = clamp(engine.gx + (i % 3 - 1) * 0.3, 0.3, MAP - 0.3); u.ty = clamp(engine.gy + 0.3, 0.3, MAP - 0.3); u.ordered = true;
     });

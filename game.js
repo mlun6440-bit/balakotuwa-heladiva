@@ -636,11 +636,8 @@ function tickWater() {
     }
     S.rain.lost += amt;
   }
-  if (S.rain.spilled > 0 && !S.warnedCascade) { S.warnedCascade = true; say("A full wewa spills down the canal into the next tank. That is ellangawa: no rain wasted."); }
-  if (S.rain.lost > 20 && !S.warnedSpill && S.L.objectives.some(o => o.type === "catch")) {
-    S.warnedSpill = true;
-    say("Rain is spilling from full wewas to the sea! Link another wewa to them with a canal.", true);
-  }
+  if (S.rain.spilled > 0) tip("cascade", "A full wewa spills down the canal into the next tank. That is ellangawa: no rain wasted.");
+  if (S.rain.lost > 20 && S.L.objectives.some(o => o.type === "catch")) tip("spill", "Rain is spilling from full wewas to the sea! Link another wewa to them with a canal.", true);
   updateNetWater();
   for (const p of S.buildings) {
     if (p.id !== "paddy") continue;
@@ -712,13 +709,9 @@ function assignSeasonWork() {
     for (const spot of row.spots()) {
       for (let have = crew.filter(spot.mine).length; have < spot.n && idleVillagers() > 0; have++) spot.send(helper(row.job, {}), have);
     }
-    S.warnedWork = S.warnedWork || {};
-    if (row.tip && !S.warnedWork[row.job] && S.workers.some(w => w.job === row.job)) { S.warnedWork[row.job] = true; say(row.tip); }
+    if (row.tip && S.workers.some(w => w.job === row.job)) tip(row.job, row.tip);
   }
-  if (!S.warnedSilt && S.buildings.some(b => b.id === "wewa" && b.silt >= 20)) {
-    S.warnedSilt = true;
-    say("Monsoon rain washes silt into the wewas, and they hold less. In Yala, idle villagers gather for shramadana to dig it out and manure the paddies.");
-  }
+  if (S.buildings.some(b => b.id === "wewa" && b.silt >= 20)) tip("silt", "Monsoon rain washes silt into the wewas, and they hold less. In Yala, idle villagers gather for shramadana to dig it out and manure the paddies.");
 }
 const endParty = w => { if (w.target && w.target.reserved) w.target.reserved = false; S.workers = S.workers.filter(x => x !== w); };
 // A temporary helper drawn from the idle villagers (water carrier or work party).
@@ -988,7 +981,7 @@ function gainXp(u, n) {
   const hp = Math.round(u.def.hp * next.hp);
   u.hp += hp - u.maxHp; u.maxHp = hp;
   spawnFloat(`${"★".repeat(u.rank)} ${next.name}!`, u.gx, u.gy, "#ffd27a");
-  if (!S.warnedRank) { S.warnedRank = true; say("A soldier has risen in rank. Soldiers resting by the Angam Maduwa drill between raids, and every fight teaches them."); }
+  tip("rank", "A soldier has risen in rank. Soldiers resting by the Angam Maduwa drill between raids, and every fight teaches them.");
 }
 function drillSoldiers() {
   const halls = S.buildings.filter(b => b.id === "barracks");
@@ -1016,10 +1009,7 @@ function spawnWild() {
   const [x, y] = t ? [t.gx, t.gy] : edgeSpawn(["east", "west", "north", "south"][Math.floor(Math.random() * 4)]);
   const d = FOES.aliya;
   S.units.push({ uid: ++S.uid, team: "w", type: "aliya", def: d, gx: x, gy: y, tx: x, ty: y, hp: d.hp, maxHp: d.hp, last: -9, z: 0, hx: x, hy: y });
-  if (!S.warnedWild) {
-    S.warnedWild = true;
-    say(`A wild elephant is coming out of the jungle for your ripening rice!${S.unlocked.buildings.has("pela") ? " A pela (watch hut) by the paddies scares elephants away." : ""}`, true);
-  }
+  tip("wild", `A wild elephant is coming out of the jungle for your ripening rice!${S.unlocked.buildings.has("pela") ? " A pela (watch hut) by the paddies scares elephants away." : ""}`, true);
 }
 function updateWild(u, dt) {
   if (u.flee) {
@@ -1163,7 +1153,7 @@ function attack(u, target, dmg) {
   if (u.team === "p" && inCover(u) && S.time - u.last > AMBUSH_RESET) {
     dmg *= 2;
     spawnFloat("Ambush!", u.gx, u.gy, "#bff0a8");
-    if (!S.warnedAmbush) { S.warnedAmbush = true; say("Ambush! Soldiers hidden in the forest strike first for double damage, and raiders can't see them from afar."); }
+    tip("ambush", "Ambush! Soldiers hidden in the forest strike first for double damage, and raiders can't see them from afar.");
   }
   if (u.rank) dmg *= RANKS[u.rank].dmg;
   u.last = S.time;
@@ -1202,7 +1192,7 @@ function siegeTarget(u, range) {
 function lobStone(u, b) {
   const tx = b.gx + b.w / 2, ty = b.gy + b.h / 2, d = Math.hypot(tx - u.gx, ty - u.gy);
   S.shots.push({ sx: u.gx, sy: u.gy, sz: 14, target: { gx: tx, gy: ty, hp: 0 }, dmg: 0, t: 0, dur: Math.max(0.6, d / 5), stone: b, bdmg: u.def.bdmg, kind: "stone" });
-  if (!S.warnedSiege) { S.warnedSiege = true; say("A stone thrower! It outranges watchtowers. Bolt towers and archers on the walls can reach it, or send soldiers out to cut down its crew.", true); }
+  tip("siege", "A stone thrower! It outranges watchtowers. Bolt towers and archers on the walls can reach it, or send soldiers out to cut down its crew.", true);
 }
 const nearestSiege = (c, range) => { let best = null, bd = range; for (const v of unitsNear(c.gx, c.gy, range)) { if (v.team === "e" && v.def.siege && v.hp > 0) { const d = Math.hypot(v.gx - c.gx, v.gy - c.gy); if (d <= bd) { bd = d; best = v; } } } return best; };
 
@@ -1250,7 +1240,6 @@ function lootRaid(u, dt) {
     S.stats.looted = (S.stats.looted || 0) + n;
     spawnFloat(`−${n}${RES[key]} looted`, b.gx + b.w / 2, b.gy + b.h / 2, "#ff9a7a");
   }
-  S.warnedLoot = true;
   return true;
 }
 
@@ -1406,12 +1395,9 @@ function ignite(b) {
   if (!(b.fire > 0)) spawnFloat("🔥 Fire!", b.gx + b.w / 2, b.gy + b.h / 2, "#ffb04a");
   b.fire = Math.max(b.fire, 1);
   sfx("fire");
-  if (!S.warnedFire) {
-    S.warnedFire = true;
-    say(S.season === "maha"
-      ? "Fire arrows! The monsoon rain will help, but villagers are running with water pots."
-      : "Fire arrows on the thatch! In Yala it spreads fast. Villagers fetch water from the wewas: keep them full.", true);
-  }
+  tip("fire", S.season === "maha"
+    ? "Fire arrows! The monsoon rain will help, but villagers are running with water pots."
+    : "Fire arrows on the thatch! In Yala it spreads fast. Villagers fetch water from the wewas: keep them full.", true);
 }
 
 function tickFire() {
@@ -2047,6 +2033,15 @@ function syncHud() {
 }
 
 let advisorTimer = null;
+// Once-only advice: a tip is said the first time its moment comes in a level.
+function tip(key, text, warn = false) {
+  S.tips = S.tips || {};
+  if (S.tips[key]) return false;
+  S.tips[key] = true;
+  say(text, warn);
+  return true;
+}
+
 function say(text, warn = false) {
   const el = document.getElementById("advisor");
   document.getElementById("advisorText").textContent = text;
