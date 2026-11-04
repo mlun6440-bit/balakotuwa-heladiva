@@ -32,7 +32,8 @@ off here when they ship.
       menu; "Continue" on the menu (`saveRun`/`continueRun` in `game.js`).
 - [x] **Building upgrades.** ⬆️ Upgrade tool; palisade → rampart, house →
       walawwa (+cap, +harmony). Rows declare `upgrade: { to, cost }`.
-- [ ] **Soldier stances.** Hold / guard / patrol; a "garrison this tower" command.
+- [x] **Soldier stances.** Guard (default) and Hold (H) in batch 7 (R27). Archers
+      already garrison a tower or wall by being moved onto it. Patrol not planned.
 
 ## Ideas from Sri Lankan history (gameplay)
 
@@ -102,6 +103,18 @@ Recorded so these are not re-added without a strong reason:
 - [x] R7 Monsoon deadwood gathering by idle villagers (late timber fixed).
 - [x] R8 Diya agala (moat) fed by the canal network.
 - [x] R9 Simplify round 3 (below).
+
+## Loop batch 7 (R26–R29)
+
+- [x] R26 Hena (chena): idle villagers clear jungle-edge plots for millet in Yala.
+- [x] R27 Soldier stances: Hold position (H, or the Army tab card).
+- [x] R28 Lion Rock's final assault: 10 raiders, 4 bowmen, 2 ram bearers.
+- [x] R29 Simplify round 8 (below).
+
+## Simplify round 8 (R29)
+
+- **Merged (code):** every seasonal job's work and drop-off behaviour lives on
+  its `SEASON_WORK` row (`done`, `again`) instead of branches in `updateWorker`.
 
 ## Loop batch 6 (R22–R25)
 

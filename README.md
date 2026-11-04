@@ -37,7 +37,9 @@ and baked into `assets/` (regenerate with `cd tools && npm install` once, then
 - **Morale.** A raid party that loses most of its strength breaks and flees (no gold for those who escape).
 - **Defences.** A moat (diya agala) on your canal network slows raiders to a crawl while it holds water. The 🔨 Improve tool repairs damage, or upgrades palisades to ramparts and houses to walawwas.
 - **Silt and shramadana.** Monsoon rain washes silt into the wewas and they hold less. In the dry season idle villagers form work parties to dig it out and carry it to the paddies as manure.
+- **Hena.** In Yala, idle villagers clear jungle-edge plots for millet; each plot fells a tree, which regrows.
 - **Attam.** In the monsoon, idle neighbours join the farmer on each watered paddy (traditional exchange labour), and the rice grows faster.
+- **Stances.** Select soldiers and press H (or use the Army tab) to hold them on their post; otherwise they step out to meet raiders nearby.
 - **Soldier ranks.** Soldiers resting by the Angam Maduwa drill between raids, and every fight teaches them: ★ veterans and ★★ champions are tougher and hit harder.
 - **Raids on the fields.** Raiders break off to trample ripening paddies and rob granaries on their way in, so guard the harvest, not just the citadel.
 - **Siege (Hill Kingdom).** Stone throwers outrange watchtowers. Bolt towers and archers on the walls can reach them. Melee raiders can't reach soldiers standing on walls or towers.
