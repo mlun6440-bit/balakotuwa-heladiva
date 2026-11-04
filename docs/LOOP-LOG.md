@@ -1,0 +1,22 @@
+# Loop log: what the improvement loop learned about itself
+
+Each batch changes the game, and also shows where the *process* is weak:
+a finding that was wrong, a check that could not fail, a problem only found
+by hand. This log keeps those lessons. Each lesson ends as a tool, a check
+or a rule, so the next batch does not depend on someone remembering it.
+The resulting rules are in `docs/ITERATION-GUARDRAILS.md`
+("The loop improves itself").
+
+| Batch | Process lesson | Now built in |
+|---|---|---|
+| 2 | A playtest run without `--out` overwrote the committed report. | Use a scratch `--out` for checks; only the end-of-batch `learn` run writes `docs/playtest`. |
+| 3 | Over 1000 3D renders, the headless WebGL context was lost and sprites came out blank, silently. | The bake warns on every empty sprite (`tools/art/bake.js`); a clean bake has zero warnings. |
+| 4 | The report said "fire took 4 buildings". An instrumented run showed raiders had done the damage, and the defeat screen was giving the wrong advice. | Measure before fixing: confirm a finding's cause with an instrumented run. Fire is credited only for the final blow. |
+| 5 | Lion Rock's rice never rose above its starting 79. Only a hand-built script found that the market sold the harvest during a famine. | Detector: "the market sold N rice while families starved". |
+| 5 | Hill Kingdom hit the time limit with three stone throwers grinding forever; found by hand. | Detector: **stall** (every raid launched, raiders still standing at the limit). |
+| 5 | The hint-following novice ignored the advisor's siege hint, so the stall looked like a game bug. | Rule: every new advisor hint gets a matching novice rule. |
+| 6 | The planner broke the disawa's dam 17s in and won untouched. The first design had a free option. | Detectors: "broke the dam early and still won untouched"; a choice check when a two-way dial settles at an extreme. |
+| 6 | Inserting levels would have shifted saved progress and the learned dials, which were keyed by position. | Progress and `tools/playtest-brain.json` are keyed by level id. |
+| 7 | Hena helpers claim trees. Sending a helper home by filtering the list would have left trees claimed forever. | All helper removal goes through `endParty`, which releases claims. |
+| 8 | After seven batches nobody had checked that saves still restore everything new. | `node tools/review.mjs` (save and continue on every level, tooltips, top bar, every building and decree). |
+| 8 | A checker that has never failed proves nothing. | `node tools/review.mjs --selftest` and `node tools/playtest.mjs detectors` replay known faults and must catch them. |

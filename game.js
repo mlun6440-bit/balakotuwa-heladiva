@@ -587,7 +587,8 @@ function hitDam(u) {
   puff(d.gx + d.w / 2, d.gy + d.h / 2, 3, "#9a9080");
   if (d.hp > 0) return;
   d.hp = 0;
-  S.stats.damBroken = true;
+  S.stats.damBroken = (S.stats.damBroken || 0) + 1;
+  S.stats.damBrokenAt = S.stats.damBrokenAt ?? Math.round(S.time);
   const w = S.L.waves[S.nextWave];
   if (w) S.waveClock = Math.max(S.waveClock, w.t - 20);
   S.revenge = true;
@@ -948,7 +949,7 @@ function updateWorker(w, dt) {
           w.timer = 6;
           // Pola orders (👑 tab): sell rice above a level, buy timber/stone below one at a markup
           const m = S.market || (S.market = { sell: 30, buy: 0 });
-          if (S.rice > sellAbove() + 5) { S.rice -= 5; S.gold += 8; spawnFloat("-5🍚 +8🪙", w.gx, w.gy, "#e9b949"); sfx("coin"); }
+          if (S.rice > sellAbove() + 5) { S.rice -= 5; S.gold += 8; S.stats.riceSold = (S.stats.riceSold || 0) + 5; spawnFloat("-5🍚 +8🪙", w.gx, w.gy, "#e9b949"); sfx("coin"); }
           else if (S.gold >= 12 && (S.timber < m.buy || S.stone < m.buy)) {
             const k = S.timber <= S.stone ? "timber" : "stone";
             S.gold -= 12; S[k] += 5; spawnFloat(`-12🪙 +5${RES[k]}`, w.gx, w.gy, "#e9b949"); sfx("coin");

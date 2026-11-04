@@ -56,6 +56,22 @@ runs. These rules keep it a focused game rather than a feature pile.
 - **Stop when done.** When the roadmap item is finished and tested, stop and
   report. Do not invent work to fill time. Ask the human for the next direction.
 
+## The loop improves itself
+
+Every batch also improves the process that makes the batches. Record the
+lesson in `docs/LOOP-LOG.md`, and make it permanent:
+
+- **Measure before fixing.** Confirm a finding's cause with an instrumented
+  run before changing the game. Batch 4's fire finding was really raiders.
+- **A hand investigation ends as a check.** If you had to write a one-off
+  script to find a problem, turn it into a detector in `tools/playtest.mjs`
+  or a check in `tools/review.mjs` before moving on.
+- **A check that can't fail proves nothing.** Every detector and review check
+  has a self-test that replays the fault it was written for
+  (`node tools/playtest.mjs detectors`, `node tools/review.mjs --selftest`).
+- **A new advisor hint gets a novice rule.** The novice bot models a player
+  who follows hints; if it ignores a new one, its results mislead.
+
 ## Reviewing a long autonomous run
 
 Run `node tools/review.mjs` first: it catches the mechanical breakage (saves

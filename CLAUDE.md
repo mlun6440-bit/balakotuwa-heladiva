@@ -113,7 +113,8 @@ a few minutes) and read `docs/playtest/REPORT.md`: it catches exploits and
 stalls a single hand-played minute won't. The learned dials live in
 `tools/playtest-brain.json`; commit it so learning continues next time.
 
-After a batch of rounds, run `node tools/review.mjs`: save and continue on
+`node tools/playtest.mjs detectors` checks that every report detector still
+fires on the fault it was written for. After a batch of rounds, run `node tools/review.mjs`: save and continue on
 every level, one-sentence tooltips, a one-row top bar, every building and
 decree still usable. `--selftest` breaks saving on purpose to prove it fails.
 
