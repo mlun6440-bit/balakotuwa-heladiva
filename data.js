@@ -253,6 +253,27 @@ const LEVELS = [
     objectives: [{ type: "build", id: "wewa", n: 4 }, { type: "build", id: "dagoba", n: 1 }, { type: "catch", n: 400 }, { type: "waves" }]
   },
   {
+    // A siege mission: the fortress is already built and the raids come at once.
+    id: "yapahuwa", name: "The Stair of Yapahuwa", era: "Yapahuwa", seed: 61,
+    intro: "Yapahuwa, the rock fortress with its great stone stair. Your walls, towers and garrison are already raised, and the enemy comes at once, from every side. Keep the granary full, guard the fields outside the walls, and hold.",
+    citadel: [13, 13], season: "yala",
+    start: { timber: 80, stone: 100, rice: 110, gold: 150, villagers: 10 },
+    prebuilt: [["tower", 9, 9], ["rampart", 9, 10], ["rampart", 9, 11], ["rampart", 9, 12], ["rampart", 9, 13], ["rampart", 9, 14], ["rampart", 9, 15], ["rampart", 9, 16], ["rampart", 9, 17], ["tower", 9, 18], ["rampart", 10, 9], ["rampart", 10, 18], ["rampart", 11, 9], ["rampart", 11, 18], ["rampart", 12, 9], ["rampart", 12, 18], ["rampart", 13, 9], ["gate", 13, 18], ["rampart", 14, 9], ["rampart", 14, 18], ["rampart", 15, 9], ["rampart", 15, 18], ["rampart", 16, 9], ["rampart", 16, 18], ["rampart", 17, 9], ["rampart", 17, 18], ["tower", 18, 9], ["rampart", 18, 10], ["rampart", 18, 11], ["rampart", 18, 12], ["gate", 18, 13], ["rampart", 18, 14], ["rampart", 18, 15], ["rampart", 18, 16], ["rampart", 18, 17], ["tower", 18, 18], ["barracks", 10, 10], ["bissa", 16, 10], ["bissa", 16, 11], ["house", 10, 16], ["house", 11, 16], ["house", 12, 16], ["house", 15, 16], ["house", 16, 16], ["wewa", 10, 13], ["paddy", 2, 13], ["paddy", 3, 16], ["paddy", 3, 19]],
+    army: { spearman: 4, archer: 6, angampora: 2, elephant: 1 },
+    rivers: [{ edge: "west", at: 0, width: 2, wobble: 1 }],
+    rocks: [[11, 2, 16, 5], [20, 20, 23, 23]],
+    forests: [[19, 2, 24, 7, 0.4], [2, 2, 7, 7, 0.35], [20, 10, 24, 16, 0.35]],
+    unlocks: {}, fireArrows: true,
+    waves: [
+      { t: 90, from: ["east", "south"], raider: 8, bowman: 4, brute: 1 },
+      { t: 200, from: ["north", "east"], raider: 10, bowman: 5, brute: 2 },
+      { t: 310, from: ["south", "west"], raider: 12, bowman: 6, brute: 2 },
+      { t: 420, from: ["north", "east", "south"], raider: 14, bowman: 6, brute: 3 }
+    ],
+    hpScale: 1.3,
+    objectives: [{ type: "res", key: "rice", n: 180 }, { type: "waves" }]
+  },
+  {
     id: "senkadagala", name: "Hill Kingdom", era: "Senkadagala", seed: 71,
     intro: "The last free kingdom in the hills, and the home of the Perahera. Raiders come from three sides and bring stone throwers that outrange your towers: answer with bolt towers and archers on the walls, and use royal decrees to rally your people.",
     citadel: [13, 13], season: "maha",
