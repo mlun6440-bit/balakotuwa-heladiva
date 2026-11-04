@@ -663,20 +663,28 @@ function tickWater() {
 //   shramadana (Yala): dig silt out of the wewas and carry it to the paddies as manure.
 //   gatherer (Maha): fetch fallen deadwood from the forest edge (never felling trees).
 //   attam (Maha): exchange labour beside the farmer on watered paddies; rice grows faster.
+//   hena (Yala): clear and burn a plot at the jungle edge for millet (counted as rice);
+//     the tree is felled and regrows, so the jungle shrinks for a while.
+// again(w): what a helper does after dropping its load at a store (default: go home).
 const GATHERERS = 4, GATHER_CAP = 150;
 const ATTAM_HANDS = 2, ATTAM_GROWTH = 4, ATTAM_TIME = 5;
+const HENA_HANDS = 4, HENA_RICE = 2, HENA_TIME = 8;
 const SEASON_WORK = [
   { job: "shramadana", season: "yala", spots: () => S.buildings.filter(b => b.id === "wewa" && (b.silt || 0) >= 8)
       .map(b => ({ n: 3, mine: w => w.siltTarget === b, send: w => { w.siltTarget = b; goTo(w, b.gx + 1, b.gy + 2.25, "toSilt"); } })) },
   { job: "gatherer", season: "maha", tip: "In the monsoon, idle villagers gather fallen wood from the forest for the stores.",
-    spots: () => S.timber >= GATHER_CAP ? [] : [{ n: GATHERERS, mine: () => true, send: sendGatherer }] },
+    spots: () => S.timber >= GATHER_CAP ? [] : [{ n: GATHERERS, mine: () => true, send: sendGatherer }],
+    again: w => (S.season === "maha" && S.timber < GATHER_CAP ? sendGatherer(w) : endParty(w)) },
+  { job: "hena", season: "yala", tip: "In Yala, idle villagers clear hena plots at the jungle edge and bring back millet, but each plot costs a tree.",
+    spots: () => [{ n: HENA_HANDS, mine: () => true, send: sendHena }],
+    again: w => (S.season === "yala" ? sendHena(w) : endParty(w)) },
   { job: "attam", season: "maha", tip: "In the monsoon, idle neighbours join attam work on watered paddies, and the rice grows faster.",
     spots: () => S.buildings.filter(p => p.id === "paddy" && p.irrigated && p.worker)
       .map(p => ({ n: ATTAM_HANDS, mine: w => w.field === p, send: (w, i) => { w.field = p; goTo(w, p.gx + 0.6 + i * 0.8, p.gy + 1.3 + i * 0.3, "toPaddy"); } })) }
 ];
 function assignSeasonWork() {
   for (const row of SEASON_WORK) {
-    if (S.season !== row.season) { S.workers = S.workers.filter(w => w.job !== row.job || w.fireTarget); continue; }
+    if (S.season !== row.season) { S.workers.filter(w => w.job === row.job && !w.fireTarget).forEach(endParty); continue; }
     const crew = S.workers.filter(w => w.job === row.job);
     for (const spot of row.spots()) {
       for (let have = crew.filter(spot.mine).length; have < spot.n && idleVillagers() > 0; have++) spot.send(helper(row.job, {}), have);
@@ -689,7 +697,7 @@ function assignSeasonWork() {
     say("Monsoon rain washes silt into the wewas, and they hold less. In Yala, idle villagers gather for shramadana to dig it out and manure the paddies.");
   }
 }
-const endParty = w => { S.workers = S.workers.filter(x => x !== w); };
+const endParty = w => { if (w.target && w.target.reserved) w.target.reserved = false; S.workers = S.workers.filter(x => x !== w); };
 // A temporary helper drawn from the idle villagers (water carrier or work party).
 function helper(job, extra) {
   const w = { b: S.citadel, job, temp: true, gx: S.citadel.gx + 1, gy: S.citadel.gy + 2.2, tx: 0, ty: 0, phase: "plan", timer: 0, carry: null, target: null, ...extra };
@@ -704,6 +712,18 @@ function woodSpot(w) {
     if (d < bd) { bd = d; best = t; }
   }
   return best;
+}
+// Hena: the nearest mature tree nobody has claimed, felled for the plot.
+function sendHena(w) {
+  let best = null, bd = Infinity;
+  for (const t of S.trees) {
+    if (t.stage < 100 || t.reserved) continue;
+    const d = Math.hypot(t.gx - w.gx, t.gy - w.gy);
+    if (d < bd) { bd = d; best = t; }
+  }
+  if (!best) { endParty(w); return; }
+  best.reserved = true; w.target = best;
+  goTo(w, best.gx + 0.35, best.gy + 0.35, "toWood");
 }
 function sendGatherer(w) {
   const t = woodSpot(w);
@@ -722,7 +742,7 @@ function staff() {
     if (S.workers.length >= S.villagers) {
       const party = S.workers.findIndex(w => w.temp && w.job !== "bucket" && !w.fireTarget);
       if (party < 0) break;
-      S.workers.splice(party, 1); // a real job beats a work party
+      endParty(S.workers[party]); // a real job beats a work party
     }
     const w = { b, job: b.def.worker, gx: S.citadel.gx + 1, gy: S.citadel.gy + 2.2, tx: 0, ty: 0, phase: "plan", timer: 0, carry: null, target: null };
     b.worker = w;
@@ -814,7 +834,7 @@ function updateWorker(w, dt) {
       if (w.timer <= 0) planJob(w);
       break;
     case "toWood":
-      if (walk(w, dt)) { w.phase = "work"; w.timer = 6; }
+      if (walk(w, dt)) { w.phase = "work"; w.timer = w.job === "hena" ? HENA_TIME : 6; }
       break;
     case "toPaddy":
       if (walk(w, dt)) { w.phase = "work"; w.timer = ATTAM_TIME; }
@@ -878,6 +898,12 @@ function updateWorker(w, dt) {
       w.timer -= dt * workMult();
       if (w.timer > 0) break;
       if (w.job === "gatherer") { carryHome(w, "timber", 2); break; }
+      if (w.job === "hena") {
+        const t = w.target; w.target = null;
+        if (t && S.trees.includes(t)) { t.stage = 0; t.reserved = false; puff(t.gx, t.gy, 5, "#8a8378"); }
+        carryHome(w, "rice", HENA_RICE);
+        break;
+      }
       if (w.job === "attam") {
         const p = w.field;
         if (!p || !S.buildings.includes(p) || !p.irrigated || !p.worker || S.season !== "maha") { endParty(w); break; }
@@ -938,13 +964,10 @@ function updateWorker(w, dt) {
           spawnFloat(`+${w.carry.n} ${RES[w.carry.key]}`, w.gx, w.gy, "#bff0a8");
         }
         if (w.carry.key === "rice") sfx("harvest");
-        if (w.job === "gatherer") {
-          w.carry = null;
-          if (S.season === "maha" && S.timber < GATHER_CAP) sendGatherer(w); else endParty(w);
-          break;
-        }
         w.carry = null;
-        planJob(w);
+        const row = w.temp && SEASON_WORK.find(r => r.job === w.job);
+        if (row) (row.again || endParty)(w);
+        else planJob(w);
       }
       break;
   }
