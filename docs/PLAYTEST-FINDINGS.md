@@ -56,6 +56,22 @@ Curve after retraining: the planner wins every level (three stars on 1, 2, 3
 and 5; two on 4). The novice wins 1–4 and loses the finale, now to stone
 throwers and undefended north and south edges rather than hunger.
 
+## Loop batch 8 (R30–R33): review, and the loop improves itself
+
+| Round | Change | Evidence |
+|---|---|---|
+| R30 | `tools/review.mjs`: save/continue on every level, tooltips, top bar, every building and decree | Clean on all 8 round trips; `--selftest` catches a deliberately broken save |
+| R31 | Final raids with teeth on The Dry Zone and The Disawa's Dam | Novice still wins (3 of 3 each) with the citadel at 84–94% and 84–87% (was 95–97%) |
+| R32 | Past hand investigations become report detectors; each has a self-test | `playtest.mjs detectors`: 4 of 4 fire on their old fault; a clean game raises none |
+| R33 | One `tip()` for once-only advice | Review, detectors, smoke and bots unchanged |
+
+Curve after retraining: the planner wins all seven levels; the novice wins
+1–6 and lost Hill Kingdom this run (it has swung between won, lost and
+unfinished across recent runs). New: gold piles up to 1258 on Lion Rock with
+nothing worth buying, a sink is missing. Still open: idle near 50% on Ruhuna
+and the dam level; raids barely touch the citadel on levels 1–2; tribute
+unused by the learner.
+
 ## Loop batch 7 (R26–R29)
 
 | Round | Change | Bot evidence |
