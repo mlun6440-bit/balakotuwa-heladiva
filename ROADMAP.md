@@ -27,7 +27,7 @@ off here when they ship.
 - [x] **Sound and music.** `audio.js` synthesises every effect and a seasonal
       ambience live with WebAudio (conch, knocks, harvest notes, clashes, fire,
       splash; Maha rain/frogs/thunder, Yala wind/cicadas/koel; war and
-      Perahera drums). Follow-up: a quiet melodic loop.
+      Perahera drums). Follow-up done in batch 9: a quiet melodic loop (R35).
 - [x] **Save mid-level.** Autosave every 15s, on tab hide/close and at the
       menu; "Continue" on the menu (`saveRun`/`continueRun` in `game.js`).
 - [x] **Building upgrades.** ⬆️ Upgrade tool; palisade → rampart, house →
@@ -103,6 +103,45 @@ Recorded so these are not re-added without a strong reason:
 - [x] R7 Monsoon deadwood gathering by idle villagers (late timber fixed).
 - [x] R8 Diya agala (moat) fed by the canal network.
 - [x] R9 Simplify round 3 (below).
+
+## Loop batch 11 (R42–R45)
+
+- [x] R42 A siege mission: new level 7, The Stair of Yapahuwa (start inside a
+      built fortress; heavy raids from several sides at once).
+- [x] R43 Lion Rock measured with six-run A/Bs: raiders absorbed by its own
+      rampart goal, pressure lands on the fields. Level unchanged; the report's
+      "raids too weak" finding now counts field damage.
+- [x] R44 Floods in skirmish: a brimming wewa with no spillway bursts its bund.
+- [x] R45 Simplify round 12: hazards are level flags (wild, rival, floods,
+      droughts); hand-run mechanic tests became review scenarios.
+
+## Loop batch 10 (R38–R41)
+
+- [x] R38 Drill masters: gold raises selected soldiers one rank (gold-glut finding).
+- [x] R39 **Cut before shipping: village militia.** Idle villagers mustering
+      when raiders reached the Maligawa. Measured on/off with everything else
+      equal: it flattened the raid tension built in R28/R31 (novice citadel on
+      the dam level 65–91% off, 100% on; Sea of Parakrama 68–88% off, 99% on),
+      even as a last-ditch muster of 4, and did not move the idle share (militia
+      exist only during raids). Not re-add without a cost that keeps raids sharp.
+- [x] R40 A/B of R38 (drill masters on/off, two runs each): no flattening,
+      kept. The A/B became a tool: `node tools/playtest.mjs ab <ref> --reps N`.
+- [x] R41 Simplify round 11: one Army-tab card for orders to the selected
+      soldiers (Hold, Drill master) instead of two.
+
+## Loop batch 9 (R34–R37): from the PC's indie-guide notes (docs/DEV-WORKFLOW.md)
+
+- [x] R34 Every one-shot sound varies a little each time it plays.
+- [x] R35 A quiet melodic loop (pentatonic, seasonal, rests during raids).
+- [x] R36 One soft-light colour grade over the whole frame.
+- [x] R37 Simplify round 10 (below).
+
+## Simplify round 10 (R37)
+
+- **Merged:** `hit` no longer randomises its own pitch; the shared per-play
+  variation does it for every effect.
+- **Check, not script:** the offline sound renders written by hand this batch
+  are now `tools/review.mjs` section 5, with a self-test.
 
 ## Loop batch 8 (R30–R33): review, and the loop improves itself
 

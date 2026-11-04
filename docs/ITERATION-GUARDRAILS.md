@@ -69,6 +69,9 @@ lesson in `docs/LOOP-LOG.md`, and make it permanent:
 - **A check that can't fail proves nothing.** Every detector and review check
   has a self-test that replays the fault it was written for
   (`node tools/playtest.mjs detectors`, `node tools/review.mjs --selftest`).
+- **A/B before shipping, with several runs.** One run per bot is a sample, not
+  a verdict. `node tools/playtest.mjs ab HEAD~1 --reps 3` runs the same bots on
+  this checkout and the previous commit and averages them side by side.
 - **A new advisor hint gets a novice rule.** The novice bot models a player
   who follows hints; if it ignores a new one, its results mislead.
 

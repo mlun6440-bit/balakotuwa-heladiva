@@ -42,8 +42,8 @@ title), restated for Balakotuwa in batch 6. Ideas only.
 |---|------------------|--------------------|--------|
 | 20 | Hazards between raids | **Wild elephants** raid ripe paddies; a *pela* (watch hut) turns them back | Done (R22, level 2) |
 | 21 | A rival lord who acts by his own plan | **The disawa's dam**: shut every Yala; break it (revenge raid) or pay a gift | Done (R23, level 5) |
-| 22 | Droughts and floods | **Drought years** (one Yala in three runs long) in skirmish; bund breaches still open | Drought done (R24) |
-| 23 | Different mission types | A peaceful tank-builder level; a siege level starting with a built fort | Open |
+| 22 | Droughts and floods | **Drought years** (one Yala in three runs long) and **burst bunds** (a brimming wewa with no spillway) in skirmish | Done (R24, R44) |
+| 23 | Different mission types | A siege level starting with a built fort; a peaceful tank-builder level | Siege done (R42, Yapahuwa); peaceful level open |
 | 24 | Arms supply chain | Forged arms stocked at the barracks gate elite troops | Open |
 | 25 | Tax lever | A harvest share (*bhaga*): more rice to the citadel for gold, at a harmony cost | Open |
 

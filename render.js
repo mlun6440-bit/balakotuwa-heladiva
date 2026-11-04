@@ -641,14 +641,16 @@ function render(now) {
 
   // Screen-space atmosphere and seasonal grading
   ctx.setTransform(view.dpr, 0, 0, view.dpr, 0, 0);
-  if (S.season === "maha") {
-    ctx.fillStyle = "rgba(40,70,90,0.07)"; ctx.fillRect(0, 0, view.w, view.h);
-    drawRain(now);
-  } else {
-    const g = ctx.createLinearGradient(0, 0, view.w, view.h);
-    g.addColorStop(0, "rgba(255,214,140,0.10)"); g.addColorStop(1, "rgba(255,170,90,0.04)");
-    ctx.fillStyle = g; ctx.fillRect(0, 0, view.w, view.h);
-  }
+  // One grade over the whole frame ties sprites, terrain and effects together:
+  // a soft-light colour pass (cool and grey in Maha, warm and gold in Yala)
+  // that shifts the colours without washing them out like a flat tint does.
+  ctx.globalCompositeOperation = "soft-light";
+  const g = ctx.createLinearGradient(0, 0, view.w, view.h);
+  if (S.season === "maha") { g.addColorStop(0, "rgba(120,150,170,0.55)"); g.addColorStop(1, "rgba(70,95,120,0.55)"); }
+  else { g.addColorStop(0, "rgba(255,205,130,0.5)"); g.addColorStop(1, "rgba(220,150,90,0.45)"); }
+  ctx.fillStyle = g; ctx.fillRect(0, 0, view.w, view.h);
+  ctx.globalCompositeOperation = "source-over";
+  if (S.season === "maha") drawRain(now);
   const vg = ctx.createRadialGradient(view.w / 2, view.h / 2, Math.min(view.w, view.h) * 0.35, view.w / 2, view.h / 2, Math.max(view.w, view.h) * 0.75);
   vg.addColorStop(0, "rgba(0,0,0,0)");
   vg.addColorStop(1, "rgba(0,0,0,0.38)");

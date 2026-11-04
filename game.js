@@ -96,7 +96,7 @@ function saveRun() {
     L: S.L.skirmish ? { ...S.L, all: undefined } : null, st,
     trees: S.trees.map(t => [r3(t.gx), r3(t.gy), r3(t.stage)]),
     buildings: S.buildings.map(b => ({ uid: b.uid, id: b.id, gx: b.gx, gy: b.gy, hp: b.hp, maxHp: b.maxHp, water: b.water, growth: b.growth,
-      open: b.open, next: b.next, at: b.at, fire: b.fire, silt: b.silt, irrigated: b.irrigated })),
+      open: b.open, next: b.next, at: b.at, fire: b.fire, silt: b.silt, irrigated: b.irrigated, strain: b.strain })),
     units: S.units.map(u => ({ uid: u.uid, team: u.team, type: u.type, gx: r3(u.gx), gy: r3(u.gy), tx: u.tx, ty: u.ty, hp: u.hp, maxHp: u.maxHp,
       last: u.last, z: u.z, ordered: u.ordered, lastFire: u.lastFire, party: u.party, hx: u.hx, hy: u.hy, flee: u.flee, looted: u.looted, rank: u.rank, xp: u.xp, hold: u.hold }))
   };
@@ -227,7 +227,7 @@ function makeSkirmish(seed, sandbox = false) {
     forests: Array.from({ length: ri(3, 5) }, () => [...rect(ri(4, 7), ri(4, 7)), 0.35 + r() * 0.2]),
     unlocks: {}, all,
     waves: sandbox ? [] : [0, 1, 2].map(k => skirmishWave(k, seed, riverEdge)),
-    hpScale: 1, objectives: [{ type: sandbox ? "sandbox" : "endless" }], wild: { first: 150, every: 110 },
+    hpScale: 1, objectives: [{ type: sandbox ? "sandbox" : "endless" }], wild: { first: 150, every: 110 }, floods: true, droughts: true,
     ...(sandbox ? {
       id: `sandbox-${seed}`, name: "Sandbox", sandbox: true, endless: false, era: `Royal sandbox · seed ${seed}`,
       intro: "A peaceful valley with full stores. Build anything; open 👑 Decrees to send raids of any size from any edge and test your defences.",
@@ -610,16 +610,37 @@ const RAIN = 2.4; // water each wewa catches per second of Maha
 const SILT_RATE = 0.25, SILT_MAX = 60; // Maha rain washes silt in; it eats capacity
 const wewaCap = w => WEWA_CAP - (w.silt || 0);
 
+// Floods (skirmish, L.floods): in the monsoon a brimming wewa whose overflow has
+// nowhere to go (no wewa with room on its network, no open sluice) strains its
+// bund; after BREACH_AT seconds of that it bursts, emptying the tank, flooding
+// paddies nearby and damaging what stands close. Canals and sluices are spillways.
+const BREACH_AT = 24;
+function breachBund(w) {
+  w.water = 0; w.strain = 0;
+  S.stats.breaches = (S.stats.breaches || 0) + 1;
+  const cx = w.gx + w.w / 2, cy = w.gy + w.h / 2;
+  for (const b of [...S.buildings]) {
+    if (b === w) continue;
+    const d = rectDist({ gx: cx, gy: cy }, b);
+    if (b.id === "paddy" && d <= 3) { b.growth = 0; puff(b.gx + 1, b.gy + 1, 6, "#7fb0d0"); }
+    else if (!b.def.ground && !b.def.water && d <= 2) damageBuilding(b, 80);
+  }
+  damageBuilding(w, 200);
+  spawnFloat("The bund has burst!", cx, cy, "#7fd0ff");
+  say("A wewa's bund has burst in the storm! The tank is empty and the fields below are flooded. Give brimming tanks a canal to another wewa, or open a sluice to spill.", true);
+}
+
 function tickWater() {
   const maha = S.season === "maha";
   const spill = new Map(); // network id -> rain a full wewa could not hold
+  const spillers = new Map(); // network id -> the full wewas that overflowed
   for (const w of S.buildings) {
     if (w.id !== "wewa") continue;
     if (maha) {
       w.silt = Math.min(SILT_MAX, (w.silt || 0) + SILT_RATE);
       const add = Math.max(0, Math.min(RAIN, wewaCap(w) - w.water));
       w.water += add; S.rain.caught += add;
-      if (add < RAIN) { const id = S.netOf[w.gy][w.gx]; spill.set(id, (spill.get(id) || 0) + RAIN - add); }
+      if (add < RAIN) { const id = S.netOf[w.gy][w.gx]; spill.set(id, (spill.get(id) || 0) + RAIN - add); (spillers.get(id) || spillers.set(id, []).get(id)).push(w); }
     } else w.water = Math.max(0, w.water - 0.3);
     if (riverBeside(w)) w.water = Math.min(wewaCap(w), w.water + 1.2);
     w.water = Math.min(w.water, wewaCap(w));
@@ -635,6 +656,14 @@ function tickWater() {
       if (amt <= 0) break;
     }
     S.rain.lost += amt;
+    if (S.L.floods && amt > 0 && !(id !== -1 && [...S.nets[id].sluices].some(s => s.open))) for (const w of spillers.get(id)) w.straining = true;
+  }
+  if (S.L.floods) for (const w of [...S.buildings]) {
+    if (w.id !== "wewa") continue;
+    w.strain = w.straining ? (w.strain || 0) + 1 : Math.max(0, (w.strain || 0) - 2);
+    w.straining = false;
+    if (w.strain >= BREACH_AT / 2) tip("bund", "A brimming wewa is straining its bund in the storm. Give its overflow somewhere to go: a canal to a wewa with room, or open a sluice.", true);
+    if (w.strain >= BREACH_AT) breachBund(w);
   }
   if (S.rain.spilled > 0) tip("cascade", "A full wewa spills down the canal into the next tank. That is ellangawa: no rain wasted.");
   if (S.rain.lost > 20 && S.L.objectives.some(o => o.type === "catch")) tip("spill", "Rain is spilling from full wewas to the sea! Link another wewa to them with a canal.", true);
@@ -983,9 +1012,25 @@ function gainXp(u, n) {
   spawnFloat(`${"★".repeat(u.rank)} ${next.name}!`, u.gx, u.gy, "#ffd27a");
   tip("rank", "A soldier has risen in rank. Soldiers resting by the Angam Maduwa drill between raids, and every fight teaches them.");
 }
+// A drill master at the Angam Maduwa raises the selected soldiers one rank at
+// once, for the next rank's fee in gold.
+function payDrill() {
+  if (!S.buildings.some(b => b.id === "barracks")) { say("Build an Angam Maduwa (Defence tab) first: the drill masters work there.", true); return; }
+  const sel = S.units.filter(u => u.team === "p" && u.sel && (u.rank || 0) < RANKS.length - 1);
+  if (!sel.length) { say("Select soldiers who are not yet champions, then hire the drill master."); return; }
+  const fee = sel.reduce((a, u) => a + RANKS[(u.rank || 0) + 1].fee, 0);
+  if (S.gold < fee) { say(`The drill masters want ${fee} 🪙 for ${sel.length} soldier${sel.length > 1 ? "s" : ""}.`, true); return; }
+  S.gold -= fee;
+  for (const u of sel) gainXp(u, RANKS[(u.rank || 0) + 1].xp - (u.xp || 0));
+  spawnFloat(`-${fee}🪙 drill`, sel[0].gx, sel[0].gy, "#e9b949");
+  sfx("coin");
+  if (S.cat === "army") renderPalette();
+  syncHud();
+}
 function drillSoldiers() {
   const halls = S.buildings.filter(b => b.id === "barracks");
   if (!halls.length) return;
+  if (S.gold >= 400 && S.units.some(u => u.team === "p" && (u.rank || 0) < 2)) tip("treasury", "The treasury is full. Drill masters at the Angam Maduwa raise your soldiers' rank for gold: select soldiers, then the Army tab.");
   for (const u of S.units) {
     if (u.team !== "p" || nearestFoe(u, 6)) continue;
     if (halls.some(b => rectDist(u, b) <= 3)) gainXp(u, 1);
@@ -1566,8 +1611,8 @@ function tick() {
     S.season = SEASONS[S.season].next;
     S.seasonLeft = SEASONS[S.season].len;
     S.seasonNo++;
-    // Skirmish: one Yala in three (seeded by the map) is a drought year, half as long again.
-    S.drought = S.season === "yala" && !!S.L.skirmish && mulberry32(S.L.seed * 31 + S.seasonNo)() < DROUGHT_CHANCE;
+    // Levels with droughts (skirmish): one Yala in three (seeded by the map) runs half as long again.
+    S.drought = S.season === "yala" && !!S.L.droughts && mulberry32(S.L.seed * 31 + S.seasonNo)() < DROUGHT_CHANCE;
     if (S.drought) S.seasonLeft = Math.round(S.seasonLeft * 1.5);
     const rebuilt = S.dam && S.season === "maha" && S.dam.hp < S.dam.maxHp;
     if (rebuilt) S.dam.hp = S.dam.maxHp;
@@ -1703,6 +1748,7 @@ function defeatCauses() {
   if (st.starved >= 2) out.push([5, `🍚 The granary ran dry${st.starveSeason ? ` in ${st.starveSeason === "yala" ? "the Yala dry season" : "the Maha monsoon"}` : ""} and ${st.starved} famil${st.starved === 1 ? "y" : "ies"} left. Keep about one watered paddy per house.`]);
   else if (st.hungry >= 20) out.push([3, "🍚 The granary was empty for long stretches, so few new families came to work and fight."]);
   if (S.dam && S.dam.hp > 0 && st.starved >= 2) out.push([4, "🌊 The disawa's dam kept the river dry every Yala. Fill wewas in Maha, break the dam with soldiers, or send him a gift."]);
+  if ((st.breaches || 0) >= 1) out.push([2, `🌊 ${st.breaches} wewa bund${st.breaches > 1 ? "s" : ""} burst in the monsoon. Give brimming tanks a canal to another wewa, or open a sluice.`]);
   if ((st.eaten || 0) >= 3) out.push([3, `🐘 Wild elephants ate ${st.eaten} paddies. A staffed pela by the fields keeps them off.`]);
   for (const e of st.lastFrom || []) {
     const { towers, archers, walls } = edgeDefence(e);
@@ -1893,12 +1939,18 @@ function renderPalette() {
       pal.appendChild(card);
     }
   } else if (S.cat === "army") {
+    // one card for what the selected soldiers can be told: hold their post, or be drilled for gold
     const sel = S.units.filter(u => u.team === "p" && u.sel), held = sel.length && sel.every(u => u.hold);
-    const stance = document.createElement("button");
-    stance.className = `card ${held ? "selected" : ""}`;
-    stance.innerHTML = `<div class="card-head">${held ? "⚔️ Back on guard" : "✋ Hold position"} (H)</div><div class="card-desc">Selected soldiers stay on their post and only strike what reaches them.</div><div class="card-cost">${sel.length ? `${sel.length} selected` : "select soldiers first"}</div>`;
-    stance.addEventListener("click", toggleHold);
-    pal.appendChild(stance);
+    const up = sel.filter(u => (u.rank || 0) < RANKS.length - 1), fee = up.reduce((a, u) => a + RANKS[(u.rank || 0) + 1].fee, 0);
+    const orders = document.createElement("div");
+    orders.className = "card wide";
+    orders.innerHTML = `<div class="card-head">${sel.length ? `${sel.length} soldier${sel.length > 1 ? "s" : ""} selected` : "Select soldiers (drag a box) to give orders"}</div>
+      <div class="card-desc"><button class="btn" data-o="hold" ${sel.length ? "" : "disabled"}>${held ? "⚔️ Back on guard" : "✋ Hold post"} (H)</button>
+      <button class="btn" data-o="drill" ${up.length ? "" : "disabled"}>🎖️ Drill master${up.length ? ` ${fee}🪙` : ""}</button></div>
+      <div class="card-cost">Hold: stay on the post. Drill: one rank at once (★ ${RANKS[1].fee}🪙, ★★ ${RANKS[2].fee}🪙).</div>`;
+    orders.querySelector('[data-o="hold"]').addEventListener("click", toggleHold);
+    orders.querySelector('[data-o="drill"]').addEventListener("click", payDrill);
+    pal.appendChild(orders);
     for (const [id, t] of Object.entries(TROOPS)) {
       if (!S.unlocked.troops.has(id)) continue;
       const card = document.createElement("button");

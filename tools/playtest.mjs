@@ -2,6 +2,9 @@
 //
 //   node tools/playtest.mjs                 evaluate: novice + learned bot on every level, write the report
 //   node tools/playtest.mjs learn --gens 3  keep learning: evolve the bot's dials per level, then evaluate
+//   node tools/playtest.mjs ab <git-ref>    A/B: the same bots on this checkout and on
+//                                           <git-ref> (e.g. HEAD~1), --reps runs each,
+//                                           averages side by side. Use before shipping.
 //   node tools/playtest.mjs detectors       feed the report fake games with each known
 //                                           problem and check every detector fires
 //   options: --levels 1,3   --pages 4 (parallel games)   --out docs/playtest   --limit 1500 (sim seconds)
@@ -21,7 +24,7 @@ const { chromium } = (() => { try { return require("playwright"); } catch { retu
 const root = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "..");
 const args = process.argv.slice(2);
 const opt = (k, d) => { const i = args.indexOf(k); return i >= 0 ? args[i + 1] : d; };
-const mode = args[0] === "learn" ? "learn" : args[0] === "detectors" ? "detectors" : "evaluate";
+const mode = ["learn", "detectors", "ab"].includes(args[0]) ? args[0] : "evaluate";
 const outDir = path.resolve(root, opt("--out", "docs/playtest"));
 const levelsArg = opt("--levels", null);
 const GENS = Number(opt("--gens", "3")), LAMBDA = Number(opt("--lambda", "6")), REPS = Number(opt("--reps", "2"));
@@ -32,14 +35,13 @@ const brain = fs.existsSync(brainFile) ? JSON.parse(fs.readFileSync(brainFile, "
 
 // ---------- running games ----------
 const browser = await chromium.launch();
-const botSrc = path.join(root, "tools/playtest-bot.js");
-async function newPage() {
+async function newPage(dir = root) {
   const page = await browser.newPage({ viewport: { width: 1100, height: 680 } });
   page.errors = [];
   page.on("pageerror", e => page.errors.push(String(e.message)));
   await page.addInitScript(() => { try { localStorage.clear(); } catch (e) { } });
-  await page.goto("file://" + path.join(root, "index.html"));
-  await page.addScriptTag({ path: botSrc });
+  await page.goto("file://" + path.join(dir, "index.html"));
+  await page.addScriptTag({ path: path.join(dir, "tools/playtest-bot.js") });
   await page.waitForTimeout(600);
   return page;
 }
@@ -111,10 +113,10 @@ function score(r) {
   return (r.outcome === "lost" ? 300 : 400) * frac + 60 * r.raidsDone + (r.outcome === "lost" ? 0 : r.citadel);
 }
 // run a list of jobs across the page pool
-async function runAll(jobs) {
+async function runAll(jobs, pages = pool) {
   const out = new Array(jobs.length);
   let next = 0;
-  await Promise.all(pool.map(async page => {
+  await Promise.all(pages.map(async page => {
     while (next < jobs.length) { const i = next++; const j = jobs[i]; out[i] = await play(page, j.lv, j.style, j.P, j.shot); }
   }));
   return out;
@@ -132,23 +134,63 @@ function mutate(P, sigma) {
   }
   return Q;
 }
+// A/B: the same bots and dials on this checkout (A) and on an earlier commit
+// (B, checked out into a temporary worktree), REPS runs each, averaged. One run
+// is a sample, not a verdict: batch 10 nearly cut a feature over noise.
+if (mode === "ab") {
+  const ref = args[1];
+  if (!ref || ref.startsWith("--")) { console.log("usage: node tools/playtest.mjs ab <git-ref> [--levels 3,4] [--reps 3]"); process.exit(1); }
+  const { execFileSync } = await import("node:child_process");
+  const os = await import("node:os");
+  const dir = fs.mkdtempSync(path.join(os.tmpdir(), "balakotuwa-ab-"));
+  execFileSync("git", ["worktree", "add", "--detach", dir, ref], { cwd: root, stdio: "ignore" });
+  try {
+    const poolB = [];
+    for (let i = 0; i < PAGES; i++) poolB.push(await newPage(dir));
+    const reps = Math.max(1, Number(opt("--reps", "3")));
+    const jobsFor = () => levels.flatMap(lv => Array.from({ length: reps }, () => [
+      { lv, style: "novice", P: DEFAULTS }, { lv, style: "planner", P: { ...DEFAULTS, ...(mind(lv)?.P || {}) } }]).flat());
+    const [A, B] = [await runAll(jobsFor()), await runAll(jobsFor(), poolB)];
+    const stat = (R, lv, st) => {
+      const g = R.filter(r => r.level === lv && r.style === st);
+      const idle = g.map(r => { const s = r.samples.filter(x => x.villagers > 0); return s.length ? mean(s.map(x => x.idle / x.villagers)) : 0; });
+      return { won: g.filter(r => r.outcome === "won").length, n: g.length, citadel: mean(g.map(r => r.citadel)), stars: mean(g.map(r => r.stars)), lost: mean(g.map(r => r.starved)), idle: mean(idle) * 100 };
+    };
+    const f = s => `${s.won}/${s.n} won, citadel ${s.citadel.toFixed(0)}%, ★${s.stars.toFixed(1)}, lost ${s.lost.toFixed(1)}, idle ${s.idle.toFixed(0)}%`;
+    console.log(`A = this checkout, B = ${ref}; ${reps} run(s) each\n`);
+    for (const lv of levels) for (const st of ["novice", "planner"]) {
+      const a = stat(A, lv, st), b = stat(B, lv, st);
+      const d = a.citadel - b.citadel;
+      console.log(`L${lv} ${st.padEnd(7)} A: ${f(a)}\n${" ".repeat(11)}B: ${f(b)}${Math.abs(d) >= 10 ? `   ← citadel ${d > 0 ? "+" : ""}${d.toFixed(0)}` : ""}`);
+    }
+    const errs = [...A, ...B].flatMap(r => r.errors);
+    if (errs.length) console.log("page errors:", [...new Set(errs)].join("; "));
+  } finally {
+    execFileSync("git", ["worktree", "remove", "--force", dir], { cwd: root, stdio: "ignore" });
+    await browser.close();
+  }
+  process.exit(0);
+}
+
 // A detector that has never fired proves nothing: replay each problem found by
 // hand in an earlier batch as a fake result and check the report names it.
 if (mode === "detectors") {
   const lv = LEVEL_IDS.indexOf("dakkhina") + 1;
-  const game = (style, extra) => ({ level: lv, name: "Detector check", style, outcome: "won", time: 500, citadel: 100, stars: 3, raidsDone: 4, raids: 4,
+  const game = (style, extra) => ({ level: lv, name: "Detector check", style, outcome: "won", time: 500, citadel: 80, stars: 3, raidsDone: 4, raids: 4,
     starved: 0, hungry: 0, burned: 0, trained: 0, tributes: 0, trampled: 0, looted: 0, rainKept: 100, objectives: [], causes: [], buildings: {},
     samples: [], said: [], bot: [], errors: [], shots: [], riceSold: 0, eaten: 0, scared: 0, damBroken: 0, damBrokenAt: null, lastWaveAt: 530, foesAtEnd: 0, ...extra });
   const cases = [
     ["stall", { outcome: "unfinished", time: 1500, foesAtEnd: 3 }, "**stall:**"],
     ["market sold food in a famine", { riceSold: 140, starved: 8 }, "the market sold"],
     ["elephants ate the fields", { eaten: 4 }, "wild elephants ate"],
-    ["the dam broken for free", { damBroken: 1, damBrokenAt: 17 }, "broke the disawa's dam"]
+    ["the dam broken for free", { damBroken: 1, damBrokenAt: 17, citadel: 100 }, "broke the disawa's dam"],
+    ["raids that bite nowhere", { citadel: 100, trampled: 0 }, "Raids may be too weak"],
+    ["raids that bite the fields instead", { citadel: 100, trampled: 15 }, "the pressure lands on the fields"]
   ];
   levels.length = 0; levels.push(lv);
   let ok = 0;
   for (const [what, extra, needle] of cases) {
-    const md = report([game("novice", {}), game("planner", extra)]);
+    const md = report([game("novice", extra), game("planner", extra)]);
     const hit = md.includes(needle);
     console.log(`${hit ? "✓" : "✗"} ${what}`);
     if (hit) ok++;
@@ -216,7 +258,13 @@ function report(results) {
     const tag = `**L${lv} ${p.name}:**`;
     if (p.outcome !== "won") F.push(`${tag} even the learned planner did not win (${p.outcome}). Unmet: ${p.objectives.filter(o => o.cur < o.n).map(o => `${o.label} ${o.cur}/${o.n}`).join(", ") || "none"}. ${p.causes.length ? "Causes: " + p.causes.join(" ") : ""} Either the level is too hard or the bot lacks a skill it needs (see bot limits).`);
     if (n.outcome !== "won") F.push(`${tag} a hint-following novice ${n.outcome === "lost" ? "lost" : "did not finish"}${n.causes.length ? ` — the defeat screen said: ${n.causes.join(" ")}` : ""}. Unmet: ${n.objectives.filter(o => o.cur < o.n).map(o => `${o.label} ${o.cur}/${o.n}`).join(", ") || "none"}. Consider a clearer hint or a gentler first raid here.`);
-    if (p.outcome === "won" && n.outcome === "won" && p.citadel >= 95 && n.citadel >= 95) F.push(`${tag} both bots won with the citadel almost untouched (${n.citadel}% / ${p.citadel}%). Raids may be too weak to create tension here.`);
+    // batch 11: raids can bite without touching the citadel (Lion Rock's rampart goal
+    // walls everyone in; the raiders trample the fields instead), so count field damage too
+    if (p.outcome === "won" && n.outcome === "won" && p.citadel >= 95 && n.citadel >= 95) {
+      const fields = (n.trampled || 0) + (n.looted || 0) / 20;
+      if (fields < 10) F.push(`${tag} both bots won with the citadel almost untouched (${n.citadel}% / ${p.citadel}%) and the novice lost little in the fields (${n.trampled || 0} paddies trampled). Raids may be too weak to create tension here.`);
+      else F.push(`${tag} raids never reached the citadel (${n.citadel}% / ${p.citadel}%) but cost the novice ${n.trampled || 0} trampled paddies: the pressure lands on the fields here.`);
+    }
     if (p.outcome === "won" && p.time < 260) F.push(`${tag} the planner won in ${p.time}s; the level may end before its ideas get explored.`);
     const s = p.samples.filter(x => x.villagers > 0);
     const idle = s.length ? mean(s.map(x => x.idle / x.villagers)) : 0;

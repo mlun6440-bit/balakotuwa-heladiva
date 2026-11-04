@@ -78,7 +78,9 @@ Key invariants:
   `catch` (rain caught; three stars then need 70% kept), `harmony`, `pop`,
   `waves` (always include `waves`). Unlock decrees with `unlocks.edicts`.
   Level flags: `fireArrows`, `wild: { first, every }` (wild elephants),
-  `rival: true` (the disawa's dam on the first river), `tutorial`.
+  `rival: true` (the disawa's dam on the first river), `floods` (brimming
+  wewas can burst), `droughts` (one Yala in three runs long), `prebuilt`
+  (a siege mission's fortress), `tutorial`. Skirmish sets wild, floods, droughts.
 - **New decree:** add a row to `EDICTS` (`cost`, `once: "season" | "maha" | "yala"`,
   `dur`, `harmony`, `said`), unlock it in a level, and read its effect where it
   applies with `edictOn(id)` (see `workMult`, `buildCost`, the harmony target).
@@ -113,10 +115,14 @@ a few minutes) and read `docs/playtest/REPORT.md`: it catches exploits and
 stalls a single hand-played minute won't. The learned dials live in
 `tools/playtest-brain.json`; commit it so learning continues next time.
 
+Before shipping a balance or mechanic change, A/B it: `node tools/playtest.mjs ab HEAD~1 --reps 3`
+runs the same bots on this checkout and the previous commit, averaged side by side.
 `node tools/playtest.mjs detectors` checks that every report detector still
 fires on the fault it was written for. After a batch of rounds, run `node tools/review.mjs`: save and continue on
 every level, one-sentence tooltips, a one-row top bar, every building and
-decree still usable. `--selftest` breaks saving on purpose to prove it fails.
+decree still usable, every sound effect and the music render (offline, measured), and
+short scenarios for the pela, the dam, floods, Hold and drill masters behave.
+`--selftest` plants faults on purpose (a broken save, unvaried sounds) to prove it fails.
 
 Then play level 1 by hand for a minute: build, paint canals, open a sluice,
 train a soldier, zoom and pan.
