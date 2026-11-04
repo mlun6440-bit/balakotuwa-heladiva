@@ -22,7 +22,7 @@
     "breakDam": 0.64,
     "drillGold": 400
    },
-   "sigma": 0.11852883498411101,
+   "sigma": 0.06535300668751931,
    "history": [
     {
      "at": "2026-11-02T11:25",
@@ -223,6 +223,21 @@
      "at": "2026-11-04T12:24",
      "gen": 40,
      "score": 1385
+    },
+    {
+     "at": "2026-11-04T20:44",
+     "gen": 41,
+     "score": 1385
+    },
+    {
+     "at": "2026-11-04T20:44",
+     "gen": 42,
+     "score": 1385
+    },
+    {
+     "at": "2026-11-04T20:44",
+     "gen": 43,
+     "score": 1385
     }
    ],
    "score": 1385
@@ -248,7 +263,7 @@
     "breakDam": 1,
     "drillGold": 400
    },
-   "sigma": 0.21497227801415938,
+   "sigma": 0.11852883498411101,
    "history": [
     {
      "at": "2026-11-02T11:25",
@@ -464,9 +479,24 @@
      "at": "2026-11-04T12:25",
      "gen": 43,
      "score": 1379
+    },
+    {
+     "at": "2026-11-04T20:44",
+     "gen": 44,
+     "score": 1380
+    },
+    {
+     "at": "2026-11-04T20:44",
+     "gen": 45,
+     "score": 1380
+    },
+    {
+     "at": "2026-11-04T20:45",
+     "gen": 46,
+     "score": 1380
     }
    ],
-   "score": 1379
+   "score": 1380
   },
   "lionrock": {
    "P": {
@@ -1243,26 +1273,26 @@
   },
   "ruhuna": {
    "P": {
-    "paddyPerHouse": 0.67,
-    "houseRice": 0.5,
-    "maxHouses": 22.32,
-    "woodcutters": 2.59,
+    "paddyPerHouse": 0.71,
+    "houseRice": 2.08,
+    "maxHouses": 17.09,
+    "woodcutters": 3.86,
     "barracksAt": 38.73,
-    "armyBase": 5.97,
+    "armyBase": 10,
     "armyPerRaid": 2.4,
-    "towersPerEdge": 1.97,
+    "towersPerEdge": 2.78,
     "towerAt": 98.94,
-    "walls": 1.58,
-    "boltTowers": 1,
-    "moat": 0,
+    "walls": 1.53,
+    "boltTowers": 0,
+    "moat": 6.25,
     "tribute": 0,
-    "reserve": 0.69,
+    "reserve": 0.88,
     "decrees": 1,
     "pelas": 1.01,
-    "breakDam": 0.05,
-    "drillGold": 400
+    "breakDam": 0.16,
+    "drillGold": 789.65
    },
-   "sigma": 0.2899233545532226,
+   "sigma": 0.3714642980213165,
    "history": [
     {
      "at": "2026-11-03T21:37",
@@ -1322,6 +1352,21 @@
     {
      "at": "2026-11-04T12:25",
      "gen": 12,
+     "score": 1385
+    },
+    {
+     "at": "2026-11-04T20:44",
+     "gen": 13,
+     "score": 1385
+    },
+    {
+     "at": "2026-11-04T20:44",
+     "gen": 14,
+     "score": 1385
+    },
+    {
+     "at": "2026-11-04T20:44",
+     "gen": 15,
      "score": 1385
     }
    ],
