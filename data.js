@@ -119,10 +119,11 @@ const TROOPS = {
 
 // Ranks: soldiers resting within 3 tiles of a barracks drill (1 xp/s while no
 // raider is near), and every raider killed close by teaches them (KILL_XP).
+// fee: gold a drill master takes to raise a soldier to this rank at once.
 const RANKS = [
   { name: "Recruit", xp: 0, hp: 1, dmg: 1 },
-  { name: "Veteran", xp: 90, hp: 1.25, dmg: 1.2 },
-  { name: "Champion", xp: 300, hp: 1.5, dmg: 1.4 }
+  { name: "Veteran", xp: 90, hp: 1.25, dmg: 1.2, fee: 25 },
+  { name: "Champion", xp: 300, hp: 1.5, dmg: 1.4, fee: 50 }
 ];
 const KILL_XP = 6;
 

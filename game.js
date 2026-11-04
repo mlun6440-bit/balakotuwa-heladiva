@@ -983,9 +983,25 @@ function gainXp(u, n) {
   spawnFloat(`${"★".repeat(u.rank)} ${next.name}!`, u.gx, u.gy, "#ffd27a");
   tip("rank", "A soldier has risen in rank. Soldiers resting by the Angam Maduwa drill between raids, and every fight teaches them.");
 }
+// A drill master at the Angam Maduwa raises the selected soldiers one rank at
+// once, for the next rank's fee in gold.
+function payDrill() {
+  if (!S.buildings.some(b => b.id === "barracks")) { say("Build an Angam Maduwa (Defence tab) first: the drill masters work there.", true); return; }
+  const sel = S.units.filter(u => u.team === "p" && u.sel && (u.rank || 0) < RANKS.length - 1);
+  if (!sel.length) { say("Select soldiers who are not yet champions, then hire the drill master."); return; }
+  const fee = sel.reduce((a, u) => a + RANKS[(u.rank || 0) + 1].fee, 0);
+  if (S.gold < fee) { say(`The drill masters want ${fee} 🪙 for ${sel.length} soldier${sel.length > 1 ? "s" : ""}.`, true); return; }
+  S.gold -= fee;
+  for (const u of sel) gainXp(u, RANKS[(u.rank || 0) + 1].xp - (u.xp || 0));
+  spawnFloat(`-${fee}🪙 drill`, sel[0].gx, sel[0].gy, "#e9b949");
+  sfx("coin");
+  if (S.cat === "army") renderPalette();
+  syncHud();
+}
 function drillSoldiers() {
   const halls = S.buildings.filter(b => b.id === "barracks");
   if (!halls.length) return;
+  if (S.gold >= 400 && S.units.some(u => u.team === "p" && (u.rank || 0) < 2)) tip("treasury", "The treasury is full. Drill masters at the Angam Maduwa raise your soldiers' rank for gold: select soldiers, then the Army tab.");
   for (const u of S.units) {
     if (u.team !== "p" || nearestFoe(u, 6)) continue;
     if (halls.some(b => rectDist(u, b) <= 3)) gainXp(u, 1);
@@ -1899,6 +1915,12 @@ function renderPalette() {
     stance.innerHTML = `<div class="card-head">${held ? "⚔️ Back on guard" : "✋ Hold position"} (H)</div><div class="card-desc">Selected soldiers stay on their post and only strike what reaches them.</div><div class="card-cost">${sel.length ? `${sel.length} selected` : "select soldiers first"}</div>`;
     stance.addEventListener("click", toggleHold);
     pal.appendChild(stance);
+    const up = sel.filter(u => (u.rank || 0) < RANKS.length - 1), fee = up.reduce((a, u) => a + RANKS[(u.rank || 0) + 1].fee, 0);
+    const drill = document.createElement("button");
+    drill.className = "card";
+    drill.innerHTML = `<div class="card-head">🎖️ Drill master</div><div class="card-desc">Pay to raise the selected soldiers one rank at once (★ ${RANKS[1].fee}🪙, ★★ ${RANKS[2].fee}🪙).</div><div class="card-cost">${up.length ? `${fee} 🪙 for ${up.length}` : "select soldiers first"}</div>`;
+    drill.addEventListener("click", payDrill);
+    pal.appendChild(drill);
     for (const [id, t] of Object.entries(TROOPS)) {
       if (!S.unlocked.troops.has(id)) continue;
       const card = document.createElement("button");

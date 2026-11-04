@@ -29,7 +29,8 @@ const BOT = (() => {
     reserve: [1, 0, 1],               // hold back resources a "store N" objective needs
     decrees: [1, 0, 1],
     pelas: [1, 0, 3],                 // watch huts among the paddies (levels with wild elephants)
-    breakDam: [0.5, 0, 1]             // ≥ 0.5: send melee soldiers to break the disawa's dam; else pay the gift in Yala
+    breakDam: [0.5, 0, 1],            // ≥ 0.5: send melee soldiers to break the disawa's dam; else pay the gift in Yala
+    drillGold: [400, 50, 1500]        // pay drill masters for ranks with gold above this
   };
   const DEFAULTS = Object.fromEntries(Object.entries(DIALS).map(([k, v]) => [k, v[0]]));
   const log = [];
@@ -310,6 +311,14 @@ const BOT = (() => {
     if (engine) S.units.filter(u => u.team === "p" && !u.def.ranged).forEach((u, i) => {
       u.tx = clamp(engine.gx + (i % 3 - 1) * 0.3, 0.3, MAP - 0.3); u.ty = clamp(engine.gy + 0.3, 0.3, MAP - 0.3); u.ordered = true;
     });
+
+    // gold to spare: the planner hires drill masters for its soldiers
+    if ((novice ? S.tips?.treasury && S.gold > 300 : S.gold > P.drillGold) && count("barracks")) {
+      const was = S.units.filter(u => u.sel);
+      for (const u of S.units) u.sel = u.team === "p" && (u.rank || 0) < 2;
+      if (S.units.some(u => u.sel)) { const g0 = S.gold; payDrill(); if (S.gold < g0) note(`drill masters (${Math.round(g0 - S.gold)} gold)`); }
+      for (const u of S.units) u.sel = was.includes(u);
+    }
 
     // decrees
     if (!novice && P.decrees >= 0.5 && S.unlocked.edicts.has("perahera") && !edictBlocked("perahera") && S.harmony < 65) { proclaim("perahera"); note("perahera"); }
