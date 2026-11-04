@@ -2,13 +2,14 @@
 // ============================================================================
 // BALAKOTUWA — sound. Every sound is synthesised live with WebAudio: no
 // recordings, no downloads. game.js calls SOUND.play(kind) for effects and
-// SOUND.update() once a frame for the ambience (season beds, wildlife, drums).
+// SOUND.update() once a frame for the ambience (season beds, wildlife, drums)
+// and the music (a quiet pentatonic phrase now and then).
 // Reads S and audio from game.js; never changes game state.
 // ============================================================================
 const SOUND = (() => {
-  let ac = null, master, fx, bed, noise;
+  let ac = null, master, fx, bed, mus, noise;
   const beds = {};
-  const next = { bird: 0, koel: 0, thunder: 0, frog: 0, drum: 0 };
+  const next = { bird: 0, koel: 0, thunder: 0, frog: 0, drum: 0, tune: 4 };
   let beat = 0;
   // Every one-shot is varied a little each time it plays (the ear catches exact
   // repeats fast): pitch, filter and level, chosen once per play. Ambience is not.
@@ -26,6 +27,7 @@ const SOUND = (() => {
       master = gainNode(0.75, comp);
       fx = gainNode(0.9, master);
       bed = gainNode(0.6, master);
+      mus = gainNode(0.5, master);
       noise = ac.createBuffer(1, ac.sampleRate * 2, ac.sampleRate);
       const d = noise.getChannelData(0);
       let b = 0;
@@ -116,6 +118,22 @@ const SOUND = (() => {
     lose(t) { [4, 3, 1, 0].forEach((k, i) => tone(t + i * 0.32, PENTA[k] / 2, { type: "sawtooth", dur: 0.6, vol: 0.06 })); }
   };
 
+  // ---- music ----
+  // A short phrase on the pentatonic scale over a soft drone, every 8-16s. Maha:
+  // low, slow, flute-like. Yala: brighter and a little quicker. It walks by
+  // steps, starts on the home note or the fifth, and always comes home.
+  function phrase(t, maha) {
+    const n = 4 + Math.floor(Math.random() * 4), step = maha ? 0.62 : 0.46, oct = maha ? 0.5 : 1;
+    let i = Math.random() < 0.5 ? 0 : 3;
+    for (let k = 0; k < n; k++) {
+      if (k === n - 1) i = i > 3 ? 5 : 0;
+      tone(t + k * step, PENTA[i] * oct, { type: maha ? "sine" : "triangle", dur: step * 1.7, vol: maha ? 0.06 : 0.045, a: 0.05, out: mus });
+      i = Math.max(0, Math.min(7, i + [-2, -1, 1, 1, 2][Math.floor(Math.random() * 5)]));
+    }
+    tone(t, PENTA[0] * oct / 2, { type: "sine", dur: n * step + 1.2, vol: 0.022, a: 0.9, out: mus }); // drone
+    return n * step + 1.2;
+  }
+
   // ---- ambience ----
   const drum = (t, f, vol) => { tone(t, f, { dur: 0.22, vol, f2: f * 0.55 }); hiss(t, { f: 2200, q: 1.5, dur: 0.03, vol: vol * 0.6 }); };
   function chirp(t) { const n = 2 + Math.floor(Math.random() * 3), f = 2600 + Math.random() * 1400; for (let i = 0; i < n; i++) tone(t + i * 0.11, f, { dur: 0.06, vol: 0.035, f2: f * 1.3, out: bed }); }
@@ -148,6 +166,9 @@ const SOUND = (() => {
     // drums: a steady war beat while raiders are on the field, a quick festival beat at a Perahera
     const fest = typeof edictOn === "function" && edictOn("perahera");
     const war = S.units.some(u => u.team === "e");
+    // music rests while raiders are on the field: the drums carry the raid
+    if (!war && !fest && t > next.tune) next.tune = t + phrase(t + 0.05, maha) + 7 + Math.random() * 8;
+    else if (war && next.tune < t + 6) next.tune = t + 6;
     if ((fest || war) && t > next.drum) {
       const step = fest ? 0.19 : 0.32;
       next.drum = Math.max(next.drum, t) + step;

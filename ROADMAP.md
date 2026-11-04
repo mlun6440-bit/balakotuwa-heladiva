@@ -27,7 +27,7 @@ off here when they ship.
 - [x] **Sound and music.** `audio.js` synthesises every effect and a seasonal
       ambience live with WebAudio (conch, knocks, harvest notes, clashes, fire,
       splash; Maha rain/frogs/thunder, Yala wind/cicadas/koel; war and
-      Perahera drums). Follow-up: a quiet melodic loop.
+      Perahera drums). Follow-up done in batch 9: a quiet melodic loop (R35).
 - [x] **Save mid-level.** Autosave every 15s, on tab hide/close and at the
       menu; "Continue" on the menu (`saveRun`/`continueRun` in `game.js`).
 - [x] **Building upgrades.** ⬆️ Upgrade tool; palisade → rampart, house →
