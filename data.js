@@ -206,7 +206,7 @@ const LEVELS = [
       { t: 150, from: ["east"], raider: 5, bowman: 2 },
       { t: 260, from: ["south"], raider: 6, bowman: 2 },
       { t: 370, from: ["east", "south"], raider: 7, bowman: 3 },
-      { t: 480, from: ["east", "south"], raider: 8, bowman: 3, brute: 1 }
+      { t: 480, from: ["east", "south"], raider: 10, bowman: 4, brute: 2 }
     ],
     hpScale: 1.2,
     objectives: [{ type: "build", id: "rampart", n: 10 }, { type: "build", id: "market", n: 1 }, { type: "res", key: "gold", n: 250 }, { type: "waves" }]
