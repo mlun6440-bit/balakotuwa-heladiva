@@ -47,6 +47,7 @@ and baked into `assets/` (regenerate with `cd tools && npm install` once, then
 - **Defeat is explained.** If the Maligawa falls, the end screen names the two or three main reasons and what to try next.
 - **Wild elephants (Ruhuna on).** Elephants come out of the jungle for ripening rice. Nobody fights them: a staffed pela (watch hut) within 5 tiles turns them back.
 - **The disawa's dam.** On one level a rival lord shuts his dam upstream every Yala and the river runs dry. Break it with soldiers (his revenge raid comes early and stronger) or send a 🎁 gift. He rebuilds it every Maha.
+- **Sound and music.** Every effect is synthesised and varies a little each time; a quiet pentatonic phrase drifts in now and then, low in the monsoon and brighter in Yala, and rests while raiders are on the field.
 - **Scouts.** The Next raid row names the edge raiders will come from; in the last minute that edge glows on the map and minimap, and the scouts warn if no archers or towers guard it.
 - **Raiders.** They follow the cheapest path to the citadel. They walk around walls when there is a gap and break through when there isn't.
 

@@ -104,8 +104,8 @@ const SOUND = (() => {
       [0, 2, 4].forEach((k, i) => tone(t + i * 0.09, PENTA[base + k], { type: "triangle", dur: 0.35, vol: 0.12 }));
     },
     hit(t) { // metal on metal
-      tone(t, 420 + Math.random() * 60, { type: "square", dur: 0.12, vol: 0.05 });
-      tone(t, 611 + Math.random() * 80, { type: "square", dur: 0.09, vol: 0.04 });
+      tone(t, 440, { type: "square", dur: 0.12, vol: 0.05 }); // play() varies the pitch
+      tone(t, 650, { type: "square", dur: 0.09, vol: 0.04 });
       hiss(t, { type: "highpass", f: 3000, dur: 0.08, vol: 0.25 });
     },
     fire(t) { // crackle
@@ -187,5 +187,5 @@ const SOUND = (() => {
     if (f) try { f(ac.currentTime + 0.01); } catch (e) { /* ignore a dropped effect */ }
     vary = SAME;
   }
-  return { init, play, update };
+  return { init, play, update, kinds: Object.keys(KINDS) };
 })();

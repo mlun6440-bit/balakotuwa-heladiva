@@ -116,7 +116,8 @@ stalls a single hand-played minute won't. The learned dials live in
 `node tools/playtest.mjs detectors` checks that every report detector still
 fires on the fault it was written for. After a batch of rounds, run `node tools/review.mjs`: save and continue on
 every level, one-sentence tooltips, a one-row top bar, every building and
-decree still usable. `--selftest` breaks saving on purpose to prove it fails.
+decree still usable, and every sound effect and the music render (offline, measured).
+`--selftest` plants faults on purpose (a broken save, unvaried sounds) to prove it fails.
 
 Then play level 1 by hand for a minute: build, paint canals, open a sluice,
 train a soldier, zoom and pan.

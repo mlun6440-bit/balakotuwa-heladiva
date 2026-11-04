@@ -104,6 +104,20 @@ Recorded so these are not re-added without a strong reason:
 - [x] R8 Diya agala (moat) fed by the canal network.
 - [x] R9 Simplify round 3 (below).
 
+## Loop batch 9 (R34–R37): from the PC's indie-guide notes (docs/DEV-WORKFLOW.md)
+
+- [x] R34 Every one-shot sound varies a little each time it plays.
+- [x] R35 A quiet melodic loop (pentatonic, seasonal, rests during raids).
+- [x] R36 One soft-light colour grade over the whole frame.
+- [x] R37 Simplify round 10 (below).
+
+## Simplify round 10 (R37)
+
+- **Merged:** `hit` no longer randomises its own pitch; the shared per-play
+  variation does it for every effect.
+- **Check, not script:** the offline sound renders written by hand this batch
+  are now `tools/review.mjs` section 5, with a self-test.
+
 ## Loop batch 8 (R30–R33): review, and the loop improves itself
 
 - [x] R30 Review round: `tools/review.mjs` (save and continue on every level,

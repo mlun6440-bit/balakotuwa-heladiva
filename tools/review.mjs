@@ -6,9 +6,12 @@
 //   2. tooltips: every building, troop and decree description is one sentence
 //   3. the top bar stays one row at a narrow window, on every level
 //   4. every building can still be placed, every decree proclaimed
+//   5. sound: every effect renders offline and varies between takes, and the
+//      music renders (headless browsers can't listen, so measure instead)
 // Prints one line per problem and exits non-zero if there are any.
 //   --selftest   break saving on purpose (the dam is left out of the save) and
-//                check that the review notices: a review that can't fail proves nothing.
+//                switch sound variation off, and check that the review notices
+//                both: a review that can't fail proves nothing.
 import { createRequire } from "node:module";
 import fs from "node:fs";
 import path from "node:path";
@@ -146,10 +149,39 @@ async function page(w = 1400, h = 860) {
   await p.close();
 }
 
+// ---------- 5. sound ----------
+{
+  const p = await page();
+  let src = fs.readFileSync(path.join(root, "audio.js"), "utf8").replace("return { init, play, update, kinds", "return { init, play, update, phrase, kinds");
+  if (selftest) src = src.replace("vary = { pitch:", "vary = SAME; void { pitch:");
+  const out = await p.evaluate(async src => {
+    const res = [], take = async (fn, secs = 1) => {
+      const ctx = new OfflineAudioContext(1, 22050 * secs, 22050), SND = new Function("audio", src + "\nreturn SOUND;")({ on: true, ctx });
+      SND.init(); fn(SND);
+      const d = (await ctx.startRendering()).getChannelData(0);
+      let e = 0, z = 0; for (let i = 1; i < d.length; i++) { e += d[i] * d[i]; if ((d[i] > 0) !== (d[i - 1] > 0)) z++; }
+      return `${Math.sqrt(e / d.length).toFixed(5)}/${z}`;
+    };
+    const kinds = new Function("audio", src + "\nreturn SOUND;")({ on: false }).kinds;
+    for (const k of kinds) {
+      const a = await take(S => S.play(k)), b = await take(S => S.play(k)), c = await take(S => S.play(k));
+      if (a.startsWith("0.00000")) res.push(`sound ${k} renders silence`);
+      else if (a === b && b === c) res.push(`sound ${k} is identical every time it plays`);
+    }
+    const m = await take(S => S.phrase(0.1, true), 8);
+    if (m.startsWith("0.00000")) res.push("the music phrase renders silence");
+    return { res, n: kinds.length };
+  }, src);
+  for (const r of out.res) bad(r);
+  if (!out.res.length) console.log(`✓ ${out.n} sound effects render and vary; the music renders`);
+  if (p.errors.length) bad(`sound: page errors ${[...new Set(p.errors)].join("; ")}`);
+  await p.close();
+}
+
 await browser.close();
 if (selftest) {
-  const caught = problems.some(p => p.includes("dakkhina") && p.includes("dam"));
-  console.log(caught ? "\nselftest passed: the broken save was caught" : "\nselftest FAILED: the broken save went unnoticed");
+  const caught = problems.some(p => p.includes("dakkhina") && p.includes("dam")) && problems.some(p => p.includes("identical every time"));
+  console.log(caught ? "\nselftest passed: the broken save and the unvaried sounds were caught" : "\nselftest FAILED: a planted fault went unnoticed");
   process.exit(caught ? 0 : 1);
 }
 console.log(problems.length ? `\n${problems.length} problem(s)` : "\nreview clean");
