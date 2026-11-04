@@ -58,7 +58,9 @@ runs. These rules keep it a focused game rather than a feature pile.
 
 ## Reviewing a long autonomous run
 
-Check the diff for:
+Run `node tools/review.mjs` first: it catches the mechanical breakage (saves
+that lose new state, tooltips that grew, a top bar that wraps, a building or
+decree that no longer works). Then check the diff for:
 
 - features that serve no pillar
 - UI that adds a row, a panel or a currency
