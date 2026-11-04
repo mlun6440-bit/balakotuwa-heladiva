@@ -1909,18 +1909,18 @@ function renderPalette() {
       pal.appendChild(card);
     }
   } else if (S.cat === "army") {
+    // one card for what the selected soldiers can be told: hold their post, or be drilled for gold
     const sel = S.units.filter(u => u.team === "p" && u.sel), held = sel.length && sel.every(u => u.hold);
-    const stance = document.createElement("button");
-    stance.className = `card ${held ? "selected" : ""}`;
-    stance.innerHTML = `<div class="card-head">${held ? "⚔️ Back on guard" : "✋ Hold position"} (H)</div><div class="card-desc">Selected soldiers stay on their post and only strike what reaches them.</div><div class="card-cost">${sel.length ? `${sel.length} selected` : "select soldiers first"}</div>`;
-    stance.addEventListener("click", toggleHold);
-    pal.appendChild(stance);
     const up = sel.filter(u => (u.rank || 0) < RANKS.length - 1), fee = up.reduce((a, u) => a + RANKS[(u.rank || 0) + 1].fee, 0);
-    const drill = document.createElement("button");
-    drill.className = "card";
-    drill.innerHTML = `<div class="card-head">🎖️ Drill master</div><div class="card-desc">Pay to raise the selected soldiers one rank at once (★ ${RANKS[1].fee}🪙, ★★ ${RANKS[2].fee}🪙).</div><div class="card-cost">${up.length ? `${fee} 🪙 for ${up.length}` : "select soldiers first"}</div>`;
-    drill.addEventListener("click", payDrill);
-    pal.appendChild(drill);
+    const orders = document.createElement("div");
+    orders.className = "card wide";
+    orders.innerHTML = `<div class="card-head">${sel.length ? `${sel.length} soldier${sel.length > 1 ? "s" : ""} selected` : "Select soldiers (drag a box) to give orders"}</div>
+      <div class="card-desc"><button class="btn" data-o="hold" ${sel.length ? "" : "disabled"}>${held ? "⚔️ Back on guard" : "✋ Hold post"} (H)</button>
+      <button class="btn" data-o="drill" ${up.length ? "" : "disabled"}>🎖️ Drill master${up.length ? ` ${fee}🪙` : ""}</button></div>
+      <div class="card-cost">Hold: stay on the post. Drill: one rank at once (★ ${RANKS[1].fee}🪙, ★★ ${RANKS[2].fee}🪙).</div>`;
+    orders.querySelector('[data-o="hold"]').addEventListener("click", toggleHold);
+    orders.querySelector('[data-o="drill"]').addEventListener("click", payDrill);
+    pal.appendChild(orders);
     for (const [id, t] of Object.entries(TROOPS)) {
       if (!S.unlocked.troops.has(id)) continue;
       const card = document.createElement("button");
