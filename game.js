@@ -98,7 +98,7 @@ function saveRun() {
     buildings: S.buildings.map(b => ({ uid: b.uid, id: b.id, gx: b.gx, gy: b.gy, hp: b.hp, maxHp: b.maxHp, water: b.water, growth: b.growth,
       open: b.open, next: b.next, at: b.at, fire: b.fire, silt: b.silt, irrigated: b.irrigated })),
     units: S.units.map(u => ({ uid: u.uid, team: u.team, type: u.type, gx: r3(u.gx), gy: r3(u.gy), tx: u.tx, ty: u.ty, hp: u.hp, maxHp: u.maxHp,
-      last: u.last, z: u.z, ordered: u.ordered, lastFire: u.lastFire, party: u.party, hx: u.hx, hy: u.hy, flee: u.flee, looted: u.looted, rank: u.rank, xp: u.xp }))
+      last: u.last, z: u.z, ordered: u.ordered, lastFire: u.lastFire, party: u.party, hx: u.hx, hy: u.hy, flee: u.flee, looted: u.looted, rank: u.rank, xp: u.xp, hold: u.hold }))
   };
   try { localStorage.setItem(RUN_KEY, JSON.stringify(data)); } catch (e) { /* storage full or blocked */ }
   S.lastSave = S.time;
@@ -1313,11 +1313,11 @@ function updateSoldier(u, dt) {
   const toPost = Math.hypot(u.tx - u.gx, u.ty - u.gy);
   if (u.ordered && toPost < 0.15) u.ordered = false;
 
-  const foe = nearestFoe(u, u.ordered || d.ranged ? range : 4);
+  const foe = nearestFoe(u, u.ordered || d.ranged || u.hold ? range : 4);
   if (foe && dist(u, foe) <= range) {
     attack(u, d.ranged ? volleyTarget(u, range) || foe : foe, d.dmg);
     if (!u.ordered) return;
-  } else if (foe && !u.ordered && Math.hypot(foe.gx - u.tx, foe.gy - u.ty) < 5) {
+  } else if (foe && !u.ordered && !u.hold && Math.hypot(foe.gx - u.tx, foe.gy - u.ty) < 5) {
     moveToward(u, foe.gx, foe.gy, dt);
     return;
   }
@@ -1907,6 +1907,12 @@ function renderPalette() {
       pal.appendChild(card);
     }
   } else if (S.cat === "army") {
+    const sel = S.units.filter(u => u.team === "p" && u.sel), held = sel.length && sel.every(u => u.hold);
+    const stance = document.createElement("button");
+    stance.className = `card ${held ? "selected" : ""}`;
+    stance.innerHTML = `<div class="card-head">${held ? "⚔️ Back on guard" : "✋ Hold position"} (H)</div><div class="card-desc">Selected soldiers stay on their post and only strike what reaches them.</div><div class="card-cost">${sel.length ? `${sel.length} selected` : "select soldiers first"}</div>`;
+    stance.addEventListener("click", toggleHold);
+    pal.appendChild(stance);
     for (const [id, t] of Object.entries(TROOPS)) {
       if (!S.unlocked.troops.has(id)) continue;
       const card = document.createElement("button");
@@ -2333,6 +2339,7 @@ window.addEventListener("mouseup", () => {
     }
   }
   if (best) best.sel = true;
+  if (S.cat === "army") renderPalette(); // the stance card counts the selection
 });
 
 canvas.addEventListener("contextmenu", e => e.preventDefault());
@@ -2354,11 +2361,25 @@ window.addEventListener("keydown", e => {
     buildTabs(); renderPalette();
   } else if (k === "c") {
     centerCamera();
+  } else if (k === "h" && S.mode === "play") {
+    toggleHold();
   } else if (/^Digit[1-9]$/.test(e.code)) {
     controlGroup(Number(e.code.slice(5)), e.ctrlKey || e.metaKey || e.shiftKey);
     e.preventDefault();
   }
 });
+
+// Stances. Guard (the default): melee soldiers step out to meet raiders near
+// their post. Hold (H): they stay on the post and only strike what reaches them.
+function toggleHold() {
+  const sel = S.units.filter(u => u.team === "p" && u.sel);
+  if (!sel.length) { say("Select soldiers first, then press H to hold them on their post."); return; }
+  const hold = !sel.every(u => u.hold);
+  for (const u of sel) u.hold = hold;
+  const gx = sel.reduce((a, u) => a + u.gx, 0) / sel.length, gy = sel.reduce((a, u) => a + u.gy, 0) / sel.length;
+  spawnFloat(hold ? `✋ ${sel.length} holding` : `⚔️ ${sel.length} on guard`, gx, gy, "#9fc8ff");
+  if (S.cat === "army") renderPalette();
+}
 
 // Control groups: Ctrl/Shift+1..9 stores the selected soldiers, 1..9 selects
 // them again, pressing the same number twice centres the camera on them.
@@ -2375,6 +2396,7 @@ function controlGroup(n, assign) {
   const members = S.units.filter(u => u.team === "p" && ids.has(u.uid));
   if (!members.length) return;
   for (const u of S.units) u.sel = ids.has(u.uid) && u.team === "p";
+  if (S.cat === "army") renderPalette();
   const now = performance.now();
   if (lastGroupKey.n === n && now - lastGroupKey.at < 400) {
     centerCamera(members.reduce((a, u) => a + u.gx, 0) / members.length, members.reduce((a, u) => a + u.gy, 0) / members.length);

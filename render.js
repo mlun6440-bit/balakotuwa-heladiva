@@ -1525,6 +1525,10 @@ function drawUnit(u, now) {
     ctx.strokeStyle = "#6cc070"; ctx.lineWidth = 1.6;
     ctx.beginPath(); ctx.ellipse(p.x, p.y + 1, heavy ? 16 : 8, heavy ? 7 : 4, 0, 0, Math.PI * 2); ctx.stroke();
   }
+  if (u.hold) { // holding its post: a dashed blue ring at the feet
+    ctx.save(); ctx.setLineDash([2, 2]); ctx.strokeStyle = "rgba(140,190,255,0.9)"; ctx.lineWidth = 1.2;
+    ctx.beginPath(); ctx.ellipse(p.x, p.y + 1, heavy ? 13 : 6, heavy ? 5.5 : 3, 0, 0, Math.PI * 2); ctx.stroke(); ctx.restore();
+  }
   const moving = u.team === "p" ? Math.hypot(u.tx - u.gx, u.ty - u.gy) > 0.15 : true;
   const base = `u.${u.type}`;
   if (hasSprite(`u3d.${u.type}.d0.i0`)) {
