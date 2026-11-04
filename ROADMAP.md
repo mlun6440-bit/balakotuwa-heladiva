@@ -104,6 +104,20 @@ Recorded so these are not re-added without a strong reason:
 - [x] R8 Diya agala (moat) fed by the canal network.
 - [x] R9 Simplify round 3 (below).
 
+## Loop batch 8 (R30–R33): review, and the loop improves itself
+
+- [x] R30 Review round: `tools/review.mjs` (save and continue on every level,
+      tooltips, top bar, every building and decree) with a self-test.
+- [x] R31 Final raids with teeth on The Dry Zone and The Disawa's Dam.
+- [x] R32 Past hand investigations become permanent playtest detectors, each
+      with a self-test; `docs/LOOP-LOG.md`; four new guardrail rules.
+- [x] R33 Simplify round 9 (below).
+
+## Simplify round 9 (R33)
+
+- **Merged (code):** eleven once-only advisor tips with their own flags go
+  through one `tip(key, text)`; a flag that was set but never read is gone.
+
 ## Loop batch 7 (R26–R29)
 
 - [x] R26 Hena (chena): idle villagers clear jungle-edge plots for millet in Yala.
