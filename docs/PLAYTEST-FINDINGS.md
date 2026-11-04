@@ -56,6 +56,22 @@ Curve after retraining: the planner wins every level (three stars on 1, 2, 3
 and 5; two on 4). The novice wins 1–4 and loses the finale, now to stone
 throwers and undefended north and south edges rather than hunger.
 
+## Loop batch 10 (R38–R41)
+
+| Round | Change | Evidence |
+|---|---|---|
+| R38 | Drill masters: gold raises selected soldiers one rank (25 / 50) | Gold-glut finding gone (peak 678, was 1258). A/B on/off, two runs each: same citadel spread on levels 3–7 |
+| R39 | Village militia: **cut before shipping** | A/B: flattened raid tension (dam level 65–91% → 100%, Sea of Parakrama 68–88% → 99%) and didn't move idle |
+| R40 | `playtest.mjs ab <ref> --reps N` | Same bots on two commits, averaged side by side |
+| R41 | One Army card for orders to selected soldiers | Hold and drill tested from the card; review clean |
+
+Curve after retraining: **both bots win all seven levels** (novice Hill
+Kingdom at 67%, two stars). The learner set its drill threshold to the
+minimum on Lion Rock and Sea of Parakrama, so it spends gold on ranks there.
+Open: Lion Rock's citadel untouched again in this run (the A/B said drill
+masters don't flatten it; check with `ab --reps 3` before tuning); idle near
+50% on Ruhuna and the dam level; tribute unused (dial 0.05).
+
 ## Loop batch 8 (R30–R33): review, and the loop improves itself
 
 | Round | Change | Evidence |
